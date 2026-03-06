@@ -1,0 +1,7 @@
+ALTER TABLE `JobOrder`
+	ADD COLUMN `locationPlaceId` VARCHAR(191) NULL,
+	ADD COLUMN `locationLatitude` DOUBLE NULL,
+	ADD COLUMN `locationLongitude` DOUBLE NULL,
+	ADD COLUMN `city` VARCHAR(191) NULL,
+	ADD COLUMN `state` VARCHAR(191) NULL,
+	ADD COLUMN `zipCode` VARCHAR(191) NULL;

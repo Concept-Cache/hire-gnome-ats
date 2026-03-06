@@ -1,0 +1,1649 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowUpRight, MoreVertical, RefreshCcw } from 'lucide-react';
+import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
+import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
+import FormField from '@/app/components/form-field';
+import LoadingIndicator from '@/app/components/loading-indicator';
+import RichTextEditor from '@/app/components/rich-text-editor';
+import ListSortControls from '@/app/components/list-sort-controls';
+import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import { useToast } from '@/app/components/toast-provider';
+import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
+import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	JOB_ORDER_EMPLOYMENT_TYPES,
+	JOB_ORDER_STATUS_OPTIONS,
+	toJobOrderStatusValue
+} from '@/lib/job-order-options';
+import { formatSelectValueLabel } from '@/lib/select-value-label';
+import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
+import { sortByConfig } from '@/lib/list-sort';
+import { submissionCreatedByLabel } from '@/lib/submission-origin';
+import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
+import { fetchLookupOptionById } from '@/lib/lookup-client';
+import { toBooleanFlag } from '@/lib/boolean-flag';
+
+const JOB_ORDER_CURRENCIES = ['USD', 'CAD'];
+
+const initialForm = {
+	title: '',
+	description: '',
+	publicDescription: '',
+	location: '',
+	locationPlaceId: '',
+	locationLatitude: '',
+	locationLongitude: '',
+	city: '',
+	state: '',
+	zipCode: '',
+	status: 'open',
+	employmentType: '',
+	openings: '1',
+	currency: 'USD',
+	salaryMin: '',
+	salaryMax: '',
+	publishToCareerSite: false,
+	divisionId: '',
+	ownerId: '',
+	clientId: '',
+	contactId: ''
+};
+
+const initialSubmissionForm = {
+	candidateId: '',
+	status: 'submitted',
+	notes: ''
+};
+
+const submissionStatuses = [
+	{ value: 'submitted', label: 'Submitted' },
+	{ value: 'under_review', label: 'Under Review' },
+	{ value: 'qualified', label: 'Qualified' },
+	{ value: 'rejected', label: 'Rejected' },
+	{ value: 'offered', label: 'Offered' },
+	{ value: 'hired', label: 'Hired' },
+	{ value: 'placed', label: 'Placed' }
+];
+
+function toForm(row) {
+	if (!row) return initialForm;
+	const employmentType = JOB_ORDER_EMPLOYMENT_TYPES.includes(row.employmentType) ? row.employmentType : '';
+	const currency = JOB_ORDER_CURRENCIES.includes(row.currency) ? row.currency : 'USD';
+
+	return {
+		title: row.title || '',
+		description: row.description || '',
+		publicDescription: row.publicDescription || '',
+		location: row.location || '',
+		locationPlaceId: row.locationPlaceId || '',
+		locationLatitude: row.locationLatitude ?? '',
+		locationLongitude: row.locationLongitude ?? '',
+		city: row.city || '',
+		state: row.state || '',
+		zipCode: row.zipCode || '',
+		status: toJobOrderStatusValue(row.status),
+		employmentType,
+		openings: row.openings == null ? '1' : String(row.openings),
+		currency,
+		salaryMin: row.salaryMin == null ? '' : formatCurrencyInput(String(row.salaryMin), currency),
+		salaryMax: row.salaryMax == null ? '' : formatCurrencyInput(String(row.salaryMax), currency),
+		publishToCareerSite: Boolean(row.publishToCareerSite),
+		divisionId: row.divisionId == null ? '' : String(row.divisionId),
+		ownerId: row.ownerId == null ? '' : String(row.ownerId),
+		clientId: String(row.clientId || ''),
+		contactId: row.contactId ? String(row.contactId) : ''
+	};
+}
+
+function toSalaryPayloadValue(value) {
+	const parsed = parseCurrencyInput(value);
+	return parsed == null ? '' : parsed;
+}
+
+function normalizeZipValue(value) {
+	const rawValue = String(value || '').trim();
+	if (!rawValue) return '';
+	const match = rawValue.match(/\d{5}/);
+	return match ? match[0] : rawValue;
+}
+
+function toJobOrderPayload(formValue) {
+	const currency = JOB_ORDER_CURRENCIES.includes(formValue.currency) ? formValue.currency : 'USD';
+	return {
+		...formValue,
+		status: toJobOrderStatusValue(formValue.status),
+		currency,
+		salaryMin: toSalaryPayloadValue(formValue.salaryMin),
+		salaryMax: toSalaryPayloadValue(formValue.salaryMax)
+	};
+}
+
+function formatDate(value) {
+	return formatDateTimeAt(value);
+}
+
+export default function JobOrderDetailsPage() {
+	const { id } = useParams();
+	const router = useRouter();
+	const [actingUser, setActingUser] = useState(null);
+	const [jobOrder, setJobOrder] = useState(null);
+	const [ownerDivisionId, setOwnerDivisionId] = useState(null);
+	const [selectedClientDivisionId, setSelectedClientDivisionId] = useState(null);
+	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
+	const [form, setForm] = useState(initialForm);
+	const [submissionForm, setSubmissionForm] = useState(initialSubmissionForm);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState('');
+	const [saveState, setSaveState] = useState({ saving: false, error: '', success: '' });
+	const [submissionState, setSubmissionState] = useState({
+		saving: false,
+		error: '',
+		success: ''
+	});
+	const [actionsOpen, setActionsOpen] = useState(false);
+	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [closeState, setCloseState] = useState({ closing: false, error: '' });
+	const [enhanceState, setEnhanceState] = useState({ enhancing: false, error: '', success: '' });
+	const [workspaceTab, setWorkspaceTab] = useState('submissions');
+	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
+	const [submissionSort, setSubmissionSort] = useState({ field: 'createdAt', direction: 'desc' });
+	const [interviewSort, setInterviewSort] = useState({ field: 'startsAt', direction: 'desc' });
+	const [placementSort, setPlacementSort] = useState({ field: 'createdAt', direction: 'desc' });
+	const [matchesSort, setMatchesSort] = useState({ field: 'scorePercent', direction: 'desc' });
+	const [matchState, setMatchState] = useState({
+		loading: false,
+		error: '',
+		computedAt: '',
+		requiredSkillNames: [],
+		totalCandidatesEvaluated: 0,
+		matches: [],
+		submittingCandidateId: ''
+	});
+	const detailsPanelRef = useRef(null);
+	const actionsMenuRef = useRef(null);
+	const { requestConfirm } = useConfirmDialog();
+	const toast = useToast();
+	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
+	const { markAsClean } = useUnsavedChangesGuard(form, {
+		enabled: !loading && Boolean(jobOrder)
+	});
+
+	const selectedDivisionId = useMemo(() => {
+		if (isAdmin) return form.divisionId || '';
+		if (selectedClientDivisionId) return String(selectedClientDivisionId);
+		if (ownerDivisionId) return String(ownerDivisionId);
+		if (jobOrder?.divisionId) return String(jobOrder.divisionId);
+		return '';
+	}, [form.divisionId, isAdmin, jobOrder?.divisionId, ownerDivisionId, selectedClientDivisionId]);
+
+	const ownerLookupParams = useMemo(
+		() => (selectedDivisionId ? { divisionId: selectedDivisionId } : {}),
+		[selectedDivisionId]
+	);
+	const clientLookupParams = useMemo(
+		() => (selectedDivisionId ? { divisionId: selectedDivisionId } : {}),
+		[selectedDivisionId]
+	);
+	const contactLookupParams = useMemo(() => {
+		const params = {};
+		if (form.clientId) {
+			params.clientId = form.clientId;
+		}
+		if (selectedDivisionId) {
+			params.divisionId = selectedDivisionId;
+		}
+		return params;
+	}, [form.clientId, selectedDivisionId]);
+	const submissionCandidateLookupParams = useMemo(() => {
+		const params = {
+			excludeSubmittedJobOrderId: String(id)
+		};
+		if (jobOrder?.divisionId) {
+			params.divisionId = String(jobOrder.divisionId);
+		}
+		return params;
+	}, [id, jobOrder?.divisionId]);
+
+	const submittedCandidateIds = useMemo(() => {
+		if (!jobOrder?.submissions) return new Set();
+
+		return new Set(
+			jobOrder.submissions
+				.map((submission) => submission.candidateId ?? submission.candidate?.id)
+				.filter((candidateId) => candidateId != null)
+				.map((candidateId) => String(candidateId))
+		);
+	}, [jobOrder?.submissions]);
+
+	const sortedSubmissions = useMemo(
+		() =>
+			sortByConfig(jobOrder?.submissions || [], submissionSort, (submission, field) => {
+				if (field === 'createdAt') return submission.createdAt || '';
+				if (field === 'candidate') {
+					return `${submission.candidate?.firstName || ''} ${submission.candidate?.lastName || ''}`;
+				}
+				if (field === 'status') return formatSelectValueLabel(submission.status);
+				if (field === 'submittedBy') return submissionCreatedByLabel(submission);
+				return '';
+			}),
+		[jobOrder?.submissions, submissionSort]
+	);
+
+	const sortedInterviews = useMemo(
+		() =>
+			sortByConfig(jobOrder?.interviews || [], interviewSort, (interview, field) => {
+				if (field === 'startsAt') return interview.startsAt || interview.createdAt || '';
+				if (field === 'subject') return interview.subject || '';
+				if (field === 'status') return formatSelectValueLabel(interview.status);
+				if (field === 'candidate') {
+					return `${interview.candidate?.firstName || ''} ${interview.candidate?.lastName || ''}`;
+				}
+				return '';
+			}),
+		[jobOrder?.interviews, interviewSort]
+	);
+
+	const sortedPlacements = useMemo(
+		() =>
+			sortByConfig(jobOrder?.offers || [], placementSort, (offer, field) => {
+				if (field === 'createdAt') return offer.createdAt || '';
+				if (field === 'status') return formatSelectValueLabel(offer.status);
+				if (field === 'candidate') {
+					return `${offer.candidate?.firstName || ''} ${offer.candidate?.lastName || ''}`;
+				}
+				return '';
+			}),
+		[jobOrder?.offers, placementSort]
+	);
+
+	const sortedMatches = useMemo(
+		() =>
+			sortByConfig(matchState.matches || [], matchesSort, (match, field) => {
+				if (field === 'scorePercent') return Number(match.scorePercent || 0);
+				if (field === 'candidate') return match.candidateName || '';
+				if (field === 'owner') return match.ownerName || '';
+				return '';
+			}),
+		[matchState.matches, matchesSort]
+	);
+
+	async function load() {
+		setLoading(true);
+		setError('');
+
+		const [jobRes, settingsRes] = await Promise.all([
+			fetch(`/api/job-orders/${id}`),
+			fetch('/api/system-settings', { cache: 'no-store' })
+		]);
+		const settingsData = await settingsRes.json().catch(() => ({}));
+		setCareerSiteEnabled(toBooleanFlag(settingsData?.careerSiteEnabled, false));
+
+		if (!jobRes.ok) {
+			setError('Job order not found.');
+			setLoading(false);
+			return;
+		}
+
+		const jobData = await jobRes.json();
+
+		const nextForm = toForm(jobData);
+		setJobOrder(jobData);
+		setOwnerDivisionId(jobData.ownerUser?.divisionId ?? null);
+		setSelectedClientDivisionId(jobData.client?.divisionId ?? null);
+		setForm(nextForm);
+		markAsClean(nextForm);
+		setSubmissionForm(initialSubmissionForm);
+		setSubmissionState({ saving: false, error: '', success: '' });
+		setLoading(false);
+	}
+
+	async function loadMatches(options = {}) {
+		if (!id) return;
+		const { keepResults = true } = options;
+
+		setMatchState((current) => ({
+			...current,
+			loading: true,
+			error: '',
+			matches: keepResults ? current.matches : []
+		}));
+
+		const res = await fetch(`/api/job-orders/${id}/matches?includeSubmitted=false&limit=10`);
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			setMatchState((current) => ({
+				...current,
+				loading: false,
+				error: data.error || 'Failed to load candidate matches.'
+			}));
+			return;
+		}
+
+		const data = await res.json();
+		setMatchState((current) => ({
+			...current,
+			loading: false,
+			error: '',
+			computedAt: data.computedAt || '',
+			requiredSkillNames: Array.isArray(data.requiredSkillNames) ? data.requiredSkillNames : [],
+			totalCandidatesEvaluated: Number(data.totalCandidatesEvaluated || 0),
+			matches: Array.isArray(data.matches) ? data.matches : []
+		}));
+	}
+
+	useEffect(() => {
+		let cancelled = false;
+
+		async function loadSessionUser() {
+			const sessionRes = await fetch('/api/session/acting-user');
+			const sessionData = await sessionRes.json().catch(() => ({ user: null }));
+			if (cancelled) return;
+			setActingUser(sessionData?.user || null);
+		}
+
+		loadSessionUser();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		load();
+	}, [id]);
+
+	useEffect(() => {
+		if (!jobOrder?.id) return;
+		loadMatches({ keepResults: false });
+	}, [jobOrder?.id]);
+
+	useEffect(() => {
+		let active = true;
+		if (!form.ownerId) {
+			setOwnerDivisionId(null);
+			return () => {
+				active = false;
+			};
+		}
+
+		fetchLookupOptionById('users', form.ownerId, {})
+			.then((option) => {
+				if (!active) return;
+				setOwnerDivisionId(option?.divisionId ?? null);
+			})
+			.catch(() => {
+				if (!active) return;
+				setOwnerDivisionId(null);
+			});
+
+		return () => {
+			active = false;
+		};
+	}, [form.ownerId]);
+
+	useEffect(() => {
+		let active = true;
+		if (!form.clientId) {
+			setSelectedClientDivisionId(null);
+			return () => {
+				active = false;
+			};
+		}
+
+		fetchLookupOptionById('clients', form.clientId, {})
+			.then((option) => {
+				if (!active) return;
+				setSelectedClientDivisionId(option?.divisionId ?? null);
+			})
+			.catch(() => {
+				if (!active) return;
+				setSelectedClientDivisionId(null);
+			});
+
+		return () => {
+			active = false;
+		};
+	}, [form.clientId]);
+
+	useEffect(() => {
+		if (
+			form.clientId &&
+			ownerDivisionId != null &&
+			selectedClientDivisionId != null &&
+			Number(ownerDivisionId) !== Number(selectedClientDivisionId)
+		) {
+			setForm((current) => ({ ...current, clientId: '', contactId: '' }));
+		}
+	}, [form.clientId, ownerDivisionId, selectedClientDivisionId]);
+
+	useEffect(() => {
+		if (!isAdmin) return;
+		if (!form.divisionId) {
+			setForm((current) => {
+				if (!current.ownerId && !current.clientId && !current.contactId) return current;
+				return {
+					...current,
+					ownerId: '',
+					clientId: '',
+					contactId: ''
+				};
+			});
+			return;
+		}
+		if (!form.clientId || selectedClientDivisionId == null) return;
+		if (Number(form.divisionId) === Number(selectedClientDivisionId)) return;
+		setForm((current) => ({
+			...current,
+			ownerId: '',
+			clientId: '',
+			contactId: ''
+		}));
+	}, [form.clientId, form.divisionId, isAdmin, selectedClientDivisionId]);
+
+	useEffect(() => {
+		if (!form.clientId) {
+			setForm((f) => (f.contactId ? { ...f, contactId: '' } : f));
+		}
+	}, [form.clientId]);
+
+	useEffect(() => {
+		if (!hasMeaningfulRichTextContent(form.publicDescription) && form.publishToCareerSite) {
+			setForm((current) => ({ ...current, publishToCareerSite: false }));
+		}
+	}, [form.publicDescription, form.publishToCareerSite]);
+
+	useEffect(() => {
+		if (!submissionForm.candidateId) return;
+		if (!submittedCandidateIds.has(String(submissionForm.candidateId))) return;
+
+		setSubmissionForm((current) => ({ ...current, candidateId: '' }));
+	}, [submissionForm.candidateId, submittedCandidateIds]);
+
+	useEffect(() => {
+		function onMouseDown(event) {
+			if (!actionsMenuRef.current) return;
+			if (actionsMenuRef.current.contains(event.target)) return;
+			setActionsOpen(false);
+		}
+
+		function onKeyDown(event) {
+			if (event.key === 'Escape') {
+				setActionsOpen(false);
+			}
+		}
+
+		document.addEventListener('mousedown', onMouseDown);
+		document.addEventListener('keydown', onKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', onMouseDown);
+			document.removeEventListener('keydown', onKeyDown);
+		};
+	}, []);
+
+	useEffect(() => {
+		const panel = detailsPanelRef.current;
+		if (!panel || typeof ResizeObserver === 'undefined') return;
+
+		const updateHeight = () => {
+			setDetailsPanelHeight(panel.getBoundingClientRect().height);
+		};
+		updateHeight();
+
+		const observer = new ResizeObserver(updateHeight);
+		observer.observe(panel);
+		return () => observer.disconnect();
+	}, [jobOrder, form, saveState.saving, submissionState.saving, workspaceTab]);
+
+	useEffect(() => {
+		if (saveState.error) {
+			toast.error(saveState.error);
+		}
+	}, [saveState.error, toast]);
+
+	useEffect(() => {
+		if (saveState.success) {
+			toast.success(saveState.success);
+		}
+	}, [saveState.success, toast]);
+
+	useEffect(() => {
+		if (closeState.error) {
+			toast.error(closeState.error);
+		}
+	}, [closeState.error, toast]);
+
+	useEffect(() => {
+		if (enhanceState.error) {
+			toast.error(enhanceState.error);
+		}
+	}, [enhanceState.error, toast]);
+
+	useEffect(() => {
+		if (enhanceState.success) {
+			toast.success(enhanceState.success);
+		}
+	}, [enhanceState.success, toast]);
+
+	useEffect(() => {
+		if (submissionState.error) {
+			toast.error(submissionState.error);
+		}
+	}, [submissionState.error, toast]);
+
+	useEffect(() => {
+		if (submissionState.success) {
+			toast.success(submissionState.success);
+		}
+	}, [submissionState.success, toast]);
+
+	async function onSave(e) {
+		e.preventDefault();
+		const salaryMin = parseCurrencyInput(form.salaryMin);
+		const salaryMax = parseCurrencyInput(form.salaryMax);
+		if (isAdmin && !form.divisionId) {
+			setSaveState({ saving: false, error: 'Division is required.', success: '' });
+			return;
+		}
+		if (!form.clientId) {
+			setSaveState({ saving: false, error: 'Client is required.', success: '' });
+			return;
+		}
+		if (!form.ownerId) {
+			setSaveState({ saving: false, error: 'Owner is required.', success: '' });
+			return;
+		}
+		if (!form.status) {
+			setSaveState({ saving: false, error: 'Status is required.', success: '' });
+			return;
+		}
+		if (!form.employmentType) {
+			setSaveState({ saving: false, error: 'Employment Type is required.', success: '' });
+			return;
+		}
+		if (!form.contactId) {
+			setSaveState({ saving: false, error: 'Hiring Manager is required.', success: '' });
+			return;
+		}
+		if (!form.zipCode.trim()) {
+			setSaveState({ saving: false, error: 'Zip code is required.', success: '' });
+			return;
+		}
+		if (salaryMin != null && salaryMax != null && salaryMin > salaryMax) {
+			setSaveState({ saving: false, error: 'Salary Min cannot be greater than Salary Max.', success: '' });
+			return;
+		}
+		if (careerSiteEnabled && form.publishToCareerSite && !hasMeaningfulRichTextContent(form.publicDescription)) {
+			setSaveState({
+				saving: false,
+				error: 'Public description is required when posting to the career site.',
+				success: ''
+			});
+			return;
+		}
+
+		setSaveState({ saving: true, error: '', success: '' });
+
+		const res = await fetch(`/api/job-orders/${id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(toJobOrderPayload(form))
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			const firstFieldError = data?.errors?.fieldErrors
+				? Object.values(data.errors.fieldErrors).flat().filter(Boolean)[0]
+				: '';
+			setSaveState({
+				saving: false,
+				error: data.error || firstFieldError || 'Failed to update job order.',
+				success: ''
+			});
+			return;
+		}
+
+		const updated = await res.json();
+		const nextForm = toForm(updated);
+		setJobOrder((current) => (current ? { ...current, ...updated } : current));
+		setForm(nextForm);
+		markAsClean(nextForm);
+		setSaveState({ saving: false, error: '', success: 'Job order updated.' });
+	}
+
+	async function onCreateSubmission(e) {
+		e.preventDefault();
+		setSubmissionState({ saving: false, error: '', success: '' });
+
+		if (!submissionForm.candidateId) {
+			setSubmissionState({ saving: false, error: 'Candidate is required.', success: '' });
+			return;
+		}
+
+		if (submittedCandidateIds.has(String(submissionForm.candidateId))) {
+			setSubmissionState({
+				saving: false,
+				error: 'This candidate is already submitted to this job order.',
+				success: ''
+			});
+			return;
+		}
+
+		setSubmissionState({ saving: true, error: '', success: '' });
+
+		const res = await fetch('/api/submissions', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				candidateId: submissionForm.candidateId,
+				jobOrderId: jobOrder.id,
+				status: submissionForm.status,
+				notes: submissionForm.notes
+			})
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			setSubmissionState({
+				saving: false,
+				error: data.error || 'Failed to create submission.',
+				success: ''
+			});
+			return;
+		}
+
+		const createdSubmission = await res.json();
+		setJobOrder((current) => {
+			if (!current) return current;
+			const alreadyExists = current.submissions.some(
+				(submission) => submission.id === createdSubmission.id
+			);
+			const nextSubmissions = alreadyExists
+				? current.submissions
+				: [createdSubmission, ...current.submissions];
+			const currentCount = current._count?.submissions ?? current.submissions.length;
+			return {
+				...current,
+				submissions: nextSubmissions,
+				_count: {
+					...current._count,
+					submissions: alreadyExists ? currentCount : currentCount + 1
+				}
+			};
+		});
+		setSubmissionForm(initialSubmissionForm);
+		setSubmissionState({ saving: false, error: '', success: 'Submission added.' });
+		await loadMatches();
+	}
+
+	async function onCreateMatchedSubmission(match) {
+		if (!jobOrder?.id || !match?.candidateId) return;
+
+		if (submittedCandidateIds.has(String(match.candidateId))) {
+			setMatchState((current) => ({
+				...current,
+				error: 'This candidate is already submitted to this job order.'
+			}));
+			return;
+		}
+
+		setMatchState((current) => ({
+			...current,
+			submittingCandidateId: String(match.candidateId),
+			error: ''
+		}));
+
+		const res = await fetch('/api/submissions', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				candidateId: match.candidateId,
+				jobOrderId: jobOrder.id,
+				status: 'submitted',
+				notes: ''
+			})
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			setMatchState((current) => ({
+				...current,
+				submittingCandidateId: '',
+				error: data.error || 'Failed to create submission from match.'
+			}));
+			return;
+		}
+
+		const createdSubmission = await res.json();
+		setJobOrder((current) => {
+			if (!current) return current;
+			const alreadyExists = current.submissions.some(
+				(submission) => submission.id === createdSubmission.id
+			);
+			const nextSubmissions = alreadyExists
+				? current.submissions
+				: [createdSubmission, ...current.submissions];
+			const currentCount = current._count?.submissions ?? current.submissions.length;
+			return {
+				...current,
+				submissions: nextSubmissions,
+				_count: {
+					...current._count,
+					submissions: alreadyExists ? currentCount : currentCount + 1
+				}
+			};
+		});
+		setSubmissionState({ saving: false, error: '', success: 'Submission added from match.' });
+		setMatchState((current) => ({ ...current, submittingCandidateId: '' }));
+		await loadMatches();
+	}
+
+	async function onCloseJobOrder() {
+		if (!jobOrder) return;
+		if (jobOrder.status === 'closed') {
+			setActionsOpen(false);
+			return;
+		}
+
+		const confirmed = await requestConfirm({
+			message: `Close this job order?\n\nTitle: ${jobOrder.title || '-'}\nClient: ${jobOrder.client?.name || '-'}`,
+			confirmLabel: 'Close',
+			cancelLabel: 'Keep Open',
+			isDanger: true
+		});
+		if (!confirmed) return;
+
+		setCloseState({ closing: true, error: '' });
+		setSaveState((current) => ({ ...current, error: '', success: '' }));
+
+		const res = await fetch(`/api/job-orders/${id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ...toJobOrderPayload(form), status: 'closed' })
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			setCloseState({
+				closing: false,
+				error: data.error || 'Failed to close job order.'
+			});
+			return;
+		}
+
+		const updated = await res.json();
+		const nextForm = toForm(updated);
+		setJobOrder((current) => (current ? { ...current, ...updated } : current));
+		setForm(nextForm);
+		markAsClean(nextForm);
+		setCloseState({ closing: false, error: '' });
+		setActionsOpen(false);
+		setSaveState({ saving: false, error: '', success: 'Job order closed.' });
+	}
+
+	async function onEnhancePublicPosting() {
+		if (!hasMeaningfulRichTextContent(form.publicDescription)) {
+			setEnhanceState({
+				enhancing: false,
+				error: 'Public description is required before AI enhancement.',
+				success: ''
+			});
+			return;
+		}
+
+		setEnhanceState({ enhancing: true, error: '', success: '' });
+
+		const res = await fetch(`/api/job-orders/${id}/enhance-public-description`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				title: form.title,
+				description: form.description,
+				publicDescription: form.publicDescription,
+				location: form.location,
+				employmentType: form.employmentType,
+				currency: form.currency,
+				salaryMin: form.salaryMin,
+				salaryMax: form.salaryMax
+			})
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			setEnhanceState({
+				enhancing: false,
+				error: data.error || 'Failed to enhance public posting.',
+				success: ''
+			});
+			return;
+		}
+
+		const data = await res.json().catch(() => ({}));
+		const nextPublicDescription = String(data?.enhancedPublicDescription || '');
+		if (!hasMeaningfulRichTextContent(nextPublicDescription)) {
+			setEnhanceState({
+				enhancing: false,
+				error: 'OpenAI returned an empty enhancement.',
+				success: ''
+			});
+			return;
+		}
+
+		setForm((current) => ({
+			...current,
+			publicDescription: nextPublicDescription
+		}));
+		setEnhanceState({
+			enhancing: false,
+			error: '',
+			success: 'Public posting enhanced with AI. Review and save.'
+		});
+	}
+
+	function onToggleAuditTrail() {
+		setActionsOpen(false);
+		setShowAuditTrail((current) => !current);
+	}
+
+	if (loading) {
+		return (
+			<section className="module-page">
+				<LoadingIndicator className="page-loading-indicator" label="Loading job order details" />
+			</section>
+		);
+	}
+
+	if (error || !jobOrder) {
+		return (
+			<section className="module-page">
+				<p>{error || 'Job order not found.'}</p>
+				<button type="button" onClick={() => router.push('/job-orders')}>
+					Back to Job Orders
+				</button>
+			</section>
+		);
+	}
+
+	const workspacePanelStyle =
+		detailsPanelHeight > 0 ? { height: `${detailsPanelHeight}px`, maxHeight: `${detailsPanelHeight}px` } : undefined;
+	const requiresPublicDescription = careerSiteEnabled && form.publishToCareerSite;
+	const hasPublicDescription = hasMeaningfulRichTextContent(form.publicDescription);
+	const canPublishToCareerSite = careerSiteEnabled && hasPublicDescription;
+	const salaryMinValue = parseCurrencyInput(form.salaryMin);
+	const salaryMaxValue = parseCurrencyInput(form.salaryMax);
+	const hasSalaryRangeError =
+		salaryMinValue != null && salaryMaxValue != null && salaryMinValue > salaryMaxValue;
+	const canEnhancePublicPosting =
+		careerSiteEnabled &&
+		!enhanceState.enhancing &&
+		!saveState.saving &&
+		!closeState.closing &&
+		hasMeaningfulRichTextContent(form.publicDescription);
+	const canViewPublicPosting = careerSiteEnabled && Boolean(jobOrder.publishToCareerSite);
+	const publicPostingHref = canViewPublicPosting ? `/careers/jobs/${jobOrder.id}` : '';
+	const statusOptions = JOB_ORDER_STATUS_OPTIONS.filter(
+		(option) => option.value !== 'closed' || form.status === 'closed'
+	);
+	const canSaveJobOrder =
+		form.title.trim().length > 0 &&
+		(!isAdmin || Boolean(form.divisionId)) &&
+		Boolean(form.status) &&
+		Boolean(form.employmentType) &&
+		Boolean(form.ownerId) &&
+		Boolean(form.clientId) &&
+		Boolean(form.contactId) &&
+		Boolean(form.zipCode.trim()) &&
+		!hasSalaryRangeError &&
+		(!requiresPublicDescription || hasPublicDescription) &&
+		!saveState.saving;
+
+	return (
+		<section className="module-page">
+			<header className="module-header">
+				<div>
+					<Link href="/job-orders" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<h2>{jobOrder.title}</h2>
+					<p>{jobOrder.client?.name || 'No client linked'}</p>
+				</div>
+				<div className="module-header-actions">
+										<div className="actions-menu" ref={actionsMenuRef}>
+						<button
+							type="button"
+							className="btn-secondary actions-menu-toggle"
+							onClick={() => setActionsOpen((current) => !current)}
+							aria-haspopup="menu"
+							aria-expanded={actionsOpen}
+							aria-label="Open job order actions"
+							title="Actions"
+							>
+								<span className="actions-menu-icon" aria-hidden="true">
+									<MoreVertical />
+								</span>
+							</button>
+						{actionsOpen ? (
+							<div className="actions-menu-list" role="menu" aria-label="Job order actions">
+								{canViewPublicPosting ? (
+									<a
+										href={publicPostingHref}
+										target="_blank"
+										rel="noreferrer"
+										role="menuitem"
+										className="actions-menu-item"
+										onClick={() => setActionsOpen(false)}
+									>
+										View Public Posting
+									</a>
+								) : null}
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onCloseJobOrder}
+									disabled={closeState.closing || saveState.saving || jobOrder.status === 'closed'}
+								>
+									{closeState.closing ? 'Closing...' : 'Close Job Order'}
+								</button>
+								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+								</button>
+							</div>
+						) : null}
+					</div>
+				</div>
+			</header>
+
+			<article className="panel">
+				<h3>Snapshot</h3>
+				<div className="info-list snapshot-grid snapshot-grid-six">
+					<p>
+						<span>Record ID</span>
+						<strong>{jobOrder.recordId || '-'}</strong>
+					</p>
+					<p>
+						<span>Client</span>
+						<strong>
+							{jobOrder.client?.id ? (
+								<Link href={`/clients/${jobOrder.client.id}`}>
+									{jobOrder.client.name}{' '}
+									<ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
+								</Link>
+							) : (
+								jobOrder.client?.name || '-'
+							)}
+						</strong>
+					</p>
+					<p>
+						<span>Hiring Manager</span>
+						<strong>
+							{jobOrder.contact?.id ? (
+								<Link href={`/contacts/${jobOrder.contact.id}`}>
+									{`${jobOrder.contact.firstName} ${jobOrder.contact.lastName}`}{' '}
+									<ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
+								</Link>
+							) : jobOrder.contact ? (
+								`${jobOrder.contact.firstName} ${jobOrder.contact.lastName}`
+							) : (
+								'-'
+							)}
+						</strong>
+					</p>
+					<p>
+						<span>Owner</span>
+						<strong>
+							{jobOrder.ownerUser
+								? `${jobOrder.ownerUser.firstName} ${jobOrder.ownerUser.lastName}`
+								: '-'}
+						</strong>
+					</p>
+				</div>
+			</article>
+
+			<div className="detail-layout detail-layout-equal">
+				<article className="panel panel-spacious" ref={detailsPanelRef}>
+					<h3>Job Order Details</h3>
+					<p className="panel-subtext">Edit job order details and save updates.</p>
+					<form onSubmit={onSave} className="detail-form">
+						<section className="form-section">
+							<h4>Core Details</h4>
+							<FormField label="Title" required>
+								<input
+									value={form.title}
+									onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+									required
+								/>
+							</FormField>
+							<FormField label="Internal Description">
+								<textarea
+									rows={8}
+									value={form.description}
+									onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+								/>
+							</FormField>
+							<div className="detail-form-grid-2">
+								<FormField label="Location">
+									<AddressTypeaheadInput
+										value={form.location}
+										onChange={(nextValue) =>
+											setForm((f) => ({
+												...f,
+												location: nextValue
+											}))
+										}
+										onPlaceDetailsChange={(details) =>
+											setForm((f) => ({
+												...f,
+												locationPlaceId: details?.placeId || '',
+												locationLatitude: details?.latitude ?? '',
+												locationLongitude: details?.longitude ?? '',
+												city: details?.city ?? f.city,
+												state: details?.state ?? f.state,
+												zipCode: details?.postalCode ? normalizeZipValue(details.postalCode) : f.zipCode
+											}))
+										}
+										placeholder="Search address or enter manually"
+										label="Location"
+									/>
+								</FormField>
+								<FormField label="Employment Type" required>
+									<select
+										value={form.employmentType}
+										onChange={(e) => setForm((f) => ({ ...f, employmentType: e.target.value }))}
+										required
+									>
+										<option value="">Select employment type</option>
+										{JOB_ORDER_EMPLOYMENT_TYPES.map((employmentType) => (
+											<option key={employmentType} value={employmentType}>
+												{employmentType}
+											</option>
+										))}
+									</select>
+								</FormField>
+							</div>
+							<div className="detail-form-grid-3">
+								<FormField label="City">
+									<input
+										value={form.city}
+										onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+									/>
+								</FormField>
+								<FormField label="State">
+									<input
+										value={form.state}
+										onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+									/>
+								</FormField>
+								<FormField label="Zip Code" required>
+									<input
+										value={form.zipCode}
+										onChange={(e) => setForm((f) => ({ ...f, zipCode: normalizeZipValue(e.target.value) }))}
+										required
+									/>
+								</FormField>
+							</div>
+						</section>
+
+						<section className="form-section">
+							<h4>Status and Capacity</h4>
+								<FormField label="Status" required>
+									<select
+										value={form.status}
+										onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+										required
+									>
+										{statusOptions.map((statusOption) => (
+											<option key={statusOption.value} value={statusOption.value}>
+												{statusOption.label}
+											</option>
+										))}
+									</select>
+								</FormField>
+							<div className="detail-form-grid-4">
+								<FormField label="Openings">
+									<input
+										type="number"
+										min="1"
+										value={form.openings}
+										onChange={(e) => setForm((f) => ({ ...f, openings: e.target.value }))}
+									/>
+								</FormField>
+								<FormField label="Currency">
+									<select
+										value={form.currency}
+										onChange={(e) => {
+											const nextCurrency = JOB_ORDER_CURRENCIES.includes(e.target.value)
+												? e.target.value
+												: 'USD';
+											setForm((current) => ({
+												...current,
+												currency: nextCurrency,
+												salaryMin: formatCurrencyInput(current.salaryMin, nextCurrency),
+												salaryMax: formatCurrencyInput(current.salaryMax, nextCurrency)
+											}));
+										}}
+									>
+										<option value="USD">USD</option>
+										<option value="CAD">CAD</option>
+									</select>
+								</FormField>
+								<FormField label="Salary Min">
+									<input
+										type="text"
+										inputMode="decimal"
+										value={form.salaryMin}
+										onChange={(e) =>
+											setForm((f) => ({
+												...f,
+												salaryMin: formatCurrencyInput(e.target.value, f.currency)
+											}))
+										}
+									/>
+								</FormField>
+								<FormField label="Salary Max">
+									<input
+										type="text"
+										inputMode="decimal"
+										value={form.salaryMax}
+										onChange={(e) =>
+											setForm((f) => ({
+												...f,
+												salaryMax: formatCurrencyInput(e.target.value, f.currency)
+											}))
+										}
+									/>
+								</FormField>
+							</div>
+							{hasSalaryRangeError ? <p className="panel-subtext error">Salary Min cannot exceed Salary Max.</p> : null}
+						</section>
+
+						<section className="form-section">
+							<h4>Client Assignment</h4>
+							{isAdmin ? (
+								<FormField label="Division" required>
+									<LookupTypeaheadSelect
+										entity="divisions"
+										lookupParams={{}}
+										value={form.divisionId}
+										onChange={(nextValue) =>
+											setForm((f) => ({
+												...f,
+												divisionId: nextValue,
+												ownerId: '',
+												clientId: '',
+												contactId: ''
+											}))
+										}
+										placeholder="Search division"
+										label="Division"
+										emptyLabel="No matching divisions."
+									/>
+								</FormField>
+							) : null}
+								<FormField label="Owner" required>
+									<LookupTypeaheadSelect
+										entity="users"
+										lookupParams={ownerLookupParams}
+										value={form.ownerId}
+										onChange={(nextValue) => setForm((f) => ({ ...f, ownerId: nextValue }))}
+										onSelectOption={(option) => setOwnerDivisionId(option?.divisionId ?? null)}
+										placeholder={isAdmin && !form.divisionId ? 'Select division first' : 'Search owner (required)'}
+										label="Owner"
+										disabled={isAdmin && !form.divisionId}
+										emptyLabel="No matching users."
+									/>
+								</FormField>
+							<FormField label="Client" required>
+								<LookupTypeaheadSelect
+									entity="clients"
+									lookupParams={clientLookupParams}
+									value={form.clientId}
+									onChange={(nextValue) =>
+										setForm((f) => ({ ...f, clientId: nextValue, contactId: '' }))
+									}
+									onSelectOption={(option) => setSelectedClientDivisionId(option?.divisionId ?? null)}
+									placeholder={isAdmin && !form.divisionId ? 'Select division first' : 'Search client'}
+									label="Client"
+									disabled={isAdmin && !form.divisionId}
+									emptyLabel="No matching clients."
+								/>
+							</FormField>
+							<FormField label="Hiring Manager" required>
+								<LookupTypeaheadSelect
+									entity="contacts"
+									lookupParams={contactLookupParams}
+									value={form.contactId}
+									onChange={(nextValue) => setForm((f) => ({ ...f, contactId: nextValue }))}
+									placeholder={
+										isAdmin && !form.divisionId
+											? 'Select division first'
+											: form.clientId
+												? 'Search hiring manager'
+												: 'Select client first'
+									}
+									label="Hiring Manager"
+									disabled={!form.clientId || (isAdmin && !form.divisionId)}
+									emptyLabel="No matching contacts."
+								/>
+							</FormField>
+						{careerSiteEnabled ? (
+							<>
+								<div className="checkbox-grid">
+									<label className="switch-field">
+										<input
+											type="checkbox"
+											className="switch-input"
+											checked={form.publishToCareerSite}
+											disabled={!form.publishToCareerSite && !canPublishToCareerSite}
+											onChange={(e) => {
+												const checked = e.target.checked;
+												setForm((f) => ({ ...f, publishToCareerSite: checked }));
+												setSaveState((current) => ({ ...current, error: '' }));
+											}}
+										/>
+										<span className="switch-track" aria-hidden="true">
+											<span className="switch-thumb" />
+										</span>
+										<span className="switch-copy">
+											<span className="switch-label">Publish to Career Site</span>
+											<span className="switch-hint">
+												{canPublishToCareerSite
+													? 'Publish the public description to your careers page.'
+													: 'Add a public description before enabling career-site publishing.'}
+											</span>
+										</span>
+									</label>
+								</div>
+								<FormField label="Public Description" required={form.publishToCareerSite}>
+									<RichTextEditor
+										value={form.publicDescription}
+										onChange={(nextValue) => setForm((f) => ({ ...f, publicDescription: nextValue }))}
+										disabled={enhanceState.enhancing}
+										toolbarActions={[
+											{
+												key: 'enhance-public-posting',
+												label: 'Enhance with AI',
+												loadingLabel: 'Enhancing...',
+												title: 'Enhance with AI',
+												onClick: onEnhancePublicPosting,
+												disabled: !canEnhancePublicPosting,
+												loading: enhanceState.enhancing
+											}
+										]}
+										ariaLabel="Public Description"
+									/>
+								</FormField>
+							</>
+						) : null}
+					</section>
+
+						<div className="form-actions">
+							<button type="submit" disabled={!canSaveJobOrder}>
+								{saveState.saving ? 'Saving...' : 'Save Job Order'}
+							</button>
+							<span className="form-actions-meta">
+								<span>Updated:</span>
+								<strong>{formatDate(jobOrder.updatedAt)}</strong>
+							</span>
+						</div>
+					</form>
+				</article>
+
+				<article className="panel workspace-panel workspace-panel-lock-height" style={workspacePanelStyle}>
+					<h3>Job Order Workspace</h3>
+					<div
+						className="side-tabs side-tabs-four side-tabs-warm side-tabs-counted"
+						role="tablist"
+						aria-label="Job order workspace tabs"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'submissions'}
+							className={workspaceTab === 'submissions' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('submissions')}
+						>
+							<span>Submissions</span>
+							<span className="side-tab-count" aria-hidden="true">{jobOrder.submissions.length}</span>
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'interviews'}
+							className={workspaceTab === 'interviews' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('interviews')}
+						>
+							<span>Interviews</span>
+							<span className="side-tab-count" aria-hidden="true">{jobOrder.interviews.length}</span>
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'placements'}
+							className={workspaceTab === 'placements' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('placements')}
+						>
+							<span>Placements</span>
+							<span className="side-tab-count" aria-hidden="true">{jobOrder.offers.length}</span>
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'matches'}
+							className={workspaceTab === 'matches' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('matches')}
+						>
+							<span>Matches</span>
+							<span className="side-tab-count" aria-hidden="true">{matchState.matches.length}</span>
+						</button>
+					</div>
+
+					{workspaceTab === 'submissions' ? (
+						<div className="side-tab-content side-tab-content-with-scroll">
+							<form onSubmit={onCreateSubmission} className="detail-form">
+								<FormField label="Candidate" required>
+									<LookupTypeaheadSelect
+										entity="candidates"
+										lookupParams={submissionCandidateLookupParams}
+										value={submissionForm.candidateId}
+										onChange={(nextValue) => {
+											setSubmissionForm((current) => ({ ...current, candidateId: nextValue }));
+											setSubmissionState((current) => ({ ...current, error: '', success: '' }));
+										}}
+										placeholder="Search candidate"
+										label="Candidate"
+										disabled={submissionState.saving}
+										emptyLabel="No matching candidates."
+									/>
+								</FormField>
+								<FormField label="Status">
+									<select
+										value={submissionForm.status}
+										onChange={(e) => {
+											setSubmissionForm((current) => ({ ...current, status: e.target.value }));
+											setSubmissionState((current) => ({ ...current, error: '', success: '' }));
+										}}
+									>
+										{submissionStatuses.map((statusOption) => (
+											<option key={statusOption.value} value={statusOption.value}>
+												{statusOption.label}
+											</option>
+										))}
+									</select>
+								</FormField>
+								<FormField label="Notes">
+									<textarea
+										placeholder="Submission notes"
+										value={submissionForm.notes}
+										onChange={(e) => {
+											setSubmissionForm((current) => ({ ...current, notes: e.target.value }));
+											setSubmissionState((current) => ({ ...current, error: '', success: '' }));
+										}}
+									/>
+								</FormField>
+								<div className="form-actions">
+									<button
+										type="submit"
+										disabled={submissionState.saving || !submissionForm.candidateId}
+									>
+										{submissionState.saving ? 'Saving...' : 'Add Submission'}
+									</button>
+								</div>
+							</form>
+							<h4 className="side-section-title">Current Submissions</h4>
+							<div className="workspace-scroll-area">
+								<ListSortControls
+									label="Sort Submissions"
+									value={submissionSort.field}
+									direction={submissionSort.direction}
+									onValueChange={(field) => setSubmissionSort((current) => ({ ...current, field }))}
+									onDirectionToggle={() =>
+										setSubmissionSort((current) => ({
+											...current,
+											direction: current.direction === 'asc' ? 'desc' : 'asc'
+										}))
+									}
+									options={[
+										{ value: 'createdAt', label: 'Submitted Date' },
+										{ value: 'candidate', label: 'Candidate' },
+										{ value: 'status', label: 'Status' },
+										{ value: 'submittedBy', label: 'Submitted By' }
+									]}
+									disabled={sortedSubmissions.length < 2}
+								/>
+								{jobOrder.submissions.length === 0 ? (
+									<p className="panel-subtext">No submissions yet.</p>
+								) : (
+									<ul className="simple-list">
+										{sortedSubmissions.map((submission) => (
+											<li key={submission.id}>
+												<div>
+													<strong>
+														<Link href={`/submissions/${submission.id}`}>
+															{submission.candidate.firstName} {submission.candidate.lastName}
+														</Link>
+													</strong>
+													<p className="simple-list-meta">
+														By{' '}
+														{submissionCreatedByLabel(submission)}{' '}
+														@ {formatDate(submission.createdAt)}
+													</p>
+												</div>
+												<div className="simple-list-actions simple-list-indicators">
+													<span className="chip">{formatSelectValueLabel(submission.status)}</span>
+												</div>
+											</li>
+										))}
+									</ul>
+								)}
+							</div>
+						</div>
+					) : null}
+
+					{workspaceTab === 'interviews' ? (
+						<div className="side-tab-content side-tab-content-list-only">
+							<div className="workspace-scroll-area">
+								<ListSortControls
+									label="Sort Interviews"
+									value={interviewSort.field}
+									direction={interviewSort.direction}
+									onValueChange={(field) => setInterviewSort((current) => ({ ...current, field }))}
+									onDirectionToggle={() =>
+										setInterviewSort((current) => ({
+											...current,
+											direction: current.direction === 'asc' ? 'desc' : 'asc'
+										}))
+									}
+									options={[
+										{ value: 'startsAt', label: 'Start Date' },
+										{ value: 'subject', label: 'Subject' },
+										{ value: 'candidate', label: 'Candidate' },
+										{ value: 'status', label: 'Status' }
+									]}
+									disabled={sortedInterviews.length < 2}
+								/>
+								{jobOrder.interviews.length === 0 ? (
+									<p className="panel-subtext">No interviews yet.</p>
+								) : (
+									<ul className="simple-list">
+										{sortedInterviews.map((interview) => (
+											<li key={interview.id}>
+												<div>
+													<strong>
+														<Link href={`/interviews/${interview.id}`}>{interview.subject}</Link>
+													</strong>
+													<p>
+														{interview.candidate
+															? `${interview.candidate.firstName} ${interview.candidate.lastName}`
+															: 'Candidate unavailable'}
+													</p>
+													<p className="simple-list-meta">@ {formatDate(interview.startsAt || interview.createdAt)}</p>
+												</div>
+												<div className="simple-list-actions simple-list-indicators">
+													<span className="chip">{formatSelectValueLabel(interview.status)}</span>
+												</div>
+											</li>
+										))}
+									</ul>
+								)}
+							</div>
+						</div>
+					) : null}
+
+					{workspaceTab === 'placements' ? (
+						<div className="side-tab-content side-tab-content-list-only">
+							<div className="workspace-scroll-area">
+								<ListSortControls
+									label="Sort Placements"
+									value={placementSort.field}
+									direction={placementSort.direction}
+									onValueChange={(field) => setPlacementSort((current) => ({ ...current, field }))}
+									onDirectionToggle={() =>
+										setPlacementSort((current) => ({
+											...current,
+											direction: current.direction === 'asc' ? 'desc' : 'asc'
+										}))
+									}
+									options={[
+										{ value: 'createdAt', label: 'Created Date' },
+										{ value: 'candidate', label: 'Candidate' },
+										{ value: 'status', label: 'Status' }
+									]}
+									disabled={sortedPlacements.length < 2}
+								/>
+								{jobOrder.offers.length === 0 ? (
+									<p className="panel-subtext">No placements yet.</p>
+								) : (
+									<ul className="simple-list">
+										{sortedPlacements.map((offer) => (
+											<li key={offer.id}>
+												<div>
+													<strong>
+														<Link href={`/placements/${offer.id}`}>Placement #{offer.id}</Link>
+													</strong>
+													<p>
+														{offer.candidate
+															? `${offer.candidate.firstName} ${offer.candidate.lastName}`
+															: 'Candidate unavailable'}
+													</p>
+													<p className="simple-list-meta">@ {formatDate(offer.createdAt)}</p>
+												</div>
+												<div className="simple-list-actions simple-list-indicators">
+													<span className="chip">{formatSelectValueLabel(offer.status)}</span>
+												</div>
+											</li>
+										))}
+									</ul>
+								)}
+							</div>
+						</div>
+					) : null}
+
+					{workspaceTab === 'matches' ? (
+						<div className="side-tab-content side-tab-content-with-scroll">
+							<div className="form-actions">
+								<button
+									type="button"
+									className="btn-secondary btn-link-icon btn-refresh-icon"
+									onClick={() => loadMatches()}
+									disabled={matchState.loading || !!matchState.submittingCandidateId}
+									aria-label={matchState.loading ? 'Refreshing matches' : 'Refresh matches'}
+									title={matchState.loading ? 'Refreshing matches' : 'Refresh matches'}
+								>
+									<RefreshCcw
+										aria-hidden="true"
+										className={matchState.loading ? 'btn-refresh-icon-svg row-action-icon-spinner' : 'btn-refresh-icon-svg'}
+									/>
+								</button>
+								{matchState.computedAt ? (
+									<span className="form-actions-meta">
+										<span>Updated:</span>
+										<strong>{formatDate(matchState.computedAt)}</strong>
+									</span>
+								) : null}
+							</div>
+							{matchState.requiredSkillNames.length > 0 ? (
+								<p className="panel-subtext">
+									Required skills inferred: {matchState.requiredSkillNames.join(', ')}
+								</p>
+							) : null}
+							{matchState.error ? <p className="panel-subtext error">{matchState.error}</p> : null}
+							<div className="workspace-scroll-area">
+								<ListSortControls
+									label="Sort Matches"
+									value={matchesSort.field}
+									direction={matchesSort.direction}
+									onValueChange={(field) => setMatchesSort((current) => ({ ...current, field }))}
+									onDirectionToggle={() =>
+										setMatchesSort((current) => ({
+											...current,
+											direction: current.direction === 'asc' ? 'desc' : 'asc'
+										}))
+									}
+									options={[
+										{ value: 'scorePercent', label: 'Match Score' },
+										{ value: 'candidate', label: 'Candidate' },
+										{ value: 'owner', label: 'Owner' }
+									]}
+									disabled={sortedMatches.length < 2}
+								/>
+								{!matchState.loading && matchState.matches.length === 0 ? (
+									<p className="panel-subtext">
+										No matches available. Try refreshing after adding more candidate detail.
+									</p>
+								) : (
+									<ul className="simple-list">
+										{sortedMatches.map((match) => {
+											const isSubmitting =
+												matchState.submittingCandidateId === String(match.candidateId);
+											return (
+												<li key={match.candidateId}>
+													<div>
+														<strong>
+															<Link href={`/candidates/${match.candidateId}`}>{match.candidateName}</Link>
+														</strong>
+														<p>
+															{match.currentJobTitle || 'No current title'} | Owner: {match.ownerName || '-'}
+														</p>
+														<p>
+															Match score: <strong>{match.scorePercent}%</strong>
+														</p>
+														{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
+															<p>{match.reasons.join(' • ')}</p>
+														) : null}
+														{Array.isArray(match.risks) && match.risks.length > 0 ? (
+															<p className="panel-subtext error">{match.risks.join(' • ')}</p>
+														) : null}
+													</div>
+													<div className="simple-list-actions">
+														<button
+															type="button"
+															onClick={() => onCreateMatchedSubmission(match)}
+															disabled={
+																isSubmitting ||
+																matchState.loading ||
+																submittedCandidateIds.has(String(match.candidateId))
+															}
+														>
+															{isSubmitting ? 'Submitting...' : 'Add Submission'}
+														</button>
+													</div>
+												</li>
+											);
+										})}
+									</ul>
+								)}
+							</div>
+							<p className="panel-subtext">
+								Evaluated {matchState.totalCandidatesEvaluated} candidate
+								{matchState.totalCandidatesEvaluated === 1 ? '' : 's'}.
+							</p>
+						</div>
+					) : null}
+				</article>
+			</div>
+			<AuditTrailPanel entityType="JOB_ORDER" entityId={id} visible={showAuditTrail} />
+		</section>
+	);
+}

@@ -1,0 +1,668 @@
+generator client {
+	provider = "prisma-client-js"
+}
+
+datasource db {
+	provider = "mysql"
+	url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+	ADMINISTRATOR
+	DIRECTOR
+	RECRUITER
+}
+
+enum DivisionAccessMode {
+	COLLABORATIVE
+	OWNER_ONLY
+}
+
+model Division {
+	id          Int      @id @default(autoincrement())
+	recordId    String   @unique
+	name        String   @unique
+	accessMode  DivisionAccessMode @default(COLLABORATIVE)
+	createdAt   DateTime @default(now())
+	updatedAt   DateTime @updatedAt
+	users       User[]
+	candidates  Candidate[]
+	clients     Client[]
+	contacts    Contact[]
+	jobOrders   JobOrder[]
+}
+
+model SystemSetting {
+	id                Int      @id @default(autoincrement())
+	recordId          String   @unique
+	siteName          String   @default("Hire Gnome ATS")
+	siteTitle         String   @default("Hire Gnome ATS")
+	themeKey          String   @default("classic_blue")
+	careerSiteEnabled Boolean  @default(false)
+	apiErrorLogRetentionDays Int @default(90)
+	googleMapsApiKey  String?  @db.Text
+	openAiApiKey      String?  @db.Text
+	smtpHost          String?
+	smtpPort          Int?
+	smtpSecure        Boolean  @default(false)
+	smtpUser          String?
+	smtpPass          String?  @db.Text
+	smtpFromName      String?
+	smtpFromEmail     String?
+	objectStorageProvider String? @default("s3")
+	objectStorageRegion String? @default("us-east-1")
+	objectStorageBucket String?
+	objectStorageEndpoint String?
+	objectStorageForcePathStyle Boolean @default(true)
+	objectStorageAccessKeyId String?
+	objectStorageSecretAccessKey String? @db.Text
+	logoStorageProvider String?
+	logoStorageBucket String?
+	logoStorageKey    String?
+	logoContentType   String?
+	logoFileName      String?
+	createdAt         DateTime @default(now())
+	updatedAt         DateTime @updatedAt
+}
+
+model User {
+	id               Int         @id @default(autoincrement())
+	recordId         String      @unique
+	firstName        String
+	lastName         String
+	email            String      @unique
+	passwordHash     String?
+	notifyCareerSiteApplications Boolean @default(true)
+	failedLoginAttempts Int      @default(0)
+	lockoutUntil     DateTime?
+	sessionVersion   Int         @default(1)
+	role             UserRole    @default(RECRUITER)
+	divisionId       Int?
+	isActive         Boolean     @default(true)
+	createdAt        DateTime    @default(now())
+	updatedAt        DateTime    @updatedAt
+	division         Division?   @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+	ownedCandidates  Candidate[] @relation("CandidateOwner")
+	ownedClients     Client[]    @relation("ClientOwner")
+	ownedContacts    Contact[]   @relation("ContactOwner")
+	ownedJobOrders   JobOrder[]  @relation("JobOrderOwner")
+	createdSubmissions Submission[] @relation("SubmissionCreatedBy")
+	createdCandidateNotes CandidateNote[] @relation("CandidateNoteCreatedBy")
+	createdClientNotes ClientNote[] @relation("ClientNoteCreatedBy")
+	createdContactNotes ContactNote[] @relation("ContactNoteCreatedBy")
+	uploadedCandidateAttachments CandidateAttachment[] @relation("CandidateAttachmentUploadedBy")
+	candidateStatusChanges CandidateStatusChange[] @relation("CandidateStatusChangedBy")
+	auditLogs       AuditLog[]  @relation("AuditLogActor")
+	passwordResetTokens PasswordResetToken[]
+	notifications  AppNotification[]
+	archivedEntities ArchivedEntity[] @relation("ArchivedEntityByUser")
+	billingSeatSyncEvents BillingSeatSyncEvent[] @relation("BillingSeatSyncTriggeredBy")
+
+	@@index([divisionId])
+}
+
+model BillingSeatSyncEvent {
+	id                       Int      @id @default(autoincrement())
+	recordId                 String   @unique
+	provider                 String
+	status                   String   @default("skipped")
+	reason                   String?
+	activeSeatCount          Int      @default(0)
+	billedSeatQuantity       Int      @default(0)
+	previousSeatQuantity     Int?
+	nextSeatQuantity         Int?
+	stripeCustomerId         String?
+	stripeSubscriptionId     String?
+	stripeSubscriptionItemId String?
+	errorMessage             String?  @db.Text
+	metadata                 Json?
+	triggeredByUserId        Int?
+	createdAt                DateTime @default(now())
+	updatedAt                DateTime @updatedAt
+	triggeredByUser          User?    @relation("BillingSeatSyncTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+	@@index([createdAt])
+	@@index([status, createdAt])
+	@@index([triggeredByUserId, createdAt])
+}
+
+model AppNotification {
+	id         Int      @id @default(autoincrement())
+	recordId   String   @unique
+	userId     Int
+	type       String   @default("info")
+	title      String
+	message    String?  @db.Text
+	entityType String?
+	entityId   Int?
+	linkHref   String?
+	readAt     DateTime?
+	createdAt  DateTime @default(now())
+	updatedAt  DateTime @updatedAt
+	user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	@@index([userId, readAt, createdAt])
+	@@index([userId, createdAt])
+}
+
+model ArchivedEntity {
+	id               Int      @id @default(autoincrement())
+	recordId         String   @unique
+	entityType       String
+	entityId         Int
+	reason           String?  @db.Text
+	archivedByUserId Int?
+	createdAt        DateTime @default(now())
+	updatedAt        DateTime @updatedAt
+	archivedByUser   User?    @relation("ArchivedEntityByUser", fields: [archivedByUserId], references: [id], onDelete: SetNull)
+
+	@@unique([entityType, entityId])
+	@@index([entityType, createdAt])
+	@@index([archivedByUserId, createdAt])
+}
+
+model RequestThrottleEvent {
+	id         Int      @id @default(autoincrement())
+	routeKey   String
+	ipHash     String
+	createdAt  DateTime @default(now())
+
+	@@index([routeKey, ipHash, createdAt])
+	@@index([createdAt])
+}
+
+model AuditLog {
+	id           Int      @id @default(autoincrement())
+	recordId     String   @unique
+	entityType   String
+	entityId     Int?
+	action       String
+	actorUserId  Int?
+	summary      String?
+	beforeData   Json?
+	afterData    Json?
+	changedFields Json?
+	metadata     Json?
+	createdAt    DateTime @default(now())
+	actorUser    User?    @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+	@@index([entityType, entityId, createdAt])
+	@@index([actorUserId])
+	@@index([createdAt])
+}
+
+model ApiErrorLog {
+	id         Int      @id @default(autoincrement())
+	recordId   String   @unique
+	level      String   @default("error")
+	event      String
+	requestId  String?
+	method     String?
+	path       String?
+	route      String?
+	status     Int?
+	durationMs Int?
+	summary    String   @db.Text
+	reason     String?  @db.Text
+	errorData  Json?
+	payload    Json?
+	createdAt  DateTime @default(now())
+
+	@@index([createdAt])
+	@@index([requestId, createdAt])
+	@@index([status, createdAt])
+	@@index([path, createdAt])
+}
+
+model Candidate {
+	id              Int                 @id @default(autoincrement())
+	recordId        String              @unique
+	firstName       String
+	lastName        String
+	email           String              @unique
+	phone           String?
+	mobile          String?
+	status          String              @default("new")
+	source          String?
+	owner           String?
+	currentJobTitle String?
+	currentEmployer String?
+	experienceYears Float?
+	address         String?
+	addressPlaceId  String?
+	addressLatitude Float?
+	addressLongitude Float?
+	city            String?
+	state           String?
+	zipCode         String?
+	country         String?
+	website         String?
+	linkedinUrl     String?
+	skillSet        String?             @db.Text
+	summary         String?             @db.Text
+	ownerId         Int?
+	divisionId      Int?
+	createdAt       DateTime            @default(now())
+	updatedAt       DateTime            @updatedAt
+	ownerUser       User?               @relation("CandidateOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+	division        Division?           @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+	submissions     Submission[]
+	notes           CandidateNote[]
+	activities      CandidateActivity[]
+	candidateEducations CandidateEducation[]
+	candidateWorkExperiences CandidateWorkExperience[]
+	interviews      Interview[]
+	offers          Offer[]
+	candidateSkills CandidateSkill[]
+	attachments     CandidateAttachment[]
+	statusChanges   CandidateStatusChange[]
+
+	@@index([firstName, lastName])
+	@@index([mobile])
+	@@index([status])
+	@@index([ownerId, status])
+	@@index([divisionId, status])
+	@@index([zipCode])
+	@@index([divisionId])
+	@@index([ownerId])
+}
+
+model CandidateStatusChange {
+	id               Int       @id @default(autoincrement())
+	recordId         String    @unique
+	candidateId      Int
+	fromStatus       String?
+	toStatus         String
+	reason           String?   @db.Text
+	changedByUserId  Int?
+	createdAt        DateTime  @default(now())
+	candidate        Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	changedByUser    User?     @relation("CandidateStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+	@@index([candidateId, createdAt])
+	@@index([changedByUserId])
+}
+
+model Skill {
+	id              Int              @id @default(autoincrement())
+	recordId        String           @unique
+	name            String           @unique
+	category        String?
+	isActive        Boolean          @default(true)
+	createdAt       DateTime         @default(now())
+	updatedAt       DateTime         @updatedAt
+	candidateSkills CandidateSkill[]
+
+	@@index([isActive])
+}
+
+model CandidateSkill {
+	candidateId Int
+	skillId     Int
+	createdAt   DateTime  @default(now())
+	candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	skill       Skill     @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+	@@id([candidateId, skillId])
+	@@index([skillId])
+}
+
+model CandidateNote {
+	id              Int       @id @default(autoincrement())
+	recordId        String    @unique
+	content         String    @db.Text
+	createdAt       DateTime  @default(now())
+	updatedAt       DateTime  @updatedAt
+	candidateId     Int
+	createdByUserId Int?
+	candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	createdByUser   User?     @relation("CandidateNoteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+	@@index([createdByUserId])
+}
+
+model CandidateActivity {
+	id          Int       @id @default(autoincrement())
+	recordId    String    @unique
+	type        String    @default("call")
+	subject     String
+	description String?   @db.Text
+	dueAt       DateTime?
+	status      String    @default("open")
+	createdAt   DateTime  @default(now())
+	updatedAt   DateTime  @updatedAt
+	candidateId Int
+	candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+model CandidateEducation {
+	id            Int       @id @default(autoincrement())
+	recordId      String    @unique
+	schoolName    String
+	degree        String?
+	fieldOfStudy  String?
+	startDate     DateTime?
+	endDate       DateTime?
+	isCurrent     Boolean   @default(false)
+	description   String?   @db.Text
+	createdAt     DateTime  @default(now())
+	updatedAt     DateTime  @updatedAt
+	candidateId   Int
+	candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+	@@index([candidateId])
+}
+
+model CandidateWorkExperience {
+	id            Int       @id @default(autoincrement())
+	recordId      String    @unique
+	companyName   String
+	title         String?
+	location      String?
+	startDate     DateTime?
+	endDate       DateTime?
+	isCurrent     Boolean   @default(false)
+	description   String?   @db.Text
+	createdAt     DateTime  @default(now())
+	updatedAt     DateTime  @updatedAt
+	candidateId   Int
+	candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+	@@index([candidateId])
+}
+
+model CandidateAttachment {
+	id               Int       @id @default(autoincrement())
+	recordId         String    @unique
+	fileName         String
+	contentType      String?
+	sizeBytes        Int
+	storageProvider  String    @default("s3")
+	storageBucket    String
+	storageKey       String    @unique
+	candidateId      Int
+	uploadedByUserId Int?
+	createdAt        DateTime  @default(now())
+	updatedAt        DateTime  @updatedAt
+	candidate        Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	uploadedByUser   User?     @relation("CandidateAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+	@@index([candidateId])
+	@@index([uploadedByUserId])
+}
+
+model PasswordResetToken {
+	id         Int      @id @default(autoincrement())
+	recordId   String   @unique
+	userId     Int
+	tokenHash  String   @unique
+	expiresAt  DateTime
+	usedAt     DateTime?
+	createdAt  DateTime @default(now())
+	updatedAt  DateTime @updatedAt
+	user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	@@index([userId])
+	@@index([expiresAt])
+}
+
+model Client {
+	id          Int        @id @default(autoincrement())
+	recordId    String     @unique
+	name        String
+	industry    String?
+	status      String     @default("Prospect")
+	owner       String?
+	phone       String?
+	address     String?
+	city        String?
+	state       String?
+	zipCode     String?
+	website     String?
+	description String?    @db.Text
+	ownerId     Int?
+	divisionId  Int?
+	createdAt   DateTime   @default(now())
+	updatedAt   DateTime   @updatedAt
+	ownerUser   User?      @relation("ClientOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+	division    Division?  @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+	notes       ClientNote[]
+	contacts    Contact[]
+	jobOrders   JobOrder[]
+
+	@@index([name])
+	@@index([status])
+	@@index([zipCode])
+	@@index([ownerId, status])
+	@@index([divisionId])
+	@@index([ownerId])
+}
+
+model Contact {
+	id           Int      @id @default(autoincrement())
+	recordId     String   @unique
+	firstName    String
+	lastName     String
+	email        String?
+	phone        String?
+	address      String?
+	addressPlaceId String?
+	addressLatitude Float?
+	addressLongitude Float?
+	zipCode      String?
+	title        String?
+	department   String?
+	linkedinUrl  String?
+	source       String?
+	owner        String?
+	ownerId      Int?
+	divisionId   Int?
+	createdAt    DateTime @default(now())
+	updatedAt    DateTime @updatedAt
+	ownerUser    User?    @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+	division     Division? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+
+	clientId Int
+	client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+	notes     ContactNote[]
+	jobOrders JobOrder[]
+
+	@@index([firstName, lastName])
+	@@index([email])
+	@@index([phone])
+	@@index([divisionId, ownerId])
+	@@index([clientId, divisionId])
+	@@index([zipCode])
+	@@index([divisionId])
+	@@index([ownerId])
+}
+
+model ClientNote {
+	id               Int      @id @default(autoincrement())
+	recordId         String   @unique
+	content          String   @db.Text
+	createdAt        DateTime @default(now())
+	updatedAt        DateTime @updatedAt
+	clientId         Int
+	createdByUserId  Int?
+	client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+	createdByUser    User?    @relation("ClientNoteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+	@@index([createdByUserId])
+}
+
+model ContactNote {
+	id              Int      @id @default(autoincrement())
+	recordId        String   @unique
+	content         String   @db.Text
+	createdAt       DateTime @default(now())
+	updatedAt       DateTime @updatedAt
+	contactId       Int
+	createdByUserId Int?
+	contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+	createdByUser   User?    @relation("ContactNoteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+	@@index([createdByUserId])
+}
+
+model JobOrder {
+	id                    Int          @id @default(autoincrement())
+	recordId              String       @unique
+	title                 String
+	description           String?
+	publicDescription     String?      @db.Text
+	location              String?
+	locationPlaceId       String?
+	locationLatitude      Float?
+	locationLongitude     Float?
+	city                  String?
+	state                 String?
+	zipCode               String?
+	status                String       @default("open")
+	employmentType        String?
+	openings              Int          @default(1)
+	currency              String       @default("USD")
+	salaryMin             Float?
+	salaryMax             Float?
+	publishToCareerSite   Boolean      @default(false)
+	publishedAt           DateTime?
+	openedAt              DateTime     @default(now())
+	closedAt              DateTime?
+	ownerId               Int?
+	divisionId            Int?
+	createdAt             DateTime     @default(now())
+	updatedAt             DateTime     @updatedAt
+	ownerUser             User?        @relation("JobOrderOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+	division              Division?    @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+
+	clientId Int
+	client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+	contactId Int?
+	contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+	submissions Submission[]
+	interviews  Interview[]
+	offers      Offer[]
+
+	@@index([title])
+	@@index([status])
+	@@index([employmentType])
+	@@index([contactId])
+	@@index([clientId, status])
+	@@index([divisionId, status])
+	@@index([zipCode])
+	@@index([divisionId])
+	@@index([ownerId])
+}
+
+model Submission {
+	id         Int      @id @default(autoincrement())
+	recordId   String   @unique
+	status     String   @default("submitted")
+	notes      String?   @db.Text
+	createdAt  DateTime @default(now())
+	updatedAt  DateTime @updatedAt
+	createdByUserId Int?
+	createdByUser   User? @relation("SubmissionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+	offer      Offer?
+
+	candidateId Int
+	candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+
+	jobOrderId Int
+	jobOrder   JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Restrict)
+
+	@@unique([candidateId, jobOrderId])
+	@@index([candidateId, status])
+	@@index([jobOrderId, status])
+	@@index([createdByUserId])
+}
+
+model Interview {
+	id              Int       @id @default(autoincrement())
+	recordId        String    @unique
+	interviewMode   String    @default("formal")
+	status          String    @default("scheduled")
+	subject         String
+	interviewer     String?
+	interviewerEmail String?
+	optionalParticipants Json?
+	startsAt        DateTime?
+	endsAt          DateTime?
+	location        String?
+	locationPlaceId String?
+	locationLatitude Float?
+	locationLongitude Float?
+	videoLink       String?
+	feedback        String?   @db.Text
+	evaluationScore Float?
+	recommendation  String?
+	createdAt       DateTime  @default(now())
+	updatedAt       DateTime  @updatedAt
+
+	candidateId Int
+	candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+
+	jobOrderId Int
+	jobOrder   JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Restrict)
+
+	@@index([candidateId, startsAt])
+	@@index([jobOrderId, startsAt])
+	@@index([status, startsAt])
+}
+
+model Offer {
+	id               Int       @id @default(autoincrement())
+	recordId         String    @unique
+	status           String    @default("planned")
+	version          Int       @default(1)
+	placementType    String    @default("temp")
+	compensationType String    @default("hourly")
+	currency         String    @default("USD")
+	amount           Float?
+	payPeriod        String?
+	regularRate      Float?
+	overtimeRate     Float?
+	dailyRate        Float?
+	annualSalary     Float?
+	hourlyRtBillRate Float?
+	hourlyRtPayRate  Float?
+	hourlyOtBillRate Float?
+	hourlyOtPayRate  Float?
+	dailyBillRate    Float?
+	dailyPayRate     Float?
+	yearlyCompensation Float?
+	offeredOn        DateTime?
+	expectedJoinDate DateTime?
+	endDate          DateTime?
+	withdrawnReason  String?
+	notes            String?   @db.Text
+	createdAt        DateTime  @default(now())
+	updatedAt        DateTime  @updatedAt
+	submissionId     Int?      @unique
+	submission       Submission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+	candidateId Int
+	candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+
+	jobOrderId Int
+	jobOrder   JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Restrict)
+
+	@@index([candidateId, status])
+	@@index([jobOrderId, status])
+	@@index([status])
+}
+
+model ZipCode {
+	id          Int     @id @default(autoincrement())
+	zip         String  @db.Char(5)
+	primaryCity String  @map("primary_city")
+	latitude    Float?
+	longitude   Float?
+	state       String  @db.VarChar(10)
+
+	@@index([zip])
+	@@map("zip")
+}
