@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS `zip` (
+	`id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`zip` CHAR(5) NOT NULL,
+	`primary_city` VARCHAR(255) NOT NULL,
+	`latitude` FLOAT NULL,
+	`longitude` FLOAT NULL,
+	`state` VARCHAR(10) NOT NULL DEFAULT '',
+	PRIMARY KEY (`id`),
+	INDEX `zip_zip_idx` (`zip`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

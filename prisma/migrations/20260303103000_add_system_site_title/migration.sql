@@ -1,0 +1,2 @@
+ALTER TABLE `SystemSetting`
+	ADD COLUMN `siteTitle` VARCHAR(191) NOT NULL DEFAULT 'Hire Gnome ATS';

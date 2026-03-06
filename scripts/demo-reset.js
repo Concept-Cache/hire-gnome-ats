@@ -1,0 +1,143 @@
+#!/usr/bin/env node
+/* eslint-disable no-console */
+
+const { spawnSync } = require('node:child_process');
+const { PrismaClient } = require('@prisma/client');
+
+const RESET_MODE_VALUES = new Set(['full', 'seed']);
+
+function parseArgValue(name, fallback = '') {
+	const prefix = `--${name}=`;
+	const entry = process.argv.find((value) => String(value).startsWith(prefix));
+	if (!entry) return fallback;
+	return String(entry.slice(prefix.length)).trim();
+}
+
+function toBoolean(value, fallback = false) {
+	const normalized = String(value || '').trim().toLowerCase();
+	if (!normalized) return fallback;
+	if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+	if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+	return fallback;
+}
+
+function parseOptions() {
+	const modeRaw = parseArgValue('mode', 'full').toLowerCase();
+	const mode = RESET_MODE_VALUES.has(modeRaw) ? modeRaw : 'full';
+	const preserveSettings = toBoolean(parseArgValue('preserve-settings', 'true'), true);
+	return {
+		mode,
+		preserveSettings
+	};
+}
+
+function runCommand(command, args) {
+	const result = spawnSync(command, args, {
+		stdio: 'inherit',
+		env: process.env
+	});
+	if (result.error) {
+		throw result.error;
+	}
+	if (result.status !== 0) {
+		throw new Error(`${command} ${args.join(' ')} failed with exit code ${result.status}.`);
+	}
+}
+
+async function loadSystemSettingsSnapshot(enabled) {
+	if (!enabled) return null;
+	const prisma = new PrismaClient();
+	try {
+		const settings = await prisma.systemSetting.findFirst({
+			orderBy: { id: 'asc' },
+			select: {
+				recordId: true,
+				siteName: true,
+				siteTitle: true,
+				themeKey: true,
+				careerSiteEnabled: true,
+				apiErrorLogRetentionDays: true,
+				googleMapsApiKey: true,
+				openAiApiKey: true,
+				smtpHost: true,
+				smtpPort: true,
+				smtpSecure: true,
+				smtpUser: true,
+				smtpPass: true,
+				smtpFromName: true,
+				smtpFromEmail: true,
+				objectStorageProvider: true,
+				objectStorageRegion: true,
+				objectStorageBucket: true,
+				objectStorageEndpoint: true,
+				objectStorageForcePathStyle: true,
+				objectStorageAccessKeyId: true,
+				objectStorageSecretAccessKey: true,
+				logoStorageProvider: true,
+				logoStorageBucket: true,
+				logoStorageKey: true,
+				logoContentType: true,
+				logoFileName: true
+			}
+		});
+		return settings || null;
+	} finally {
+		await prisma.$disconnect();
+	}
+}
+
+async function restoreSystemSettings(snapshot) {
+	if (!snapshot) return false;
+	const prisma = new PrismaClient();
+	try {
+		const existing = await prisma.systemSetting.findFirst({
+			orderBy: { id: 'asc' },
+			select: { id: true }
+		});
+		if (existing) {
+			await prisma.systemSetting.update({
+				where: { id: existing.id },
+				data: snapshot
+			});
+		} else {
+			await prisma.systemSetting.create({
+				data: snapshot
+			});
+		}
+		return true;
+	} finally {
+		await prisma.$disconnect();
+	}
+}
+
+async function main() {
+	const options = parseOptions();
+	console.log(`[demo-reset] Starting demo reset (mode=${options.mode}, preserveSettings=${options.preserveSettings}).`);
+
+	const settingsSnapshot = await loadSystemSettingsSnapshot(options.preserveSettings);
+
+	if (options.mode === 'full') {
+		console.log('[demo-reset] Running prisma migrate reset...');
+		runCommand('npx', ['prisma', 'migrate', 'reset', '--force', '--skip-generate']);
+	} else {
+		console.log('[demo-reset] Skipping full DB reset (seed-only mode).');
+	}
+
+	console.log('[demo-reset] Seeding realistic demo data...');
+	runCommand('node', ['scripts/seed-dummy-data.js']);
+
+	if (options.preserveSettings) {
+		const restored = await restoreSystemSettings(settingsSnapshot);
+		console.log(restored
+			? '[demo-reset] Restored system settings snapshot.'
+			: '[demo-reset] No system settings snapshot to restore.');
+	}
+
+	console.log('[demo-reset] Completed successfully.');
+}
+
+main().catch((error) => {
+	console.error('[demo-reset] Failed.');
+	console.error(error?.message || error);
+	process.exitCode = 1;
+});

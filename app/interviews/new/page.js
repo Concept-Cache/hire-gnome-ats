@@ -1,0 +1,412 @@
+'use client';
+
+import Link from 'next/link';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
+import FormField from '@/app/components/form-field';
+import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
+import EmailChipInput from '@/app/components/email-chip-input';
+import { useToast } from '@/app/components/toast-provider';
+import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
+import { INTERVIEW_TYPE_OPTIONS, normalizeInterviewType } from '@/app/constants/interview-type-options';
+import { fetchLookupOptionById } from '@/lib/lookup-client';
+import { isValidOptionalHttpUrl, normalizeHttpUrl } from '@/lib/url-validation';
+import { formatCandidateStatusLabel, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
+import {
+	VIDEO_CALL_PROVIDER_OPTIONS,
+	getVideoCallLinkPlaceholder,
+	getVideoCallProviderTemplate,
+	normalizeVideoCallProvider
+} from '@/lib/video-call-links';
+
+const initialForm = {
+	interviewMode: 'phone',
+	status: 'scheduled',
+	subject: '',
+	interviewer: '',
+	interviewerEmail: '',
+	startsAt: '',
+	durationMinutes: '60',
+	location: '',
+	locationPlaceId: '',
+	locationLatitude: '',
+	locationLongitude: '',
+	videoCallProvider: '',
+	videoLink: '',
+	optionalParticipantEmails: [],
+	candidateId: '',
+	jobOrderId: ''
+};
+
+const DURATION_OPTIONS = [
+	{ value: '30', label: '30 minutes' },
+	{ value: '45', label: '45 minutes' },
+	{ value: '60', label: '60 minutes' },
+	{ value: '90', label: '90 minutes' },
+	{ value: '120', label: '120 minutes' }
+];
+
+function toLocalDateTimeValue(date) {
+	if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+		return '';
+	}
+
+	const pad = (value) => String(value).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+		date.getMinutes()
+	)}`;
+}
+
+function calculateEndsAt(startsAt, durationMinutes) {
+	if (!startsAt) {
+		return '';
+	}
+
+	const startDate = new Date(startsAt);
+	const parsedDuration = Number.parseInt(durationMinutes, 10);
+	if (Number.isNaN(startDate.getTime()) || Number.isNaN(parsedDuration) || parsedDuration <= 0) {
+		return '';
+	}
+
+	const endDate = new Date(startDate.getTime() + parsedDuration * 60 * 1000);
+	return toLocalDateTimeValue(endDate);
+}
+
+function NewInterviewsPageContent() {
+	const router = useRouter();
+	const searchParams = useSearchParams();
+	const prefillCandidateId = searchParams.get('candidateId') || '';
+	const prefillJobOrderId = searchParams.get('jobOrderId') || '';
+	const prefillSubject = searchParams.get('subject') || '';
+	const [selectedCandidateStatus, setSelectedCandidateStatus] = useState(null);
+	const [form, setForm] = useState({
+		...initialForm,
+		candidateId: prefillCandidateId,
+		jobOrderId: prefillJobOrderId,
+		subject: prefillSubject
+	});
+	const [error, setError] = useState('');
+	const [saving, setSaving] = useState(false);
+	const toast = useToast();
+	useUnsavedChangesGuard(form);
+	const computedEndsAt = useMemo(
+		() => calculateEndsAt(form.startsAt, form.durationMinutes),
+		[form.startsAt, form.durationMinutes]
+	);
+
+	const hasRequiredFields = Boolean(
+		form.subject.trim() &&
+			form.candidateId &&
+			form.jobOrderId &&
+			form.interviewer.trim() &&
+			form.interviewerEmail.trim() &&
+			form.startsAt &&
+			form.durationMinutes &&
+			computedEndsAt
+	);
+	const hasValidEmail = /\S+@\S+\.\S+/.test(form.interviewerEmail.trim());
+	const hasValidVideoLink = isValidOptionalHttpUrl(form.videoLink);
+	const selectedCandidateIsQualified =
+		!form.candidateId ||
+		!selectedCandidateStatus ||
+		isCandidateQualifiedForPipeline(selectedCandidateStatus);
+	const canSave = hasRequiredFields && hasValidEmail && hasValidVideoLink && selectedCandidateIsQualified;
+	const emailError =
+		form.interviewerEmail.trim() && !hasValidEmail ? 'Enter a valid interviewer email address.' : '';
+	const videoLinkError =
+		form.videoLink.trim() && !hasValidVideoLink
+			? 'Enter a valid video call link URL, including http:// or https://.'
+			: '';
+
+	useEffect(() => {
+		let active = true;
+
+		async function loadSelectedCandidate() {
+			if (!form.candidateId) {
+				if (active) {
+					setSelectedCandidateStatus(null);
+				}
+				return;
+			}
+
+			const option = await fetchLookupOptionById('candidates', form.candidateId, {});
+			if (!active) return;
+			setSelectedCandidateStatus(option?.status || null);
+		}
+
+		loadSelectedCandidate();
+		return () => {
+			active = false;
+		};
+	}, [form.candidateId]);
+
+	useEffect(() => {
+		if (error) {
+			toast.error(error);
+		}
+	}, [error, toast]);
+
+	async function onSubmit(e) {
+		e.preventDefault();
+		setError('');
+		if (!canSave) {
+			if (!selectedCandidateIsQualified) {
+					setError(
+						`Candidate must be Qualified or beyond before interviews can be scheduled. Current status: ${formatCandidateStatusLabel(
+							selectedCandidateStatus
+						)}.`
+					);
+				return;
+			}
+			setError(
+				'Complete required fields (Subject, Candidate, Job Order, Interviewer, Interviewer Email, Start Date & Time) and use a valid interviewer email address.'
+			);
+			return;
+		}
+		setSaving(true);
+
+		try {
+			const { videoCallProvider: _videoCallProvider, ...formPayload } = form;
+			const payload = {
+				...formPayload,
+				endsAt: computedEndsAt
+			};
+
+			const res = await fetch('/api/interviews', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				setError(data.error || 'Failed to create interview.');
+				return;
+			}
+
+			const interview = await res.json();
+			router.push(`/interviews/${interview.id}`);
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	return (
+		<section className="module-page">
+			<header className="module-header">
+				<div>
+					<Link href="/interviews" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<h2>New Interview</h2>
+					<p>Schedule interviews for candidate-job pairings.</p>
+				</div>
+			</header>
+
+			<article className="panel panel-narrow">
+				<h3>Schedule Interview</h3>
+				<form onSubmit={onSubmit}>
+					<div className="form-grid-2">
+						<FormField label="Type">
+							<select
+								value={form.interviewMode}
+								onChange={(e) =>
+									setForm((f) =>
+										normalizeInterviewType(e.target.value) === 'video'
+											? {
+													...f,
+													interviewMode: normalizeInterviewType(e.target.value),
+													location: '',
+													locationPlaceId: '',
+													locationLatitude: '',
+													locationLongitude: ''
+												}
+											: { ...f, interviewMode: normalizeInterviewType(e.target.value) }
+									)
+								}
+							>
+								{INTERVIEW_TYPE_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</FormField>
+						<FormField label="Status">
+							<select
+								value={form.status}
+								onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+							>
+								<option value="scheduled">Scheduled</option>
+								<option value="completed">Completed</option>
+							</select>
+						</FormField>
+					</div>
+						<FormField label="Subject" required>
+							<input
+								value={form.subject}
+								onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+								required
+							/>
+						</FormField>
+					<div className="form-grid-2">
+						<FormField label="Candidate" required>
+							<LookupTypeaheadSelect
+								entity="candidates"
+								lookupParams={{ qualifiedOnly: 'true' }}
+								value={form.candidateId}
+								onChange={(nextValue) => setForm((f) => ({ ...f, candidateId: nextValue }))}
+								onSelectOption={(option) => setSelectedCandidateStatus(option?.status || null)}
+								placeholder="Search candidate"
+								label="Candidate"
+								emptyLabel="No qualified candidates available."
+							/>
+						</FormField>
+						<FormField label="Job Order" required>
+							<LookupTypeaheadSelect
+								entity="job-orders"
+								lookupParams={{}}
+								value={form.jobOrderId}
+								onChange={(nextValue) => setForm((f) => ({ ...f, jobOrderId: nextValue }))}
+								placeholder="Search job order"
+								label="Job Order"
+								emptyLabel="No matching job orders."
+							/>
+						</FormField>
+					</div>
+					{!selectedCandidateIsQualified ? (
+						<p className="panel-subtext error">
+							Candidate must be Qualified or beyond before interviews can be scheduled.
+						</p>
+					) : null}
+						<div className="form-grid-2">
+							<FormField label="Interviewer" required>
+								<input
+									value={form.interviewer}
+									onChange={(e) => setForm((f) => ({ ...f, interviewer: e.target.value }))}
+									required
+								/>
+							</FormField>
+							<FormField label="Interviewer Email" required>
+								<input
+									type="email"
+									value={form.interviewerEmail}
+									onChange={(e) => setForm((f) => ({ ...f, interviewerEmail: e.target.value }))}
+									required
+								/>
+							</FormField>
+						</div>
+						{emailError ? <p className="panel-subtext error">{emailError}</p> : null}
+						<FormField label="Optional Participants" hint="Press Enter or comma to add">
+							<EmailChipInput
+								values={form.optionalParticipantEmails}
+								onChange={(nextValues) => setForm((f) => ({ ...f, optionalParticipantEmails: nextValues }))}
+								placeholder="participant@company.com"
+								emptyLabel="No optional participants."
+							/>
+						</FormField>
+					<div className="form-grid-2">
+						<FormField label="Start Date & Time" required>
+							<input
+								type="datetime-local"
+								value={form.startsAt}
+								onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
+								required
+							/>
+						</FormField>
+						<FormField label="Duration" required>
+							<select
+								value={form.durationMinutes}
+								onChange={(e) => setForm((f) => ({ ...f, durationMinutes: e.target.value }))}
+								required
+							>
+								{DURATION_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</FormField>
+					</div>
+					<input type="hidden" value={computedEndsAt} readOnly />
+					{form.interviewMode === 'video' ? null : (
+						<FormField label="Location">
+							<AddressTypeaheadInput
+								value={form.location}
+								onChange={(nextValue) => setForm((f) => ({ ...f, location: nextValue }))}
+								onPlaceDetailsChange={(details) =>
+									setForm((f) => ({
+										...f,
+										locationPlaceId: details?.placeId || '',
+										locationLatitude: details?.latitude ?? '',
+										locationLongitude: details?.longitude ?? ''
+									}))
+								}
+								placeholder="Search address or enter manually"
+								label="Location"
+							/>
+						</FormField>
+					)}
+					<div className="form-grid-2">
+						<FormField label="Video Call Provider">
+							<select
+								value={form.videoCallProvider}
+								onChange={(e) => {
+									const nextProvider = normalizeVideoCallProvider(e.target.value);
+									setForm((f) => {
+										const nextLink = f.videoLink.trim()
+											? f.videoLink
+											: getVideoCallProviderTemplate(nextProvider);
+										return {
+											...f,
+											videoCallProvider: nextProvider,
+											videoLink: nextLink
+										};
+									});
+								}}
+							>
+								<option value="">Select provider</option>
+								{VIDEO_CALL_PROVIDER_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</FormField>
+						<FormField label="Video Call Link">
+							<input
+								type="url"
+								value={form.videoLink}
+								placeholder={getVideoCallLinkPlaceholder(form.videoCallProvider)}
+								onChange={(e) => setForm((f) => ({ ...f, videoLink: e.target.value }))}
+								onBlur={(e) =>
+									setForm((f) => ({
+										...f,
+										videoLink: normalizeHttpUrl(e.target.value)
+									}))
+								}
+							/>
+						</FormField>
+					</div>
+					{videoLinkError ? <p className="panel-subtext error">{videoLinkError}</p> : null}
+						<button type="submit" disabled={saving || !canSave}>
+							{saving ? 'Saving...' : 'Save Interview'}
+						</button>
+				</form>
+			</article>
+		</section>
+	);
+}
+
+export default function NewInterviewsPage() {
+	return (
+		<Suspense
+			fallback={
+				<section className="module-page">
+					<p>Loading interview setup...</p>
+				</section>
+			}
+		>
+			<NewInterviewsPageContent />
+		</Suspense>
+	);
+}

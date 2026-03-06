@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a product or developer experience enhancement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What pain point are you trying to solve?
+      placeholder: As a recruiter/admin, I need...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe behavior, UX, and API impacts.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other options or tradeoffs?
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - Candidates
+        - Clients
+        - Contacts
+        - Job Orders
+        - Submissions
+        - Interviews
+        - Placements
+        - Dashboard
+        - Admin / Settings
+        - Career Site
+        - API / Infrastructure

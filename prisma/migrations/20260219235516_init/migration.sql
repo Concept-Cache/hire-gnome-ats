@@ -1,0 +1,46 @@
+-- CreateTable
+CREATE TABLE `Candidate` (
+		`id` INTEGER NOT NULL AUTO_INCREMENT,
+		`firstName` VARCHAR(191) NOT NULL,
+		`lastName` VARCHAR(191) NOT NULL,
+		`email` VARCHAR(191) NOT NULL,
+		`phone` VARCHAR(191) NULL,
+		`status` VARCHAR(191) NOT NULL DEFAULT 'applied',
+		`createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+		`updatedAt` DATETIME(3) NOT NULL,
+
+		UNIQUE INDEX `Candidate_email_key`(`email`),
+		PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Client` (
+		`id` INTEGER NOT NULL AUTO_INCREMENT,
+		`name` VARCHAR(191) NOT NULL,
+		`industry` VARCHAR(191) NULL,
+		`contactName` VARCHAR(191) NULL,
+		`contactEmail` VARCHAR(191) NULL,
+		`createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+		`updatedAt` DATETIME(3) NOT NULL,
+
+		PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `JobOrder` (
+		`id` INTEGER NOT NULL AUTO_INCREMENT,
+		`title` VARCHAR(191) NOT NULL,
+		`description` VARCHAR(191) NULL,
+		`location` VARCHAR(191) NULL,
+		`status` VARCHAR(191) NOT NULL DEFAULT 'open',
+		`openedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+		`closedAt` DATETIME(3) NULL,
+		`createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+		`updatedAt` DATETIME(3) NOT NULL,
+		`clientId` INTEGER NOT NULL,
+
+		PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `JobOrder` ADD CONSTRAINT `JobOrder_clientId_fkey` FOREIGN KEY (`clientId`) REFERENCES `Client`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

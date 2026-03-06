@@ -1,0 +1,2 @@
+ALTER TABLE `Offer`
+	ADD COLUMN `endDate` DATETIME(3) NULL;
