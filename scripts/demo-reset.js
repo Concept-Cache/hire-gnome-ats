@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 
+require('./load-env.cjs');
+
 const { spawnSync } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
 

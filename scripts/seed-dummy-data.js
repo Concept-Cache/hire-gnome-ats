@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('./load-env.cjs');
+
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('node:crypto');
 const { SKILLS_TO_SEED } = require('./seed-skills');

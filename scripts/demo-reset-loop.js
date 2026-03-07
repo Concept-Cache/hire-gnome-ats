@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 
+require('./load-env.cjs');
+
 const { spawn } = require('node:child_process');
 
 function toPositiveInt(value, fallback) {

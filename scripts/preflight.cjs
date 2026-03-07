@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 
+require('./load-env.cjs');
+
 const fs = require('node:fs');
 const path = require('node:path');
 const mysql = require('mysql2/promise');
