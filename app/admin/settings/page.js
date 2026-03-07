@@ -68,6 +68,7 @@ export default function AdminSettingsPage() {
 		result: null
 	});
 	const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);
+	const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
@@ -267,6 +268,40 @@ export default function AdminSettingsPage() {
 		}
 		toast.success(data.message || 'System branding updated.');
 		setSaving(false);
+	}
+
+	async function onSendTestEmail() {
+		if (demoMode || loading || saving || sendingTestEmail) return;
+		setSendingTestEmail(true);
+
+		try {
+			const res = await fetch('/api/admin/system-settings/email-test', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					siteName: form.siteName,
+					smtpHost: form.smtpHost,
+					smtpPort: form.smtpPort,
+					smtpSecure: form.smtpSecure,
+					smtpUser: form.smtpUser,
+					smtpPass: form.smtpPass,
+					smtpFromName: form.smtpFromName,
+					smtpFromEmail: form.smtpFromEmail
+				})
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				toast.error(data.error || 'Failed to send test email.');
+				return;
+			}
+			toast.success(data.message || 'Test email sent.');
+		} catch (error) {
+			toast.error(error?.message || 'Failed to send test email.');
+		} finally {
+			setSendingTestEmail(false);
+		}
 	}
 
 	async function onRunDiagnostics() {
@@ -560,6 +595,21 @@ export default function AdminSettingsPage() {
 								</label>
 								<p className="panel-subtext">
 									Outgoing emails stay disabled until required SMTP values are configured.
+								</p>
+								<div className="form-actions">
+									<button
+										type="button"
+										className="btn-secondary"
+										onClick={onSendTestEmail}
+										disabled={demoMode || loading || saving || sendingTestEmail}
+									>
+										{sendingTestEmail ? 'Sending Test Email...' : 'Send Test Email'}
+									</button>
+								</div>
+								<p className="panel-subtext">
+									{emailTestSettings.emailTestMode
+										? `EMAIL_TEST_MODE is enabled. Outbound email is routed to ${emailTestSettings.emailTestRecipient || 'EMAIL_TEST_RECIPIENT'}.`
+										: 'Test email is sent to your signed-in administrator email address.'}
 								</p>
 							</section>
 

@@ -240,6 +240,7 @@ Use `.env` for:
 | `DEMO_LOGIN_PASSWORD` | `Welcome123!` | Demo login password shown on login when demo mode is enabled. |
 | `DEMO_RESET_INTERVAL_MINUTES` | `360` | Interval used by `npm run demo:reset:loop`. |
 | `DEMO_RESET_RUN_ON_START` | `true` | If true, the loop script runs one reset immediately on boot. |
+| `DEMO_RESET_MODE` | `seed` | Mode used by `demo:reset:loop` (`seed` recommended, `full` is heavier and can show onboarding during reset). |
 
 #### Bootstrap Default Admin
 | Variable | Default | Purpose |
