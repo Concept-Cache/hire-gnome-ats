@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('./load-env.cjs');
+
 const mysql = require('mysql2/promise');
 const { SKILLS_TO_SEED } = require('./seed-skills');
 

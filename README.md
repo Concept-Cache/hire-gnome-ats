@@ -274,6 +274,8 @@ These are not in `.env.example` and are only used as fallback link sources:
 
 ## Scripts
 
+All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if present), so manual `source .env` is not required.
+
 | Script | Purpose |
 |---|---|
 | `npm run dev` | Run Next.js in development mode |

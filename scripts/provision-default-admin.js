@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('./load-env.cjs');
+
 const crypto = require('node:crypto');
 const { promisify } = require('node:util');
 const { PrismaClient } = require('@prisma/client');

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('./load-env.cjs');
+
 const { existsSync, copyFileSync, readFileSync } = require('node:fs');
 const { execSync } = require('node:child_process');
 const path = require('node:path');

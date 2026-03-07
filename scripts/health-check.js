@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('./load-env.cjs');
+
 const defaultTarget = 'http://localhost:3000/api/health';
 
 function parseArgs() {
