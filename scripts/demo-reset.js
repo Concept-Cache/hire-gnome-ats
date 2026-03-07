@@ -46,6 +46,12 @@ function runCommand(command, args) {
 	}
 }
 
+function isMissingSystemSettingsTableError(error) {
+	if (!error) return false;
+	if (error.code === 'P2021') return true;
+	return String(error.message || '').includes('SystemSetting');
+}
+
 async function loadSystemSettingsSnapshot(enabled) {
 	if (!enabled) return null;
 	const prisma = new PrismaClient();
@@ -83,6 +89,12 @@ async function loadSystemSettingsSnapshot(enabled) {
 			}
 		});
 		return settings || null;
+	} catch (error) {
+		if (isMissingSystemSettingsTableError(error)) {
+			console.log('[demo-reset] System settings table not found yet; skipping settings snapshot.');
+			return null;
+		}
+		throw error;
 	} finally {
 		await prisma.$disconnect();
 	}
@@ -107,6 +119,12 @@ async function restoreSystemSettings(snapshot) {
 			});
 		}
 		return true;
+	} catch (error) {
+		if (isMissingSystemSettingsTableError(error)) {
+			console.log('[demo-reset] System settings table not available after reset; skipping restore.');
+			return false;
+		}
+		throw error;
 	} finally {
 		await prisma.$disconnect();
 	}
