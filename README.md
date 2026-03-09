@@ -1,11 +1,17 @@
 # Hire Gnome ATS
 
+![Hire Gnome](https://hiregnome.com/gnome_banner.png)
+
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![Node](https://img.shields.io/badge/Node-20.x-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?logo=prisma)](https://www.prisma.io/)
 [![MySQL](https://img.shields.io/badge/MySQL-8+-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 
-Recruiting ATS built with Next.js, Prisma, and MySQL for staffing and recruiting teams.
+Open-source Applicant Tracking System designed for small recruiting teams that want a simple, self-hostable alternative to complex enterprise ATS platforms.
+
+Hire Gnome focuses on practical hiring workflows — candidate pipelines, structured evaluation, and lightweight reporting — while remaining easy to deploy, customize, and extend.
+
+Built for teams that want full control of their hiring stack without the cost or complexity of traditional recruiting software.
 
 ## Table Of Contents
 - [Features](#features)
