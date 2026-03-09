@@ -1,6 +1,6 @@
 # Hire Gnome ATS
 
-![Hire Gnome](https://hiregnome.com/gnome_banner.png)
+![Hire Gnome](https://hiregnome.com/gnome_banner.png?v=2)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![Node](https://img.shields.io/badge/Node-20.x-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
