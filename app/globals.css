@@ -2289,6 +2289,26 @@ p {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.admin-card-sections {
+	display: grid;
+	gap: 0.85rem;
+}
+
+.admin-card-section-head {
+	display: grid;
+	gap: 0.28rem;
+	margin-bottom: 0.7rem;
+}
+
+.admin-card-section-head h3 {
+	font-size: 1.02rem;
+}
+
+.admin-card-section-head p {
+	font-size: 0.86rem;
+	color: var(--muted);
+}
+
 .metric-card {
 	text-decoration: none;
 	padding: 0.85rem;
