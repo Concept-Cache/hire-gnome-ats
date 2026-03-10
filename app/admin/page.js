@@ -85,6 +85,11 @@ export default function AdminPage() {
 								value: 'Settings'
 							})}
 							{renderAdminCard({
+								href: '/admin/imports',
+								label: 'Data Import',
+								value: 'Preview + Apply'
+							})}
+							{renderAdminCard({
 								href: '/admin/exports',
 								label: 'Data Export',
 								value: 'JSON / NDJSON / ZIP'
