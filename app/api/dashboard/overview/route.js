@@ -6,6 +6,7 @@ import {
 	getActingUser,
 	getEntityScope
 } from '@/lib/access-control';
+import { getArchivedEntityIdSet } from '@/lib/archive-entities';
 import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
 
 import { withApiLogging } from '@/lib/api-logging';
@@ -86,7 +87,10 @@ async function getDashboard_overviewHandler(req) {
 			fallbackOpenJobOrders,
 			recentPrioritySubmissions,
 			recentPriorityJobOrders,
-			upcomingInterviews
+			upcomingInterviews,
+			archivedSubmissionIds,
+			archivedJobOrderIds,
+			archivedInterviewIds
 		] = await Promise.all([
 			prisma.interview.count({
 				where: andWhere(
@@ -232,11 +236,28 @@ async function getDashboard_overviewHandler(req) {
 				},
 				orderBy: { startsAt: 'asc' },
 				take: 12
-			})
+			}),
+			getArchivedEntityIdSet('SUBMISSION'),
+			getArchivedEntityIdSet('JOB_ORDER'),
+			getArchivedEntityIdSet('INTERVIEW')
 		]);
 
+		const activeStaleSubmissions = staleSubmissions.filter((record) => !archivedSubmissionIds.has(record.id));
+		const activeStaleOpenJobOrders = staleOpenJobOrders.filter((record) => !archivedJobOrderIds.has(record.id));
+		const activeFallbackAwaitingFeedbackSubmissions = fallbackAwaitingFeedbackSubmissions.filter(
+			(record) => !archivedSubmissionIds.has(record.id)
+		);
+		const activeFallbackOpenJobOrders = fallbackOpenJobOrders.filter((record) => !archivedJobOrderIds.has(record.id));
+		const activeRecentPrioritySubmissions = recentPrioritySubmissions.filter(
+			(record) => !archivedSubmissionIds.has(record.id)
+		);
+		const activeRecentPriorityJobOrders = recentPriorityJobOrders.filter(
+			(record) => !archivedJobOrderIds.has(record.id)
+		);
+		const activeUpcomingInterviews = upcomingInterviews.filter((record) => !archivedInterviewIds.has(record.id));
+
 		const stalePriorityQueue = [
-			...staleSubmissions.map((record) => {
+			...activeStaleSubmissions.map((record) => {
 				const staleDays = Math.max(
 					1,
 					Math.floor((now.getTime() - new Date(record.createdAt).getTime()) / (24 * 60 * 60 * 1000))
@@ -252,7 +273,7 @@ async function getDashboard_overviewHandler(req) {
 					href: `/submissions/${record.id}`
 				};
 			}),
-			...staleOpenJobOrders.map((record) => {
+			...activeStaleOpenJobOrders.map((record) => {
 				const staleDays = Math.max(
 					1,
 					Math.floor((now.getTime() - new Date(record.updatedAt).getTime()) / (24 * 60 * 60 * 1000))
@@ -273,7 +294,7 @@ async function getDashboard_overviewHandler(req) {
 			.slice(0, 8);
 
 		const fallbackPriorityQueue = [
-			...fallbackAwaitingFeedbackSubmissions.map((record) => {
+			...activeFallbackAwaitingFeedbackSubmissions.map((record) => {
 				const staleDays = Math.max(
 					1,
 					Math.floor((now.getTime() - new Date(record.createdAt).getTime()) / (24 * 60 * 60 * 1000))
@@ -290,7 +311,7 @@ async function getDashboard_overviewHandler(req) {
 					href: `/submissions/${record.id}`
 				};
 			}),
-			...fallbackOpenJobOrders.map((record) => ({
+			...activeFallbackOpenJobOrders.map((record) => ({
 				id: `fallback-job-${record.id}`,
 				type: 'jobOrder',
 				title: record.title || `Job Order #${record.id}`,
@@ -305,7 +326,7 @@ async function getDashboard_overviewHandler(req) {
 			.slice(0, 8);
 
 		const recentPriorityQueue = [
-			...recentPrioritySubmissions.map((record) => {
+			...activeRecentPrioritySubmissions.map((record) => {
 				const daysSinceUpdate = Math.max(
 					1,
 					Math.floor((now.getTime() - new Date(record.updatedAt || record.createdAt).getTime()) / (24 * 60 * 60 * 1000))
@@ -321,7 +342,7 @@ async function getDashboard_overviewHandler(req) {
 					href: `/submissions/${record.id}`
 				};
 			}),
-			...recentPriorityJobOrders.map((record) => ({
+			...activeRecentPriorityJobOrders.map((record) => ({
 				id: `recent-job-${record.id}`,
 				type: 'jobOrder',
 				title: record.title || `Job Order #${record.id}`,
@@ -350,7 +371,7 @@ async function getDashboard_overviewHandler(req) {
 				placementsThisMonth: placementsThisMonthCount
 			},
 			priorityQueue,
-			upcomingInterviews: upcomingInterviews.map((record) => ({
+			upcomingInterviews: activeUpcomingInterviews.map((record) => ({
 				id: record.id,
 				title: record.subject || `Interview #${record.id}`,
 				candidateName: toCandidateName(record.candidate),
