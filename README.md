@@ -39,6 +39,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
 - Candidate and job-order match workspaces (top matches, sortable/paged)
 - Audit trails on records and admin diagnostics
+- Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering
 - Global search with cross-entity results
 - In-app notifications, unsaved-change navigation guard, archive/restore flows
 - Per-list column chooser with persisted preferences
@@ -127,6 +128,11 @@ Use `Admin Area > System Settings` for:
 - SMTP settings
 - Object storage settings (`s3` or local mode)
 - API error log retention days
+
+Use `Admin Area > Data Export` for:
+- Export format selection (`JSON`, `NDJSON`, `ZIP`)
+- Optional inclusion of audit trail and API error logs
+- Incremental date-range exports using `updatedAt` (fallback `createdAt`)
 
 ### `.env` Configuration
 Use `.env` for:
@@ -315,6 +321,14 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 - Runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - Health endpoint: `GET /api/health`
 - Admin diagnostics: `Admin Area > System Settings > System Diagnostics`
+- Data export: `Admin Area > Data Export` (or `GET /api/admin/data-export`)
+
+Data export query options:
+- `format`: `json` | `ndjson` | `zip`
+- `includeAuditLogs`: `true`/`false`
+- `includeApiErrorLogs`: `true`/`false`
+- `dateFrom`: ISO datetime (optional)
+- `dateTo`: ISO datetime (optional)
 
 Archive behavior:
 - Archive is soft-delete and reversible through the Archive module.
@@ -365,6 +379,12 @@ npx prisma migrate deploy
 
 ### Build logs DB socket warnings during SSG
 Ensure `SKIP_SYSTEM_SETTINGS_DB_DURING_BUILD=true` (default) so system settings are not read during static build phases.
+
+### Existing browser session loops between `/login` and `/` after deploy
+This is usually stale auth cookies after a deploy or secret/session changes.
+- Refresh once and retry login.
+- If needed, clear site cookies for the app domain (`ats-session`, `ats-acting-user-id`) or open `/api/session/logout`.
+- New private/incognito windows are typically unaffected because no stale cookies exist.
 
 ### Cannot connect to MySQL
 Verify:
