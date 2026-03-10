@@ -13,6 +13,9 @@ Hire Gnome focuses on practical hiring workflows — candidate pipelines, struct
 
 Built for teams that want full control of their hiring stack without the cost or complexity of traditional recruiting software.
 
+## Live Demo
+Try the public demo environment: [https://demo.hiregnome.com](https://demo.hiregnome.com)
+
 ## Table Of Contents
 - [Features](#features)
 - [User Documentation](#user-documentation)
