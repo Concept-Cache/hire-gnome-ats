@@ -101,25 +101,25 @@ export default function AdminSettingsPage() {
 				themeKey: data.themeKey || 'classic_blue',
 				hasCustomLogo: Boolean(data.hasCustomLogo)
 			});
-					setForm({
-						siteName: data.siteName || '',
-						themeKey: data.themeKey || 'classic_blue',
-						careerSiteEnabled: toBooleanFlag(data.careerSiteEnabled, false),
-						apiErrorLogRetentionDays: String(data.apiErrorLogRetentionDays || 90),
-					removeLogo: false,
-					googleMapsApiKey: data.googleMapsApiKey || '',
-					openAiApiKey: data.openAiApiKey || '',
-					objectStorageProvider: data.objectStorageProvider || 's3',
-					objectStorageRegion: data.objectStorageRegion || 'us-east-1',
-					objectStorageBucket: data.objectStorageBucket || '',
-					objectStorageEndpoint: data.objectStorageEndpoint || '',
-					objectStorageForcePathStyle:
-						typeof data.objectStorageForcePathStyle === 'boolean'
-							? data.objectStorageForcePathStyle
-							: true,
-					objectStorageAccessKeyId: data.objectStorageAccessKeyId || '',
-					objectStorageSecretAccessKey: data.objectStorageSecretAccessKey || '',
-					smtpHost: data.smtpHost || '',
+			setForm({
+				siteName: data.siteName || '',
+				themeKey: data.themeKey || 'classic_blue',
+				careerSiteEnabled: toBooleanFlag(data.careerSiteEnabled, false),
+				apiErrorLogRetentionDays: String(data.apiErrorLogRetentionDays || 90),
+				removeLogo: false,
+				googleMapsApiKey: data.googleMapsApiKey || '',
+				openAiApiKey: data.openAiApiKey || '',
+				objectStorageProvider: data.objectStorageProvider || 's3',
+				objectStorageRegion: data.objectStorageRegion || 'us-east-1',
+				objectStorageBucket: data.objectStorageBucket || '',
+				objectStorageEndpoint: data.objectStorageEndpoint || '',
+				objectStorageForcePathStyle:
+					typeof data.objectStorageForcePathStyle === 'boolean'
+						? data.objectStorageForcePathStyle
+						: true,
+				objectStorageAccessKeyId: data.objectStorageAccessKeyId || '',
+				objectStorageSecretAccessKey: data.objectStorageSecretAccessKey || '',
+				smtpHost: data.smtpHost || '',
 				smtpPort: data.smtpPort == null ? '' : String(data.smtpPort),
 				smtpSecure: Boolean(data.smtpSecure),
 				smtpUser: data.smtpUser || '',
@@ -221,11 +221,11 @@ export default function AdminSettingsPage() {
 			hasCustomLogo: Boolean(data.hasCustomLogo)
 		});
 		committedThemeRef.current = data.themeKey || form.themeKey || 'classic_blue';
-			setForm({
-				siteName: data.siteName || form.siteName,
-				themeKey: data.themeKey || form.themeKey || 'classic_blue',
-				careerSiteEnabled: toBooleanFlag(data.careerSiteEnabled, false),
-				apiErrorLogRetentionDays: String(data.apiErrorLogRetentionDays || form.apiErrorLogRetentionDays || 90),
+		setForm({
+			siteName: data.siteName || form.siteName,
+			themeKey: data.themeKey || form.themeKey || 'classic_blue',
+			careerSiteEnabled: toBooleanFlag(data.careerSiteEnabled, false),
+			apiErrorLogRetentionDays: String(data.apiErrorLogRetentionDays || form.apiErrorLogRetentionDays || 90),
 			removeLogo: false,
 			googleMapsApiKey: data.googleMapsApiKey || '',
 			openAiApiKey: data.openAiApiKey || '',
@@ -256,15 +256,15 @@ export default function AdminSettingsPage() {
 		if (typeof window !== 'undefined') {
 			window.dispatchEvent(
 				new CustomEvent('hg:branding-updated', {
-						detail: {
-								siteName: data.siteName || form.siteName,
-								logoUrl: data.logoUrl || '/branding/hire-gnome.png',
-								themeKey: data.themeKey || form.themeKey || 'classic_blue',
-								careerSiteEnabled: toBooleanFlag(data.careerSiteEnabled, false),
-								hasCustomLogo: Boolean(data.hasCustomLogo)
-							}
-						})
-				);
+					detail: {
+						siteName: data.siteName || form.siteName,
+						logoUrl: data.logoUrl || '/branding/hire-gnome.png',
+						themeKey: data.themeKey || form.themeKey || 'classic_blue',
+						careerSiteEnabled: toBooleanFlag(data.careerSiteEnabled, false),
+						hasCustomLogo: Boolean(data.hasCustomLogo)
+					}
+				})
+			);
 		}
 		toast.success(data.message || 'System branding updated.');
 		setSaving(false);
@@ -401,10 +401,10 @@ export default function AdminSettingsPage() {
 				{loading ? <LoadingIndicator className="page-loading-indicator" label="Loading system settings" /> : null}
 
 				{!loading ? (
-					<>
-						<article className="panel panel-spacious panel-narrow">
-							<form onSubmit={onSave} className="detail-form">
-							<section className="form-section">
+						<>
+							<article className="panel panel-spacious panel-narrow">
+								<form onSubmit={onSave} className="detail-form">
+									<section className="form-section">
 								<h4>Branding</h4>
 								{demoMode ? (
 									<p className="panel-subtext">Demo mode is enabled. System settings are read-only.</p>
@@ -708,11 +708,11 @@ export default function AdminSettingsPage() {
 								</p>
 							</section>
 
-								<div className="form-actions">
-									<button type="submit" disabled={saving || !canSave}>
-										{saving ? 'Saving...' : demoMode ? 'Demo Mode (Read Only)' : 'Save Settings'}
-									</button>
-								</div>
+							<div className="form-actions">
+								<button type="submit" disabled={saving || !canSave}>
+									{saving ? 'Saving...' : demoMode ? 'Demo Mode (Read Only)' : 'Save Settings'}
+								</button>
+							</div>
 							</form>
 						</article>
 

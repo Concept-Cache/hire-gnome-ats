@@ -47,6 +47,21 @@ export default function AdminPage() {
 		};
 	}, []);
 
+	function renderAdminCard({ href, label, value }) {
+		return (
+			<Link key={href} className="metric-card" href={href}>
+				<p className="metric-label">{label}</p>
+				<p className="metric-value">{value}</p>
+				<span className="metric-link">
+					<span>Detail</span>
+					<span className="metric-link-icon" aria-hidden="true">
+						<ArrowUpRight />
+					</span>
+				</span>
+			</Link>
+		);
+	}
+
 	return (
 		<AdminGate>
 			<section className="module-page">
@@ -57,69 +72,70 @@ export default function AdminPage() {
 					</div>
 				</header>
 
-				<div className="metric-grid admin-metric-grid">
-					<Link className="metric-card" href="/admin/settings">
-						<p className="metric-label">Configuration</p>
-						<p className="metric-value">Settings</p>
-						<span className="metric-link">
-							<span>Detail</span>
-							<span className="metric-link-icon" aria-hidden="true">
-								<ArrowUpRight />
-							</span>
-						</span>
-					</Link>
-					{billingEnabled ? (
-						<Link className="metric-card" href="/admin/billing">
-							<p className="metric-label">Billing</p>
-							<p className="metric-value">Seats</p>
-							<span className="metric-link">
-								<span>Detail</span>
-								<span className="metric-link-icon" aria-hidden="true">
-									<ArrowUpRight />
-								</span>
-							</span>
-						</Link>
-					) : null}
-					<Link className="metric-card" href="/admin/users">
-						<p className="metric-label">Users</p>
-						<p className="metric-value">{counts.users}</p>
-						<span className="metric-link">
-							<span>Detail</span>
-							<span className="metric-link-icon" aria-hidden="true">
-								<ArrowUpRight />
-							</span>
-						</span>
-					</Link>
-					<Link className="metric-card" href="/admin/logs/errors">
-						<p className="metric-label">API Errors</p>
-						<p className="metric-value">{counts.apiErrors}</p>
-						<span className="metric-link">
-							<span>Detail</span>
-							<span className="metric-link-icon" aria-hidden="true">
-								<ArrowUpRight />
-							</span>
-						</span>
-					</Link>
-					<Link className="metric-card" href="/admin/divisions">
-						<p className="metric-label">Divisions</p>
-						<p className="metric-value">{counts.divisions}</p>
-						<span className="metric-link">
-							<span>Detail</span>
-							<span className="metric-link-icon" aria-hidden="true">
-								<ArrowUpRight />
-							</span>
-						</span>
-					</Link>
-					<Link className="metric-card" href="/admin/skills">
-						<p className="metric-label">Skills</p>
-						<p className="metric-value">{counts.skills}</p>
-						<span className="metric-link">
-							<span>Detail</span>
-							<span className="metric-link-icon" aria-hidden="true">
-								<ArrowUpRight />
-							</span>
-						</span>
-					</Link>
+				<div className="admin-card-sections">
+					<article className="panel panel-spacious">
+						<div className="admin-card-section-head">
+							<h3>Platform Controls</h3>
+							<p>Core configuration, billing, and export tools.</p>
+						</div>
+						<div className="metric-grid admin-metric-grid">
+							{renderAdminCard({
+								href: '/admin/settings',
+								label: 'Configuration',
+								value: 'Settings'
+							})}
+							{renderAdminCard({
+								href: '/admin/exports',
+								label: 'Data Export',
+								value: 'JSON / NDJSON / ZIP'
+							})}
+							{billingEnabled
+								? renderAdminCard({
+									href: '/admin/billing',
+									label: 'Billing',
+									value: 'Seats'
+								})
+								: null}
+						</div>
+					</article>
+
+					<article className="panel panel-spacious">
+						<div className="admin-card-section-head">
+							<h3>Access & Taxonomy</h3>
+							<p>Users, organizational structure, and skill catalog management.</p>
+						</div>
+						<div className="metric-grid admin-metric-grid">
+							{renderAdminCard({
+								href: '/admin/users',
+								label: 'Users',
+								value: counts.users
+							})}
+							{renderAdminCard({
+								href: '/admin/divisions',
+								label: 'Divisions',
+								value: counts.divisions
+							})}
+							{renderAdminCard({
+								href: '/admin/skills',
+								label: 'Skills',
+								value: counts.skills
+							})}
+						</div>
+					</article>
+
+					<article className="panel panel-spacious">
+						<div className="admin-card-section-head">
+							<h3>Monitoring</h3>
+							<p>Operational visibility for API and runtime failures.</p>
+						</div>
+						<div className="metric-grid admin-metric-grid">
+							{renderAdminCard({
+								href: '/admin/logs/errors',
+								label: 'API Errors',
+								value: counts.apiErrors
+							})}
+						</div>
+					</article>
 				</div>
 			</section>
 		</AdminGate>
