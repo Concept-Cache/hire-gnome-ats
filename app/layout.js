@@ -10,7 +10,16 @@ export async function generateMetadata() {
 	return {
 		title: String(branding?.siteName || '').trim() || DEFAULT_SITE_NAME,
 		metadataBase: new URL(baseUrl),
-		description: 'Recruiting ATS built with Next.js + MySQL'
+		description: 'Recruiting ATS built with Next.js + MySQL',
+		manifest: '/site.webmanifest',
+		icons: {
+			icon: [
+				{ url: '/favicon.ico', sizes: 'any' },
+				{ url: '/favicon.svg', type: 'image/svg+xml' },
+				{ url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' }
+			],
+			apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }]
+		}
 	};
 }
 

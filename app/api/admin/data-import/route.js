@@ -20,8 +20,13 @@ const SUPPORTED_IMPORT_ENTITY_KEYS = Object.freeze([
 	'interviews',
 	'placements'
 ]);
-const SUPPORTED_SOURCE_TYPES = Object.freeze(['hire_gnome_export', 'bullhorn_csv']);
+const SUPPORTED_SOURCE_TYPES = Object.freeze([
+	'hire_gnome_export',
+	'bullhorn_csv',
+	'zoho_recruit_csv'
+]);
 const BULLHORN_IMPORT_PROFILES = Object.freeze(['clients', 'contacts', 'candidates', 'jobOrders']);
+const ZOHO_IMPORT_PROFILES = Object.freeze(['clients', 'contacts', 'candidates', 'jobOrders']);
 const VALID_CANDIDATE_STATUSES = new Set([
 	'new',
 	'in_review',
@@ -78,7 +83,9 @@ function toOptionalDate(value) {
 function parseSourceType(value) {
 	const normalized = String(value || 'hire_gnome_export').trim().toLowerCase();
 	if (!SUPPORTED_SOURCE_TYPES.includes(normalized)) {
-		throw new ImportValidationError('Import source must be `hire_gnome_export` or `bullhorn_csv`.');
+		throw new ImportValidationError(
+			'Import source must be `hire_gnome_export`, `bullhorn_csv`, or `zoho_recruit_csv`.'
+		);
 	}
 	return normalized;
 }
@@ -90,6 +97,17 @@ function parseBullhornEntityProfile(value) {
 	}
 	if (!BULLHORN_IMPORT_PROFILES.includes(normalized)) {
 		throw new ImportValidationError('Unsupported Bullhorn CSV profile.');
+	}
+	return normalized;
+}
+
+function parseZohoEntityProfile(value) {
+	const normalized = String(value || '').trim();
+	if (!normalized) {
+		throw new ImportValidationError('Select a Zoho Recruit CSV profile before running import.');
+	}
+	if (!ZOHO_IMPORT_PROFILES.includes(normalized)) {
+		throw new ImportValidationError('Unsupported Zoho Recruit CSV profile.');
 	}
 	return normalized;
 }
@@ -186,6 +204,10 @@ function pickBullhornValue(row, aliases) {
 		}
 	}
 	return null;
+}
+
+function pickZohoValue(row, aliases) {
+	return pickBullhornValue(row, aliases);
 }
 
 function normalizeCandidateStatusValue(value) {
@@ -495,6 +517,150 @@ const BULLHORN_PROFILE_MAP = Object.freeze({
 	}
 });
 
+function mapZohoClientRow(row) {
+	const name = pickZohoValue(row, ['account name', 'client name', 'company', 'company name', 'name']);
+	if (!name) return null;
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'account id', 'client id'])),
+		name,
+		industry: pickZohoValue(row, ['industry']),
+		status: normalizeClientStatusValue(pickZohoValue(row, ['status', 'account status', 'client status'])),
+		phone: pickZohoValue(row, ['phone', 'main phone']),
+		address: pickZohoValue(
+			row,
+			['billing street', 'street', 'address', 'mailing street', 'billing address']
+		),
+		city: pickZohoValue(row, ['billing city', 'city', 'mailing city']),
+		state: pickZohoValue(row, ['billing state', 'state', 'mailing state', 'state/province']),
+		zipCode: normalizeZipCode(
+			pickZohoValue(row, ['billing code', 'billing zip', 'zip code', 'postal code', 'zip'])
+		),
+		website: pickZohoValue(row, ['website']),
+		description: pickZohoValue(row, ['description', 'notes'])
+	};
+}
+
+function mapZohoContactRow(row) {
+	const parsedName = parseDisplayName(pickZohoValue(row, ['full name', 'name', 'contact name']));
+	const firstName = pickZohoValue(row, ['first name', 'firstname']) || parsedName.firstName;
+	const lastName = pickZohoValue(row, ['last name', 'lastname']) || parsedName.lastName;
+	if (!firstName || !lastName) return null;
+	const sourceValue = normalizeContactSourceValue(
+		pickZohoValue(row, ['source', 'lead source', 'contact source'])
+	);
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'contact id'])),
+		firstName,
+		lastName,
+		email: pickZohoValue(row, ['email']),
+		phone:
+			pickZohoValue(row, ['mobile', 'mobile phone']) ||
+			pickZohoValue(row, ['phone', 'work phone']),
+		zipCode: normalizeZipCode(
+			pickZohoValue(row, ['mailing zip', 'mailing code', 'zip code', 'postal code', 'zip'])
+		),
+		title: pickZohoValue(row, ['title', 'job title', 'designation']),
+		department: pickZohoValue(row, ['department']),
+		linkedinUrl: pickZohoValue(row, ['linkedin', 'linkedin url']),
+		source: sourceValue || null,
+		address: pickZohoValue(row, ['mailing street', 'street', 'address']),
+		clientId: toOptionalInt(pickZohoValue(row, ['account id', 'client id', 'company id'])),
+		clientName: pickZohoValue(row, ['account name', 'client name', 'company', 'company name'])
+	};
+}
+
+function mapZohoCandidateRow(row) {
+	const parsedName = parseDisplayName(pickZohoValue(row, ['full name', 'name', 'candidate name']));
+	const firstName = pickZohoValue(row, ['first name', 'firstname']) || parsedName.firstName;
+	const lastName = pickZohoValue(row, ['last name', 'lastname']) || parsedName.lastName;
+	const email = pickZohoValue(row, ['email']);
+	if (!firstName || !lastName || !email) return null;
+	const sourceValue = normalizeCandidateSourceValue(
+		pickZohoValue(row, ['source', 'lead source', 'candidate source'])
+	);
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'candidate id'])),
+		firstName,
+		lastName,
+		email,
+		phone: pickZohoValue(row, ['phone', 'home phone', 'work phone']),
+		mobile: pickZohoValue(row, ['mobile', 'mobile phone']),
+		status: normalizeCandidateStatusValue(
+			pickZohoValue(row, ['candidate status', 'status', 'pipeline stage'])
+		),
+		source: sourceValue || null,
+		currentJobTitle: pickZohoValue(row, ['current job title', 'current title', 'job title']),
+		currentEmployer: pickZohoValue(row, ['current employer', 'current company', 'employer']),
+		experienceYears: toOptionalNumber(
+			pickZohoValue(row, ['years of experience', 'experience in years', 'experience years'])
+		),
+		address: pickZohoValue(row, ['street', 'address', 'mailing street']),
+		city: pickZohoValue(row, ['city', 'mailing city']),
+		state: pickZohoValue(row, ['state', 'state/province', 'mailing state']),
+		zipCode: normalizeZipCode(
+			pickZohoValue(row, ['zip code', 'postal code', 'zip', 'mailing zip', 'mailing code'])
+		),
+		website: pickZohoValue(row, ['website']),
+		linkedinUrl: pickZohoValue(row, ['linkedin', 'linkedin url']),
+		skillSet: pickZohoValue(row, ['skill set', 'skills', 'key skills']),
+		summary: pickZohoValue(row, ['resume', 'resume summary', 'summary', 'candidate profile'])
+	};
+}
+
+function mapZohoJobOrderRow(row) {
+	const title = pickZohoValue(row, ['posting title', 'job opening name', 'job title', 'title']);
+	if (!title) return null;
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'job opening id', 'job id'])),
+		title,
+		description: pickZohoValue(row, ['job description', 'description', 'internal description']),
+		publicDescription: pickZohoValue(row, ['public description', 'career site description']),
+		location: pickZohoValue(row, ['location', 'city']),
+		city: pickZohoValue(row, ['city']),
+		state: pickZohoValue(row, ['state', 'state/province']),
+		zipCode: normalizeZipCode(pickZohoValue(row, ['zip', 'zip code', 'postal code'])),
+		status: toJobOrderStatusValue(pickZohoValue(row, ['job opening status', 'status'])),
+		employmentType: normalizeEmploymentTypeValue(
+			pickZohoValue(row, ['job type', 'employment type', 'position type'])
+		),
+		openings: toOptionalInt(pickZohoValue(row, ['number of positions', 'positions', 'openings'])),
+		currency: normalizeCurrencyCode(pickZohoValue(row, ['currency'])),
+		salaryMin: toOptionalNumber(
+			pickZohoValue(row, ['salary from', 'salary min', 'minimum salary', 'pay rate min'])
+		),
+		salaryMax: toOptionalNumber(
+			pickZohoValue(row, ['salary to', 'salary max', 'maximum salary', 'pay rate max'])
+		),
+		publishToCareerSite: parseBooleanFlag(
+			pickZohoValue(row, ['publish to career site', 'published', 'is published'])
+		),
+		clientId: toOptionalInt(pickZohoValue(row, ['account id', 'client id', 'company id'])),
+		clientName: pickZohoValue(row, ['account name', 'client name', 'company', 'company name']),
+		contactId: toOptionalInt(pickZohoValue(row, ['contact id', 'hiring manager id'])),
+		contactEmail: pickZohoValue(row, ['contact email', 'hiring manager email']),
+		contactName: pickZohoValue(row, ['contact name', 'hiring manager'])
+	};
+}
+
+const ZOHO_PROFILE_MAP = Object.freeze({
+	clients: {
+		entityKey: 'clients',
+		mapRow: mapZohoClientRow
+	},
+	contacts: {
+		entityKey: 'contacts',
+		mapRow: mapZohoContactRow
+	},
+	candidates: {
+		entityKey: 'candidates',
+		mapRow: mapZohoCandidateRow
+	},
+	jobOrders: {
+		entityKey: 'jobOrders',
+		mapRow: mapZohoJobOrderRow
+	}
+});
+
 async function parseZipImport(buffer) {
 	const zip = await JSZip.loadAsync(buffer);
 	const normalized = createEmptyImportData();
@@ -590,6 +756,41 @@ async function parseUploadedBullhornCsvFile(file, bullhornProfile) {
 	const contentType = String(file.type || '').toLowerCase();
 	if (!fileName.endsWith('.csv') && !contentType.includes('csv')) {
 		throw new ImportValidationError('Bullhorn imports must use CSV files.');
+	}
+
+	const normalized = createEmptyImportData();
+	const csvRows = parseCsvText(buffer.toString('utf8'));
+	for (const row of csvRows) {
+		const mapped = profile.mapRow(row);
+		if (!mapped) continue;
+		normalized[profile.entityKey].push(mapped);
+	}
+
+	assertAtLeastOneEntity(normalized);
+	return {
+		format: 'csv',
+		data: normalized
+	};
+}
+
+async function parseUploadedZohoCsvFile(file, zohoProfile) {
+	if (!file || typeof file.arrayBuffer !== 'function') {
+		throw new ImportValidationError('Upload a CSV file to import.');
+	}
+	const profile = ZOHO_PROFILE_MAP[zohoProfile];
+	if (!profile) {
+		throw new ImportValidationError('Unsupported Zoho Recruit CSV profile.');
+	}
+
+	const buffer = Buffer.from(await file.arrayBuffer());
+	if (!buffer || buffer.length <= 0) {
+		throw new ImportValidationError('Import file is empty.');
+	}
+
+	const fileName = String(file.name || '').toLowerCase();
+	const contentType = String(file.type || '').toLowerCase();
+	if (!fileName.endsWith('.csv') && !contentType.includes('csv')) {
+		throw new ImportValidationError('Zoho Recruit imports must use CSV files.');
 	}
 
 	const normalized = createEmptyImportData();
@@ -1316,15 +1517,24 @@ async function postAdmin_data_importHandler(req) {
 	const bullhornEntity = sourceType === 'bullhorn_csv'
 		? parseBullhornEntityProfile(formData.get('bullhornEntity'))
 		: null;
-	const parsedImport = sourceType === 'bullhorn_csv'
-		? await parseUploadedBullhornCsvFile(file, bullhornEntity)
-		: await parseUploadedHireGnomeImportFile(file);
+	const zohoEntity = sourceType === 'zoho_recruit_csv'
+		? parseZohoEntityProfile(formData.get('zohoEntity'))
+		: null;
+	let parsedImport;
+	if (sourceType === 'bullhorn_csv') {
+		parsedImport = await parseUploadedBullhornCsvFile(file, bullhornEntity);
+	} else if (sourceType === 'zoho_recruit_csv') {
+		parsedImport = await parseUploadedZohoCsvFile(file, zohoEntity);
+	} else {
+		parsedImport = await parseUploadedHireGnomeImportFile(file);
+	}
 	const preview = buildPreviewSummary(parsedImport.data);
 	if (mode === 'preview') {
 		return NextResponse.json({
 			mode,
 			sourceType,
 			bullhornEntity,
+			zohoEntity,
 			format: parsedImport.format,
 			preview
 		});
@@ -1340,6 +1550,7 @@ async function postAdmin_data_importHandler(req) {
 		mode,
 		sourceType,
 		bullhornEntity,
+		zohoEntity,
 		format: parsedImport.format,
 		preview,
 		result: imported

@@ -40,6 +40,11 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Candidate and job-order match workspaces (top matches, sortable/paged)
 - Audit trails on records and admin diagnostics
 - Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering
+- Admin data import module:
+	- Hire Gnome export re-import (`JSON`, `NDJSON`, `ZIP`)
+	- Bullhorn CSV profile imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
+	- Zoho Recruit CSV profile imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
+	- Built-in CSV template downloads per profile
 - Global search with cross-entity results
 - In-app notifications, unsaved-change navigation guard, archive/restore flows
 - Per-list column chooser with persisted preferences
@@ -133,6 +138,15 @@ Use `Admin Area > Data Export` for:
 - Export format selection (`JSON`, `NDJSON`, `ZIP`)
 - Optional inclusion of audit trail and API error logs
 - Incremental date-range exports using `updatedAt` (fallback `createdAt`)
+
+Use `Admin Area > Data Import` for:
+- Source selection:
+	- Hire Gnome export (`JSON`, `NDJSON`, `ZIP`)
+	- Bullhorn CSV
+	- Zoho Recruit CSV
+- Entity profile selection for CSV imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
+- Import preview before apply
+- Profile template CSV download from the UI
 
 ### `.env` Configuration
 Use `.env` for:
@@ -322,6 +336,7 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 - Health endpoint: `GET /api/health`
 - Admin diagnostics: `Admin Area > System Settings > System Diagnostics`
 - Data export: `Admin Area > Data Export` (or `GET /api/admin/data-export`)
+- Data import: `Admin Area > Data Import` (or `POST /api/admin/data-import`)
 
 Data export query options:
 - `format`: `json` | `ndjson` | `zip`
@@ -329,6 +344,13 @@ Data export query options:
 - `includeApiErrorLogs`: `true`/`false`
 - `dateFrom`: ISO datetime (optional)
 - `dateTo`: ISO datetime (optional)
+
+Data import form fields:
+- `mode`: `preview` | `apply`
+- `sourceType`: `hire_gnome_export` | `bullhorn_csv` | `zoho_recruit_csv`
+- `file`: upload file (`.json`, `.ndjson`, `.zip`, or `.csv` based on source)
+- `bullhornEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=bullhorn_csv`)
+- `zohoEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=zoho_recruit_csv`)
 
 Archive behavior:
 - Archive is soft-delete and reversible through the Archive module.

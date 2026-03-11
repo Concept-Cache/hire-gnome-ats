@@ -8,10 +8,11 @@ import { useToast } from '@/app/components/toast-provider';
 
 const SOURCE_OPTIONS = [
 	{ value: 'hire_gnome_export', label: 'Hire Gnome Export (.json / .ndjson / .zip)' },
-	{ value: 'bullhorn_csv', label: 'Bullhorn CSV (.csv)' }
+	{ value: 'bullhorn_csv', label: 'Bullhorn CSV (.csv)' },
+	{ value: 'zoho_recruit_csv', label: 'Zoho Recruit CSV (.csv)' }
 ];
 
-const BULLHORN_ENTITY_OPTIONS = [
+const CSV_ENTITY_OPTIONS = [
 	{ value: 'clients', label: 'Clients' },
 	{ value: 'contacts', label: 'Contacts' },
 	{ value: 'candidates', label: 'Candidates' },
@@ -169,6 +170,157 @@ const BULLHORN_CSV_TEMPLATES = Object.freeze({
 	}
 });
 
+const ZOHO_CSV_TEMPLATES = Object.freeze({
+	clients: {
+		headers: [
+			'ID',
+			'Account Name',
+			'Industry',
+			'Status',
+			'Phone',
+			'Billing Street',
+			'Billing City',
+			'Billing State',
+			'Billing Code',
+			'Website',
+			'Description'
+		],
+		sample: [
+			'5001',
+			'Pioneer Clinical Group',
+			'Healthcare',
+			'Active',
+			'(555) 338-4400',
+			'900 Market Street',
+			'Denver',
+			'CO',
+			'80202',
+			'https://pioneerclinical.example',
+			'Regional clinical staffing client'
+		]
+	},
+	contacts: {
+		headers: [
+			'ID',
+			'First Name',
+			'Last Name',
+			'Email',
+			'Mobile',
+			'Title',
+			'Department',
+			'Source',
+			'Mailing Street',
+			'Mailing Zip',
+			'Account ID',
+			'Account Name'
+		],
+		sample: [
+			'6001',
+			'Elena',
+			'Brooks',
+			'elena.brooks@pioneerclinical.example',
+			'(555) 338-4411',
+			'Director of Talent',
+			'Human Resources',
+			'LinkedIn Outreach',
+			'900 Market Street',
+			'80202',
+			'5001',
+			'Pioneer Clinical Group'
+		]
+	},
+	candidates: {
+		headers: [
+			'ID',
+			'First Name',
+			'Last Name',
+			'Email',
+			'Mobile',
+			'Phone',
+			'Candidate Status',
+			'Source',
+			'Current Job Title',
+			'Current Employer',
+			'Years of Experience',
+			'Street',
+			'City',
+			'State',
+			'Zip Code',
+			'LinkedIn',
+			'Website',
+			'Skill Set',
+			'Resume'
+		],
+		sample: [
+			'7001',
+			'Marcus',
+			'Reed',
+			'marcus.reed@example.com',
+			'(555) 771-2299',
+			'(555) 771-2200',
+			'Qualified',
+			'Referral',
+			'Senior Recruiter',
+			'Northline Talent',
+			'11',
+			'55 Lakeview Dr',
+			'Charlotte',
+			'NC',
+			'28202',
+			'https://linkedin.com/in/marcusreed',
+			'https://marcusreed.example',
+			'Sourcing;Boolean Search;Account Management',
+			'Experienced recruiter focused on healthcare and professional placements.'
+		]
+	},
+	jobOrders: {
+		headers: [
+			'ID',
+			'Posting Title',
+			'Job Opening Status',
+			'Job Type',
+			'Currency',
+			'Salary From',
+			'Salary To',
+			'Number of Positions',
+			'Job Description',
+			'Public Description',
+			'Location',
+			'City',
+			'State',
+			'Zip',
+			'Publish To Career Site',
+			'Account ID',
+			'Account Name',
+			'Contact ID',
+			'Contact Email',
+			'Contact Name'
+		],
+		sample: [
+			'8001',
+			'Clinical Recruiter',
+			'Open',
+			'Permanent',
+			'USD',
+			'90000',
+			'120000',
+			'1',
+			'Internal role requirements and delivery expectations.',
+			'Join our team as a Clinical Recruiter supporting regional growth.',
+			'Denver HQ',
+			'Denver',
+			'CO',
+			'80202',
+			'true',
+			'5001',
+			'Pioneer Clinical Group',
+			'6001',
+			'elena.brooks@pioneerclinical.example',
+			'Elena Brooks'
+		]
+	}
+});
+
 function formatCount(value) {
 	return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
@@ -186,18 +338,23 @@ export default function AdminImportsPage() {
 	const [file, setFile] = useState(null);
 	const [sourceType, setSourceType] = useState('hire_gnome_export');
 	const [bullhornEntity, setBullhornEntity] = useState('clients');
+	const [zohoEntity, setZohoEntity] = useState('clients');
 	const [runningMode, setRunningMode] = useState('');
 	const [preview, setPreview] = useState(null);
 	const [result, setResult] = useState(null);
 
 	const busy = runningMode === 'preview' || runningMode === 'apply';
 	const isBullhorn = sourceType === 'bullhorn_csv';
-	const fileAccept = isBullhorn
+	const isZoho = sourceType === 'zoho_recruit_csv';
+	const isCsvSource = isBullhorn || isZoho;
+	const selectedCsvEntity = isBullhorn ? bullhornEntity : zohoEntity;
+	const fileAccept = isCsvSource
 		? '.csv,text/csv'
 		: '.json,.ndjson,.zip,application/json,application/x-ndjson,application/zip';
 
-	function downloadBullhornTemplate() {
-		const template = BULLHORN_CSV_TEMPLATES[bullhornEntity];
+	function downloadCsvTemplate() {
+		const templateSet = isBullhorn ? BULLHORN_CSV_TEMPLATES : ZOHO_CSV_TEMPLATES;
+		const template = templateSet[selectedCsvEntity];
 		if (!template) return;
 		const csvLines = [template.headers, template.sample].map((row) =>
 			row.map((value) => toCsvValue(value)).join(',')
@@ -207,7 +364,7 @@ export default function AdminImportsPage() {
 		const objectUrl = URL.createObjectURL(blob);
 		const anchor = document.createElement('a');
 		anchor.href = objectUrl;
-		anchor.download = `bullhorn-${bullhornEntity}-template.csv`;
+		anchor.download = `${isBullhorn ? 'bullhorn' : 'zoho-recruit'}-${selectedCsvEntity}-template.csv`;
 		document.body.appendChild(anchor);
 		anchor.click();
 		anchor.remove();
@@ -224,6 +381,9 @@ export default function AdminImportsPage() {
 			formData.set('sourceType', sourceType);
 			if (isBullhorn) {
 				formData.set('bullhornEntity', bullhornEntity);
+			}
+			if (isZoho) {
+				formData.set('zohoEntity', zohoEntity);
 			}
 			formData.set('file', file);
 
@@ -257,7 +417,7 @@ export default function AdminImportsPage() {
 					<div>
 						<Link href="/admin" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
 						<h2>Data Import</h2>
-						<p>Import core ATS entities from Hire Gnome exports or mapped Bullhorn CSV files.</p>
+						<p>Import core ATS entities from Hire Gnome exports, Bullhorn CSV, or Zoho Recruit CSV files.</p>
 					</div>
 				</header>
 
@@ -282,22 +442,26 @@ export default function AdminImportsPage() {
 							</select>
 						</FormField>
 
-						{isBullhorn ? (
+						{isCsvSource ? (
 							<>
 								<FormField
-									label="Bullhorn CSV Profile"
+									label={isBullhorn ? 'Bullhorn CSV Profile' : 'Zoho Recruit CSV Profile'}
 									hint="Choose the entity represented by this CSV file."
 								>
 									<select
-										value={bullhornEntity}
+										value={selectedCsvEntity}
 										onChange={(event) => {
-											setBullhornEntity(event.target.value);
+											if (isBullhorn) {
+												setBullhornEntity(event.target.value);
+											} else {
+												setZohoEntity(event.target.value);
+											}
 											setPreview(null);
 											setResult(null);
 										}}
 										disabled={busy}
 									>
-										{BULLHORN_ENTITY_OPTIONS.map((option) => (
+										{CSV_ENTITY_OPTIONS.map((option) => (
 											<option key={option.value} value={option.value}>
 												{option.label}
 											</option>
@@ -305,7 +469,7 @@ export default function AdminImportsPage() {
 									</select>
 								</FormField>
 								<div className="form-actions">
-									<button type="button" className="btn-secondary" onClick={downloadBullhornTemplate} disabled={busy}>
+									<button type="button" className="btn-secondary" onClick={downloadCsvTemplate} disabled={busy}>
 										Download Template CSV
 									</button>
 								</div>
@@ -315,8 +479,8 @@ export default function AdminImportsPage() {
 						<FormField
 							label="Import File"
 							hint={
-								isBullhorn
-									? 'Upload one Bullhorn CSV file at a time using the selected profile.'
+								isCsvSource
+									? `Upload one ${isBullhorn ? 'Bullhorn' : 'Zoho Recruit'} CSV file at a time using the selected profile.`
 									: 'Use files generated by Admin Data Export.'
 							}
 						>
