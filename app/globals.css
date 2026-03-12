@@ -3036,6 +3036,202 @@ button:disabled {
 	margin-left: 0.38rem;
 }
 
+.panel-header-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.7rem;
+	margin-bottom: 0.65rem;
+}
+
+.panel-header-row h3 {
+	margin: 0;
+}
+
+.view-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.38rem;
+}
+
+.view-toggle-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.view-toggle-button svg {
+	width: 0.9rem;
+	height: 0.9rem;
+	stroke-width: 2.1;
+}
+
+.view-toggle-button.active {
+	background: linear-gradient(180deg, var(--ui-primary-start) 0%, var(--ui-primary-end) 100%);
+	border-color: var(--ui-primary-border);
+	color: #ffffff;
+}
+
+.view-toggle-button.active:hover:not(:disabled) {
+	background: linear-gradient(180deg, var(--ui-primary-hover-start) 0%, var(--ui-primary-hover-end) 100%);
+	border-color: var(--ui-primary-hover-border);
+	color: #ffffff;
+}
+
+.kanban-board {
+	display: flex;
+	gap: 0.65rem;
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.12rem 0.06rem 0.4rem;
+}
+
+.kanban-column {
+	flex: 1 0 15.25rem;
+	min-width: 15.25rem;
+	max-width: 20rem;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	padding: 0.52rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.kanban-column.is-drop-target {
+	border-color: var(--ui-primary-border);
+	box-shadow: inset 0 0 0 1px var(--ui-primary-border);
+	background: color-mix(in srgb, var(--panel) 88%, var(--accent-ink) 12%);
+}
+
+.kanban-column-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.kanban-column-header h4 {
+	font-size: 0.88rem;
+	margin: 0;
+	color: var(--ink);
+}
+
+.kanban-column-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.55rem;
+	height: 1.45rem;
+	padding: 0 0.4rem;
+	border-radius: 999px;
+	border: 1px solid var(--ui-secondary-border);
+	background: var(--ui-secondary-bg);
+	color: var(--ui-secondary-ink);
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+
+.kanban-column-cards {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.kanban-empty {
+	font-size: 0.77rem;
+	color: var(--muted);
+	padding: 0.45rem;
+	border: 1px dashed var(--line);
+	border-radius: 8px;
+	background: #f8fbff;
+}
+
+.kanban-card {
+	position: relative;
+	display: block;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #ffffff;
+	padding: 0.48rem 0.52rem;
+	box-shadow: 0 1px 2px rgba(18, 36, 73, 0.08);
+	cursor: grab;
+}
+
+.kanban-card:hover {
+	border-color: var(--ui-secondary-hover-border);
+	box-shadow: 0 2px 5px rgba(18, 36, 73, 0.14);
+}
+
+.kanban-card:active {
+	cursor: grabbing;
+}
+
+.kanban-card.is-dragging {
+	opacity: 0.68;
+}
+
+.kanban-card.is-moving {
+	opacity: 0.62;
+	cursor: wait;
+}
+
+.kanban-card.is-moving::after {
+	content: '';
+	position: absolute;
+	top: 0.45rem;
+	right: 0.45rem;
+	width: 0.8rem;
+	height: 0.8rem;
+	border: 2px solid #c9d8ef;
+	border-top-color: #1f62c2;
+	border-radius: 999px;
+	animation: row-action-icon-spin 0.85s linear infinite;
+}
+
+.kanban-card-body {
+	display: grid;
+	gap: 0.3rem;
+}
+
+.kanban-card-link {
+	display: block;
+	min-height: 0;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--ink);
+	text-align: left;
+	font-weight: 700;
+	font-size: 0.83rem;
+	line-height: 1.2;
+	cursor: pointer;
+}
+
+.kanban-card-link:hover:not(:disabled) {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	color: var(--accent);
+	text-decoration: underline;
+}
+
+.kanban-card-meta {
+	font-size: 0.75rem;
+	color: var(--muted);
+	line-height: 1.25;
+}
+
+.kanban-card-time {
+	font-size: 0.72rem;
+	color: #5d7092;
+	line-height: 1.25;
+}
+
 .method-tabs {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
@@ -5430,6 +5626,25 @@ small {
 	.list-controls-with-columns.list-controls-three,
 	.list-controls-with-columns.interview-list-controls {
 		grid-template-columns: 1fr;
+	}
+
+	.panel-header-row {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.view-toggle {
+		width: 100%;
+	}
+
+	.view-toggle-button {
+		flex: 1 1 0;
+		justify-content: center;
+	}
+
+	.kanban-column {
+		min-width: calc(100vw - 4rem);
+		max-width: calc(100vw - 4rem);
 	}
 
 	.archive-list-actions {

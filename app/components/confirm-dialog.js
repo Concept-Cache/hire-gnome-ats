@@ -87,7 +87,6 @@ export function ConfirmDialogProvider({ children }) {
 		selectedOptionMap: {}
 	});
 	const resolverRef = useRef(null);
-	const valueRef = useRef('');
 
 	const close = useCallback((result) => {
 		setState((current) => ({ ...current, enabled: false }));
@@ -189,7 +188,6 @@ export function ConfirmDialogProvider({ children }) {
 			}
 
 			const initialValue = String(options.initialValue || '').trim();
-			valueRef.current = initialValue;
 
 			resolverRef.current = resolve;
 			setState({
@@ -228,11 +226,11 @@ export function ConfirmDialogProvider({ children }) {
 			}
 
 			if (event.key === 'Enter') {
-				if (state.mode === 'prompt' && state.required && !String(valueRef.current || '').trim()) {
+				if (state.mode === 'prompt' && state.required && !String(state.inputValue || '').trim()) {
 					return;
 				}
 				if (state.mode === 'prompt') {
-					close(String(valueRef.current || '').trim());
+					close(String(state.inputValue || '').trim());
 					return;
 				}
 				if (state.mode === 'confirm_options') {
@@ -266,7 +264,7 @@ export function ConfirmDialogProvider({ children }) {
 
 	const onConfirm = () => {
 		if (state.mode === 'prompt') {
-			const value = String(valueRef.current || '').trim();
+			const value = String(state.inputValue || '').trim();
 			if (state.required && !value) return;
 			close(value);
 			return;
@@ -319,16 +317,18 @@ export function ConfirmDialogProvider({ children }) {
 							<div className="confirm-prompt">
 								{state.inputLabel ? <label>{state.inputLabel}</label> : null}
 								<input
-									ref={(element) => {
-										if (!element) return;
-										valueRef.current = state.initialValue;
-										element.value = state.initialValue;
-										element.focus();
-									}}
+									autoFocus
 									className="confirm-input"
-									defaultValue={state.inputValue}
+									value={state.inputValue}
 									onChange={(event) => {
-										valueRef.current = event.target.value;
+										const nextValue = event.target.value;
+										setState((current) => {
+											if (current.mode !== 'prompt') return current;
+											return {
+												...current,
+												inputValue: nextValue
+											};
+										});
 									}}
 								/>
 							</div>
@@ -358,7 +358,7 @@ export function ConfirmDialogProvider({ children }) {
 							<button
 								type="button"
 								className={state.isDanger ? 'btn-danger confirm-action-button' : 'btn-primary confirm-action-button'}
-								disabled={state.mode === 'prompt' && state.required && !String(valueRef.current || '').trim()}
+								disabled={state.mode === 'prompt' && state.required && !String(state.inputValue || '').trim()}
 								onClick={onConfirm}
 							>
 								{state.confirmLabel}

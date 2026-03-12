@@ -34,6 +34,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Authentication with first-run onboarding
 - Role and division access model (`Administrator`, `Director`, `Recruiter`)
 - Core modules: Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, Placements
+- List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
 - Candidate file attachments with object storage (`s3`) and local fallback
@@ -360,6 +361,10 @@ Data import form fields:
 - `file`: upload file (`.json`, `.ndjson`, `.zip`, or `.csv` based on source)
 - `bullhornEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=bullhorn_csv`)
 - `zohoEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=zoho_recruit_csv`)
+
+Kanban status update endpoints:
+- `PATCH /api/candidates/[id]/status` with `{ "status": "...", "reason": "..." }`
+- `PATCH /api/job-orders/[id]/status` with `{ "status": "open|on_hold|closed" }`
 
 Hire Gnome export/import coverage:
 - Export includes `customFieldDefinitions`, core entities, and related child records.
