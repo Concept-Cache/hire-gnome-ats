@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
@@ -14,7 +15,8 @@ const initialForm = {
 	candidateId: '',
 	jobOrderId: '',
 	status: 'submitted',
-	notes: ''
+	notes: '',
+	customFields: {}
 };
 
 function NewSubmissionsPageContent() {
@@ -30,12 +32,23 @@ function NewSubmissionsPageContent() {
 	});
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	useUnsavedChangesGuard(form);
 	const selectedCandidateIsQualified =
 		!form.candidateId ||
 		!selectedCandidateStatus ||
 		isCandidateQualifiedForPipeline(selectedCandidateStatus);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
+	const canSave = Boolean(
+		form.candidateId &&
+		form.jobOrderId &&
+		selectedCandidateIsQualified &&
+		customFieldsComplete
+	);
 
 	useEffect(() => {
 		let active = true;
@@ -78,6 +91,10 @@ function NewSubmissionsPageContent() {
 					selectedCandidateStatus
 				)}.`
 			);
+			return;
+		}
+		if (!customFieldsComplete) {
+			setError('Complete all required custom fields before saving.');
 			return;
 		}
 		setSaving(true);
@@ -164,7 +181,18 @@ function NewSubmissionsPageContent() {
 							onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
 						/>
 					</FormField>
-					<button type="submit" disabled={saving || !selectedCandidateIsQualified}>
+					<CustomFieldsSection
+						moduleKey="submissions"
+						values={form.customFields}
+						onChange={(nextCustomFields) =>
+							setForm((f) => ({
+								...f,
+								customFields: nextCustomFields
+							}))
+						}
+						onDefinitionsChange={setCustomFieldDefinitions}
+					/>
+					<button type="submit" disabled={saving || !canSave}>
 						{saving ? 'Saving...' : 'Create Submission'}
 					</button>
 				</form>

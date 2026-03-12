@@ -124,3 +124,24 @@ Career-site quick-apply submissions use layered controls:
 - minimum form fill timing guard (`CAREERS_APPLY_MIN_FORM_FILL_SECONDS`, default `2`)
 
 Set `CAREERS_APPLY_MIN_FORM_FILL_SECONDS=0` to disable timing checks.
+
+## 8) Custom Field Export/Import Sanity Check
+
+Use this after upgrades, environment migrations, or backup/restore tests.
+
+1. In `Admin > Custom Fields`, confirm at least one custom field exists for each target module (`Candidates`, `Clients`, `Contacts`, `Job Orders`).
+2. In `Admin > Data Export`, run a `ZIP` export and download the file.
+3. Verify the export contains `data/customFieldDefinitions.json`.
+4. In a test environment, go to `Admin > Data Import`, upload the export file, and run `Preview Import`.
+5. Confirm preview counts include `Custom Fields` and expected entity totals.
+6. Run `Apply Import`.
+7. Re-open `Admin > Custom Fields` and confirm definitions are present and ordered correctly.
+8. Open one record form per module and verify:
+	- custom fields render,
+	- required custom fields block save when empty,
+	- saved values persist after refresh.
+
+Import behavior notes:
+- Custom field definitions are applied before entity upserts.
+- Definitions are upserted by `recordId` first, then by `(moduleKey, fieldKey)`.
+- Entity `customFields` payloads for clients/contacts/candidates/job orders are imported when present.

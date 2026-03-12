@@ -16,6 +16,7 @@ import { createRecordId } from '@/lib/record-id';
 import { createOwnerAssignmentNotifications } from '@/lib/notifications';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function isObjectEmpty(value) {
@@ -182,7 +183,7 @@ async function patchCandidates_idHandler(req, { params }) {
 
 		const actingUser = await getActingUser(req, { allowFallback: false });
 		const scopedWhere = addScopeToWhere({ id }, getEntityScope(actingUser));
-			const existing = await prisma.candidate.findFirst({ where: scopedWhere });
+		const existing = await prisma.candidate.findFirst({ where: scopedWhere });
 			if (!existing) {
 				return NextResponse.json({ error: 'Candidate not found.' }, { status: 404 });
 			}
@@ -192,14 +193,39 @@ async function patchCandidates_idHandler(req, { params }) {
 		if (!parsed.success) {
 			return NextResponse.json({ errors: parsed.error.flatten() }, { status: 400 });
 		}
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'candidates',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const parsedDataWithCustomFields = {
+			...parsed.data,
+			customFields: customFieldValidation.customFields
+		};
 		if (actingUser?.role === 'ADMINISTRATOR' && !parsed.data.divisionId) {
 			return NextResponse.json({ error: 'Division is required for administrators.' }, { status: 400 });
 		}
-		const stageChangeReason = normalizeStageChangeReason(parsed.data.stageChangeReason);
+		const stageChangeReason = normalizeStageChangeReason(parsedDataWithCustomFields.stageChangeReason);
 
 			const normalized = await withInferredCityStateFromZip(
 				prisma,
-				normalizeCandidateData(parsed.data)
+				normalizeCandidateData(parsedDataWithCustomFields)
 			);
 			const statusDidChange = hasStatusChanged(existing.status, normalized.status);
 		if (statusDidChange && !stageChangeReason) {
@@ -208,7 +234,10 @@ async function patchCandidates_idHandler(req, { params }) {
 				{ status: 400 }
 			);
 		}
-			const resolvedSkills = await resolveCandidateSkills(parsed.data.skillIds, parsed.data.parsedSkillNames);
+			const resolvedSkills = await resolveCandidateSkills(
+				parsedDataWithCustomFields.skillIds,
+				parsedDataWithCustomFields.parsedSkillNames
+			);
 			const resolvedSkillSet = await resolveSkillSetForWrite({
 				normalizedSkillSet: normalized.skillSet,
 				unmatchedParsedSkillNames: resolvedSkills.unmatchedParsedSkillNames,

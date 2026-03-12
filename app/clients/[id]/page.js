@@ -9,6 +9,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import PhoneInput from '@/app/components/phone-input';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
@@ -32,7 +33,8 @@ const initialForm = {
 	state: '',
 	zipCode: '',
 	website: '',
-	description: ''
+	description: '',
+	customFields: {}
 };
 
 function toForm(row) {
@@ -49,7 +51,11 @@ function toForm(row) {
 		state: row.state || '',
 		zipCode: row.zipCode || '',
 		website: row.website || '',
-		description: row.description || ''
+		description: row.description || '',
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -76,6 +82,7 @@ export default function ClientDetailsPage() {
 	const [noteState, setNoteState] = useState({ saving: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [workspaceTab, setWorkspaceTab] = useState('notes');
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [notesSort, setNotesSort] = useState({ field: 'createdAt', direction: 'desc' });
@@ -85,12 +92,17 @@ export default function ClientDetailsPage() {
 	const toast = useToast();
 	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
 	const hasValidWebsite = isValidOptionalHttpUrl(form.website);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 	const canSave = Boolean(
 		form.name.trim() &&
 		form.status &&
 		form.ownerId &&
 		form.zipCode.trim() &&
 		hasValidWebsite &&
+		customFieldsComplete &&
 		(!isAdmin || form.divisionId)
 	);
 	const websiteError =
@@ -532,6 +544,17 @@ export default function ClientDetailsPage() {
 									onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
 								/>
 							</FormField>
+							<CustomFieldsSection
+								moduleKey="clients"
+								values={form.customFields}
+								onChange={(nextCustomFields) =>
+									setForm((f) => ({
+										...f,
+										customFields: nextCustomFields
+									}))
+								}
+								onDefinitionsChange={setCustomFieldDefinitions}
+							/>
 						</section>
 
 						<div className="form-actions">

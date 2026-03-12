@@ -9,6 +9,7 @@ import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import SkillChipSelect from '@/app/components/skill-chip-select';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
@@ -79,7 +80,8 @@ const initialEditForm = {
 	skillIds: undefined,
 	skillSet: '',
 	stageChangeReason: '',
-	summary: ''
+	summary: '',
+	customFields: {}
 };
 
 function normalizeSkillKey(value) {
@@ -157,7 +159,11 @@ function toForm(row, availableSkills = []) {
 				: undefined,
 			skillSet: sanitizeOtherSkillSet(row.skillSet, row, availableSkills),
 			stageChangeReason: '',
-			summary: row.summary || ''
+			summary: row.summary || '',
+			customFields:
+				row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+					? row.customFields
+					: {}
 	};
 }
 
@@ -239,6 +245,7 @@ export default function CandidateDetailsPage() {
 	const actionsMenuRef = useRef(null);
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(editForm, {
@@ -271,6 +278,10 @@ export default function CandidateDetailsPage() {
 	const hasValidEmail = isValidEmailAddress(editForm.email);
 	const hasValidWebsite = isValidOptionalHttpUrl(editForm.website);
 	const hasValidLinkedinUrl = isValidOptionalHttpUrl(editForm.linkedinUrl);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		editForm.customFields
+	);
 	const statusIsChanging =
 		Boolean(candidate) && String(editForm.status || '').trim() !== String(candidate?.status || '').trim();
 	const hasStageChangeReason = !statusIsChanging || Boolean(editForm.stageChangeReason.trim());
@@ -279,6 +290,7 @@ export default function CandidateDetailsPage() {
 		hasValidEmail &&
 		hasValidWebsite &&
 		hasValidLinkedinUrl &&
+		customFieldsComplete &&
 		hasStageChangeReason;
 	const candidateQualifiedForSubmissionInterview = isCandidateQualifiedForPipeline(candidate?.status);
 	const emailError =
@@ -1332,6 +1344,17 @@ export default function CandidateDetailsPage() {
 							/>
 						</div>
 					</section>
+					<CustomFieldsSection
+						moduleKey="candidates"
+						values={editForm.customFields}
+						onChange={(nextCustomFields) =>
+							setEditForm((f) => ({
+								...f,
+								customFields: nextCustomFields
+							}))
+						}
+						onDefinitionsChange={setCustomFieldDefinitions}
+					/>
 
 					<div className="form-actions">
 						<button type="submit" disabled={saveState.saving || !canSaveCandidate}>

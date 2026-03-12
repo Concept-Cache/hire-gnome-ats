@@ -9,6 +9,7 @@ import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
@@ -36,7 +37,8 @@ const initialForm = {
 	linkedinUrl: '',
 	source: '',
 	ownerId: '',
-	clientId: ''
+	clientId: '',
+	customFields: {}
 };
 
 function toForm(row) {
@@ -55,7 +57,11 @@ function toForm(row) {
 		linkedinUrl: row.linkedinUrl || '',
 		source: normalizeContactSourceValue(row.source),
 		ownerId: row.ownerId == null ? '' : String(row.ownerId),
-		clientId: String(row.clientId || '')
+		clientId: String(row.clientId || ''),
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -75,6 +81,7 @@ export default function ContactDetailsPage() {
 	const [noteState, setNoteState] = useState({ saving: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [workspaceTab, setWorkspaceTab] = useState('notes');
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [notesSort, setNotesSort] = useState({ field: 'createdAt', direction: 'desc' });
@@ -87,6 +94,10 @@ export default function ContactDetailsPage() {
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
 			? 'Enter a valid LinkedIn URL, including http:// or https://.'
 			: '';
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 	const { markAsClean } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(contact)
 	});
@@ -101,9 +112,10 @@ export default function ContactDetailsPage() {
 					form.source &&
 					form.ownerId &&
 					form.clientId &&
+					customFieldsComplete &&
 					hasValidLinkedinUrl
 			),
-		[form, hasValidLinkedinUrl]
+		[customFieldsComplete, form, hasValidLinkedinUrl]
 	);
 	const isClientLocked = Boolean(contact?.id);
 
@@ -516,6 +528,17 @@ export default function ContactDetailsPage() {
 								/>
 							</FormField>
 						</section>
+						<CustomFieldsSection
+							moduleKey="contacts"
+							values={form.customFields}
+							onChange={(nextCustomFields) =>
+								setForm((f) => ({
+									...f,
+									customFields: nextCustomFields
+								}))
+							}
+							onDefinitionsChange={setCustomFieldDefinitions}
+						/>
 
 						<div className="form-actions">
 							<button type="submit" disabled={saveState.saving || !canSave}>

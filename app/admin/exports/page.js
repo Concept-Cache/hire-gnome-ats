@@ -139,6 +139,9 @@ export default function AdminExportsPage() {
 						<p className="panel-subtext">
 							Leave date range blank for a full export. Date filters use `updatedAt` first, then `createdAt`.
 						</p>
+						<p className="panel-subtext">
+							Exports include `customFieldDefinitions` so custom schema moves with record data.
+						</p>
 						<label className="switch-field">
 							<input
 								type="checkbox"

@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import EmailChipInput from '@/app/components/email-chip-input';
 import { useToast } from '@/app/components/toast-provider';
@@ -36,7 +37,8 @@ const initialForm = {
 	videoLink: '',
 	optionalParticipantEmails: [],
 	candidateId: '',
-	jobOrderId: ''
+	jobOrderId: '',
+	customFields: {}
 };
 
 const DURATION_OPTIONS = [
@@ -88,6 +90,7 @@ function NewInterviewsPageContent() {
 	});
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	useUnsavedChangesGuard(form);
 	const computedEndsAt = useMemo(
@@ -111,7 +114,12 @@ function NewInterviewsPageContent() {
 		!form.candidateId ||
 		!selectedCandidateStatus ||
 		isCandidateQualifiedForPipeline(selectedCandidateStatus);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 	const canSave = hasRequiredFields && hasValidEmail && hasValidVideoLink && selectedCandidateIsQualified;
+	const canSaveWithCustomFields = canSave && customFieldsComplete;
 	const emailError =
 		form.interviewerEmail.trim() && !hasValidEmail ? 'Enter a valid interviewer email address.' : '';
 	const videoLinkError =
@@ -162,6 +170,10 @@ function NewInterviewsPageContent() {
 			setError(
 				'Complete required fields (Subject, Candidate, Job Order, Interviewer, Interviewer Email, Start Date & Time) and use a valid interviewer email address.'
 			);
+			return;
+		}
+		if (!customFieldsComplete) {
+			setError('Complete all required custom fields before saving.');
 			return;
 		}
 		setSaving(true);
@@ -388,9 +400,20 @@ function NewInterviewsPageContent() {
 						</FormField>
 					</div>
 					{videoLinkError ? <p className="panel-subtext error">{videoLinkError}</p> : null}
-						<button type="submit" disabled={saving || !canSave}>
+					<CustomFieldsSection
+						moduleKey="interviews"
+						values={form.customFields}
+						onChange={(nextCustomFields) =>
+							setForm((f) => ({
+								...f,
+								customFields: nextCustomFields
+							}))
+						}
+						onDefinitionsChange={setCustomFieldDefinitions}
+					/>
+					<button type="submit" disabled={saving || !canSaveWithCustomFields}>
 							{saving ? 'Saving...' : 'Save Interview'}
-						</button>
+					</button>
 				</form>
 			</article>
 		</section>

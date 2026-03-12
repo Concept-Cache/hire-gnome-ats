@@ -325,6 +325,20 @@ function formatCount(value) {
 	return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
+function importEntityLabel(entity) {
+	const labels = {
+		customFieldDefinitions: 'Custom Fields',
+		clients: 'Clients',
+		contacts: 'Contacts',
+		candidates: 'Candidates',
+		jobOrders: 'Job Orders',
+		submissions: 'Submissions',
+		interviews: 'Interviews',
+		placements: 'Placements'
+	};
+	return labels[entity] || entity;
+}
+
 function toCsvValue(value) {
 	const text = String(value ?? '');
 	if (!text.includes(',') && !text.includes('"') && !text.includes('\n') && !text.includes('\r')) {
@@ -417,7 +431,7 @@ export default function AdminImportsPage() {
 					<div>
 						<Link href="/admin" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
 						<h2>Data Import</h2>
-						<p>Import core ATS entities from Hire Gnome exports, Bullhorn CSV, or Zoho Recruit CSV files.</p>
+						<p>Import core ATS entities and custom field definitions from Hire Gnome exports, Bullhorn CSV, or Zoho Recruit CSV files.</p>
 					</div>
 				</header>
 
@@ -513,12 +527,14 @@ export default function AdminImportsPage() {
 					<article className="panel panel-spacious panel-narrow">
 						<h3>Preview</h3>
 						<div className="info-list snapshot-grid snapshot-grid-six">
+							<p><span>Custom Fields</span><strong>{formatCount(preview.customFieldDefinitions)}</strong></p>
 							<p><span>Clients</span><strong>{formatCount(preview.clients)}</strong></p>
 							<p><span>Contacts</span><strong>{formatCount(preview.contacts)}</strong></p>
 							<p><span>Candidates</span><strong>{formatCount(preview.candidates)}</strong></p>
 							<p><span>Job Orders</span><strong>{formatCount(preview.jobOrders)}</strong></p>
 							<p><span>Submissions</span><strong>{formatCount(preview.submissions)}</strong></p>
 							<p><span>Interviews</span><strong>{formatCount(preview.interviews)}</strong></p>
+							<p><span>Placements</span><strong>{formatCount(preview.placements)}</strong></p>
 						</div>
 					</article>
 				) : null}
@@ -528,10 +544,10 @@ export default function AdminImportsPage() {
 						<h3>Import Result</h3>
 						<div className="workspace-scroll-area">
 							<ul className="workspace-list">
-								{['clients', 'contacts', 'candidates', 'jobOrders', 'submissions', 'interviews', 'placements'].map((entity) => (
+								{['customFieldDefinitions', 'clients', 'contacts', 'candidates', 'jobOrders', 'submissions', 'interviews', 'placements'].map((entity) => (
 									<li key={entity} className="workspace-item">
 										<div className="workspace-item-header">
-											<strong>{entity}</strong>
+											<strong>{importEntityLabel(entity)}</strong>
 											<span className="chip">Created {formatCount(result?.created?.[entity])}</span>
 											<span className="chip">Updated {formatCount(result?.updated?.[entity])}</span>
 											<span className="chip">Skipped {formatCount(result?.skipped?.[entity])}</span>

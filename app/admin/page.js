@@ -6,27 +6,35 @@ import { ArrowUpRight } from 'lucide-react';
 import AdminGate from '@/app/components/admin-gate';
 
 export default function AdminPage() {
-	const [counts, setCounts] = useState({ divisions: 0, users: 0, skills: 0, apiErrors: 0 });
+	const [counts, setCounts] = useState({
+		divisions: 0,
+		users: 0,
+		skills: 0,
+		customFields: 0,
+		apiErrors: 0
+	});
 	const [billingEnabled, setBillingEnabled] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
 
 		async function load() {
-			const [divisionRes, userRes, skillRes, errorRes, billingRes] = await Promise.all([
+			const [divisionRes, userRes, skillRes, customFieldRes, errorRes, billingRes] = await Promise.all([
 				fetch('/api/divisions'),
 				fetch('/api/users'),
 				fetch('/api/skills'),
+				fetch('/api/admin/custom-fields?includeInactive=true'),
 				fetch('/api/admin/error-logs?limit=1'),
 				fetch('/api/admin/billing/summary', { cache: 'no-store' })
 			]);
 
-			if (!divisionRes.ok || !userRes.ok || !skillRes.ok || !errorRes.ok) return;
+			if (!divisionRes.ok || !userRes.ok || !skillRes.ok || !customFieldRes.ok || !errorRes.ok) return;
 
-			const [divisionData, userData, skillData] = await Promise.all([
+			const [divisionData, userData, skillData, customFieldData] = await Promise.all([
 				divisionRes.json(),
 				userRes.json(),
-				skillRes.json()
+				skillRes.json(),
+				customFieldRes.json()
 			]);
 			const errorData = await errorRes.json().catch(() => ({}));
 			const billingData = billingRes.ok ? await billingRes.json().catch(() => ({})) : {};
@@ -36,6 +44,7 @@ export default function AdminPage() {
 				divisions: Array.isArray(divisionData) ? divisionData.length : 0,
 				users: Array.isArray(userData) ? userData.length : 0,
 				skills: Array.isArray(skillData) ? skillData.length : 0,
+				customFields: Array.isArray(customFieldData) ? customFieldData.length : 0,
 				apiErrors: Number.isInteger(errorData?.total) ? errorData.total : 0
 			});
 			setBillingEnabled(Boolean(billingData?.config?.enabled));
@@ -124,6 +133,11 @@ export default function AdminPage() {
 								href: '/admin/skills',
 								label: 'Skills',
 								value: counts.skills
+							})}
+							{renderAdminCard({
+								href: '/admin/custom-fields',
+								label: 'Custom Fields',
+								value: counts.customFields
 							})}
 						</div>
 					</article>

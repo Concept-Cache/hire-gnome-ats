@@ -15,6 +15,7 @@ import { ensureDefaultUnassignedDivision } from '@/lib/default-division';
 import { getSystemSettingRecord } from '@/lib/system-settings';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 async function validateClientAndContactDivision(clientId, contactId, divisionId) {
@@ -163,8 +164,26 @@ async function postJob_ordersHandler(req) {
 		const jobOrderInput = defaultDivisionForAdmin
 			? { ...parsed.data, divisionId: defaultDivisionForAdmin.id }
 			: parsed.data;
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'jobOrders',
+			customFieldsInput: jobOrderInput.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const jobOrderInputWithCustomFields = {
+			...jobOrderInput,
+			customFields: customFieldValidation.customFields
+		};
 
-		const normalized = await withInferredCityStateFromZip(prisma, normalizeJobOrderData(jobOrderInput));
+		const normalized = await withInferredCityStateFromZip(
+			prisma,
+			normalizeJobOrderData(jobOrderInputWithCustomFields)
+		);
 		if (normalized.publishToCareerSite && !careerSiteEnabled) {
 			return NextResponse.json(
 				{ error: 'Career site publishing is disabled. Enable it in Admin > System Settings first.' },

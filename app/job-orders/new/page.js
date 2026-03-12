@@ -6,6 +6,7 @@ import Link from 'next/link';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import RichTextEditor from '@/app/components/rich-text-editor';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -39,7 +40,8 @@ const initialForm = {
 	divisionId: '',
 	ownerId: '',
 	clientId: '',
-	contactId: ''
+	contactId: '',
+	customFields: {}
 };
 
 function toSalaryPayloadValue(value) {
@@ -86,6 +88,7 @@ function NewJobOrdersPageContent() {
 	const [presetClientDivisionId, setPresetClientDivisionId] = useState(null);
 	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
 	const [form, setForm] = useState(initialForm);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
 	const toast = useToast();
@@ -340,6 +343,10 @@ function NewJobOrdersPageContent() {
 	const salaryMaxValue = parseCurrencyInput(form.salaryMax);
 	const hasSalaryRangeError =
 		salaryMinValue != null && salaryMaxValue != null && salaryMinValue > salaryMaxValue;
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 	const canSave =
 		form.title.trim().length > 0 &&
 		Boolean(form.status) &&
@@ -349,6 +356,7 @@ function NewJobOrdersPageContent() {
 		(!isAdmin || Boolean(form.divisionId)) &&
 		Boolean(form.zipCode.trim()) &&
 		!hasSalaryRangeError &&
+		customFieldsComplete &&
 		(!requiresPublicDescription || hasPublicDescription) &&
 		!saving;
 
@@ -685,6 +693,17 @@ function NewJobOrdersPageContent() {
 									</FormField>
 								</>
 							) : null}
+						<CustomFieldsSection
+							moduleKey="jobOrders"
+							values={form.customFields}
+							onChange={(nextCustomFields) =>
+								setForm((f) => ({
+									...f,
+									customFields: nextCustomFields
+								}))
+							}
+							onDefinitionsChange={setCustomFieldDefinitions}
+						/>
 						<button type="submit" disabled={!canSave}>
 							{saving ? 'Saving...' : 'Save Job Order'}
 						</button>

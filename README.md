@@ -34,14 +34,16 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Authentication with first-run onboarding
 - Role and division access model (`Administrator`, `Director`, `Recruiter`)
 - Core modules: Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, Placements
+- Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
 - Candidate file attachments with object storage (`s3`) and local fallback
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
 - Candidate and job-order match workspaces (top matches, sortable/paged)
 - Audit trails on records and admin diagnostics
-- Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering
+- Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering (includes `customFieldDefinitions`)
 - Admin data import module:
 	- Hire Gnome export re-import (`JSON`, `NDJSON`, `ZIP`)
+	- Restores `customFieldDefinitions` from Hire Gnome exports before importing dependent records
 	- Bullhorn CSV profile imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
 	- Zoho Recruit CSV profile imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
 	- Built-in CSV template downloads per profile
@@ -134,16 +136,23 @@ Use `Admin Area > System Settings` for:
 - Object storage settings (`s3` or local mode)
 - API error log retention days
 
+Use `Admin Area > Custom Fields` for:
+- Module-scoped custom fields on Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
+- Field-level validation (`text`, `long text`, `number`, `date`, `yes/no`, `select`)
+- Required field enforcement on create/update forms
+
 Use `Admin Area > Data Export` for:
 - Export format selection (`JSON`, `NDJSON`, `ZIP`)
 - Optional inclusion of audit trail and API error logs
 - Incremental date-range exports using `updatedAt` (fallback `createdAt`)
+- Export payload includes `customFieldDefinitions` so custom schema can be moved across instances
 
 Use `Admin Area > Data Import` for:
 - Source selection:
 	- Hire Gnome export (`JSON`, `NDJSON`, `ZIP`)
 	- Bullhorn CSV
 	- Zoho Recruit CSV
+- Hire Gnome import applies `customFieldDefinitions` first, then entity records
 - Entity profile selection for CSV imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
 - Import preview before apply
 - Profile template CSV download from the UI
@@ -352,6 +361,11 @@ Data import form fields:
 - `bullhornEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=bullhorn_csv`)
 - `zohoEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=zoho_recruit_csv`)
 
+Hire Gnome export/import coverage:
+- Export includes `customFieldDefinitions`, core entities, and related child records.
+- Import upserts `customFieldDefinitions` by `recordId` or `(moduleKey, fieldKey)` before entity rows.
+- Import applies `customFields` payload values on supported entities, including Submissions, Interviews, and Placements.
+
 Archive behavior:
 - Archive is soft-delete and reversible through the Archive module.
 - Certain archive actions can optionally cascade to related records via UI selections during archive flow.
@@ -359,6 +373,7 @@ Archive behavior:
 Demo instance reset behavior:
 - `demo:reset` preserves `System Settings` (branding/theme/integration keys) by default.
 - Seed creates realistic linked records across all core modules.
+- Seed-mode reset clears all `customFieldDefinitions` so custom fields do not persist between demo reset cycles.
 - Default seeded login users use `AUTH_DEFAULT_PASSWORD`.
 - For interval resets, either:
 	- run `npm run demo:reset:loop` (uses `DEMO_RESET_INTERVAL_MINUTES`), or

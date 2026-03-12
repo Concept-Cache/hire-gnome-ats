@@ -240,6 +240,7 @@ model Candidate {
 	linkedinUrl     String?
 	skillSet        String?             @db.Text
 	summary         String?             @db.Text
+	customFields    Json?
 	ownerId         Int?
 	divisionId      Int?
 	createdAt       DateTime            @default(now())
@@ -294,6 +295,26 @@ model Skill {
 	candidateSkills CandidateSkill[]
 
 	@@index([isActive])
+}
+
+model CustomFieldDefinition {
+	id            Int      @id @default(autoincrement())
+	recordId      String   @unique
+	moduleKey     String
+	fieldKey      String
+	label         String
+	fieldType     String   @default("text")
+	selectOptions Json?
+	placeholder   String?
+	helpText      String?  @db.Text
+	isRequired    Boolean  @default(false)
+	isActive      Boolean  @default(true)
+	sortOrder     Int      @default(0)
+	createdAt     DateTime @default(now())
+	updatedAt     DateTime @updatedAt
+
+	@@unique([moduleKey, fieldKey])
+	@@index([moduleKey, isActive, sortOrder])
 }
 
 model CandidateSkill {
@@ -420,6 +441,7 @@ model Client {
 	zipCode     String?
 	website     String?
 	description String?    @db.Text
+	customFields Json?
 	ownerId     Int?
 	divisionId  Int?
 	createdAt   DateTime   @default(now())
@@ -455,6 +477,7 @@ model Contact {
 	linkedinUrl  String?
 	source       String?
 	owner        String?
+	customFields Json?
 	ownerId      Int?
 	divisionId   Int?
 	createdAt    DateTime @default(now())
@@ -529,6 +552,7 @@ model JobOrder {
 	publishedAt           DateTime?
 	openedAt              DateTime     @default(now())
 	closedAt              DateTime?
+	customFields          Json?
 	ownerId               Int?
 	divisionId            Int?
 	createdAt             DateTime     @default(now())
@@ -562,6 +586,7 @@ model Submission {
 	recordId   String   @unique
 	status     String   @default("submitted")
 	notes      String?   @db.Text
+	customFields Json?
 	createdAt  DateTime @default(now())
 	updatedAt  DateTime @updatedAt
 	createdByUserId Int?
@@ -596,6 +621,7 @@ model Interview {
 	locationLatitude Float?
 	locationLongitude Float?
 	videoLink       String?
+	customFields    Json?
 	feedback        String?   @db.Text
 	evaluationScore Float?
 	recommendation  String?
@@ -639,6 +665,7 @@ model Offer {
 	endDate          DateTime?
 	withdrawnReason  String?
 	notes            String?   @db.Text
+	customFields     Json?
 	createdAt        DateTime  @default(now())
 	updatedAt        DateTime  @updatedAt
 	submissionId     Int?      @unique

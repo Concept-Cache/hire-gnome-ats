@@ -26,6 +26,7 @@ import { logCreate } from '@/lib/audit-log';
 import { createRecordId } from '@/lib/record-id';
 import { ensureDefaultUnassignedDivision } from '@/lib/default-division';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const candidateListInclude = {
@@ -217,17 +218,39 @@ async function postCandidatesHandler(req) {
 		const candidateInput = defaultDivisionForAdmin
 			? { ...parsed.data, divisionId: defaultDivisionForAdmin.id }
 			: parsed.data;
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'candidates',
+			customFieldsInput: candidateInput.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const candidateInputWithCustomFields = {
+			...candidateInput,
+			customFields: customFieldValidation.customFields
+		};
 
 		const stageChangeReason =
-			typeof candidateInput.stageChangeReason === 'string' ? candidateInput.stageChangeReason.trim() : '';
+			typeof candidateInputWithCustomFields.stageChangeReason === 'string'
+				? candidateInputWithCustomFields.stageChangeReason.trim()
+				: '';
 		const normalized = await withInferredCityStateFromZip(
 			prisma,
-			normalizeCandidateData(candidateInput)
+			normalizeCandidateData(candidateInputWithCustomFields)
 		);
-		const resolvedSkills = await resolveCandidateSkills(candidateInput.skillIds, candidateInput.parsedSkillNames);
-		const normalizedEducationRecords = normalizeCandidateEducationRecords(candidateInput.educationRecords);
+		const resolvedSkills = await resolveCandidateSkills(
+			candidateInputWithCustomFields.skillIds,
+			candidateInputWithCustomFields.parsedSkillNames
+		);
+		const normalizedEducationRecords = normalizeCandidateEducationRecords(
+			candidateInputWithCustomFields.educationRecords
+		);
 		const normalizedWorkExperienceRecords = normalizeCandidateWorkExperienceRecords(
-			candidateInput.workExperienceRecords
+			candidateInputWithCustomFields.workExperienceRecords
 		);
 		const resolvedSkillSet = await resolveSkillSetForWrite({
 			normalizedSkillSet: normalized.skillSet,

@@ -13,6 +13,7 @@ import { logUpdate } from '@/lib/audit-log';
 import { createOwnerAssignmentNotifications } from '@/lib/notifications';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function isObjectEmpty(value) {
@@ -160,6 +161,7 @@ async function patchContacts_idHandler(req, { params }) {
 				linkedinUrl: true,
 				source: true,
 				owner: true,
+				customFields: true,
 				clientId: true,
 				ownerId: true,
 				divisionId: true,
@@ -176,8 +178,33 @@ async function patchContacts_idHandler(req, { params }) {
 		if (!parsed.success) {
 			return NextResponse.json({ errors: parsed.error.flatten() }, { status: 400 });
 		}
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'contacts',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const parsedDataWithCustomFields = {
+			...parsed.data,
+			customFields: customFieldValidation.customFields
+		};
 
-		const normalized = normalizeContactData(parsed.data);
+		const normalized = normalizeContactData(parsedDataWithCustomFields);
 		if (normalized.clientId !== existing.clientId) {
 			return NextResponse.json({ error: 'Client cannot be changed after contact is created.' }, { status: 400 });
 		}

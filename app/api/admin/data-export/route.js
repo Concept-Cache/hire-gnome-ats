@@ -219,6 +219,7 @@ async function getAdmin_dataExportHandler(req) {
 		divisions,
 		users,
 		skills,
+		customFieldDefinitions,
 		candidates,
 		candidateSkills,
 		candidateNotes,
@@ -261,6 +262,9 @@ async function getAdmin_dataExportHandler(req) {
 			}
 		}),
 		prisma.skill.findMany({ orderBy: { id: 'asc' } }),
+		prisma.customFieldDefinition.findMany({
+			orderBy: [{ moduleKey: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }]
+		}),
 		prisma.candidate.findMany({ orderBy: { id: 'asc' } }),
 		prisma.candidateSkill.findMany({ orderBy: [{ candidateId: 'asc' }, { skillId: 'asc' }] }),
 		prisma.candidateNote.findMany({ orderBy: { id: 'asc' } }),
@@ -289,6 +293,7 @@ async function getAdmin_dataExportHandler(req) {
 		divisions,
 		users,
 		skills,
+		customFieldDefinitions,
 		candidates,
 		candidateSkills,
 		candidateNotes,

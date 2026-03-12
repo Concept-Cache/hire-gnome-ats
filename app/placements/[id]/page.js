@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowUpRight, Lock, MoreVertical } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
@@ -32,7 +33,8 @@ const initialForm = {
 	withdrawnReason: '',
 	notes: '',
 	candidateId: '',
-	jobOrderId: ''
+	jobOrderId: '',
+	customFields: {}
 };
 
 function withCompensationType(formValues, nextCompensationType) {
@@ -159,7 +161,11 @@ function toForm(row) {
 		withdrawnReason: row.withdrawnReason || '',
 		notes: row.notes || '',
 		candidateId: String(row.candidateId || ''),
-		jobOrderId: String(row.jobOrderId || '')
+		jobOrderId: String(row.jobOrderId || ''),
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -224,6 +230,7 @@ export default function PlacementDetailsPage() {
 	const [saveState, setSaveState] = useState({ saving: false, error: '', success: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const relationshipsLocked = Boolean(placement?.id);
@@ -281,6 +288,10 @@ export default function PlacementDetailsPage() {
 		form.dailyPayRate,
 		form.yearlyCompensation
 	]);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 
 	useEffect(() => {
 		let active = true;
@@ -370,6 +381,10 @@ export default function PlacementDetailsPage() {
 		}
 		if (!nextForm.offeredOn || !nextForm.expectedJoinDate) {
 			setSaveState({ saving: false, error: 'Offer date and start date are required.', success: '' });
+			return null;
+		}
+		if (!customFieldsComplete) {
+			setSaveState({ saving: false, error: 'Complete all required custom fields before saving.', success: '' });
 			return null;
 		}
 
@@ -1028,6 +1043,18 @@ export default function PlacementDetailsPage() {
 									onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))}
 								/>
 							</FormField>
+							<CustomFieldsSection
+								moduleKey="placements"
+								values={form.customFields}
+								onChange={(nextCustomFields) =>
+									setForm((current) => ({
+										...current,
+										customFields: nextCustomFields
+									}))
+								}
+								onDefinitionsChange={setCustomFieldDefinitions}
+								disabled={acceptedReadOnly}
+							/>
 						</section>
 					</fieldset>
 
@@ -1041,7 +1068,8 @@ export default function PlacementDetailsPage() {
 								!form.jobOrderId ||
 								!form.offeredOn ||
 								!form.expectedJoinDate ||
-								!compensationComplete
+								!compensationComplete ||
+								!customFieldsComplete
 							}
 						>
 							{saveState.saving ? 'Saving...' : acceptedReadOnly ? 'Accepted (Read Only)' : 'Save Placement'}

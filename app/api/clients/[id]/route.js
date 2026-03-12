@@ -14,6 +14,7 @@ import { logUpdate } from '@/lib/audit-log';
 import { createOwnerAssignmentNotifications } from '@/lib/notifications';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function isObjectEmpty(value) {
@@ -151,6 +152,7 @@ async function patchClients_idHandler(req, { params }) {
 				zipCode: true,
 				website: true,
 				description: true,
+				customFields: true,
 				ownerId: true,
 				divisionId: true,
 				createdAt: true
@@ -171,8 +173,36 @@ async function patchClients_idHandler(req, { params }) {
 		if (!parsed.data.ownerId) {
 			return NextResponse.json({ error: 'Owner is required.' }, { status: 400 });
 		}
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'clients',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const parsedDataWithCustomFields = {
+			...parsed.data,
+			customFields: customFieldValidation.customFields
+		};
 
-		const normalized = await withInferredCityStateFromZip(prisma, normalizeClientData(parsed.data));
+		const normalized = await withInferredCityStateFromZip(
+			prisma,
+			normalizeClientData(parsedDataWithCustomFields)
+		);
 		const ownership = await resolveOwnershipForWrite({
 			actingUser,
 			ownerIdInput: normalized.ownerId,

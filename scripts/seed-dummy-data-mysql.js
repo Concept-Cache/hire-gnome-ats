@@ -163,6 +163,17 @@ async function cleanup(connection) {
 	await connection.query('DELETE FROM `Candidate` WHERE email LIKE ?', [emailLike]);
 	await connection.query('DELETE FROM `User` WHERE email LIKE ?', [emailLike]);
 	await connection.query('DELETE FROM `Division` WHERE name LIKE ?', [divisionLike]);
+
+	const [customFieldDefinitionTable] = await connection.query(
+		`SELECT 1
+		 FROM information_schema.tables
+		 WHERE table_schema = DATABASE()
+		 AND table_name = 'CustomFieldDefinition'
+		 LIMIT 1`
+	);
+	if (Array.isArray(customFieldDefinitionTable) && customFieldDefinitionTable.length > 0) {
+		await connection.query('DELETE FROM `CustomFieldDefinition`');
+	}
 }
 
 async function seedSkills(connection) {

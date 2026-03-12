@@ -15,6 +15,7 @@ import { createOwnerAssignmentNotifications } from '@/lib/notifications';
 import { getSystemSettingRecord } from '@/lib/system-settings';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function isObjectEmpty(value) {
@@ -185,6 +186,7 @@ async function patchJob_orders_idHandler(req, { params }) {
 				publishedAt: true,
 				openedAt: true,
 				closedAt: true,
+				customFields: true,
 				clientId: true,
 				contactId: true,
 				ownerId: true,
@@ -211,8 +213,36 @@ async function patchJob_orders_idHandler(req, { params }) {
 		if (actingUser?.role === 'ADMINISTRATOR' && !parsed.data.divisionId) {
 			return NextResponse.json({ error: 'Division is required for administrators.' }, { status: 400 });
 		}
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'jobOrders',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const parsedDataWithCustomFields = {
+			...parsed.data,
+			customFields: customFieldValidation.customFields
+		};
 
-		const normalized = await withInferredCityStateFromZip(prisma, normalizeJobOrderData(parsed.data));
+		const normalized = await withInferredCityStateFromZip(
+			prisma,
+			normalizeJobOrderData(parsedDataWithCustomFields)
+		);
 		if (!careerSiteEnabled && normalized.publishToCareerSite && !existing.publishToCareerSite) {
 			return NextResponse.json(
 				{ error: 'Career site publishing is disabled. Enable it in Admin > System Settings first.' },
