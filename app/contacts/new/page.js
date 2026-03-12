@@ -6,6 +6,7 @@ import Link from 'next/link';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { CONTACT_SOURCE_OPTIONS } from '@/app/constants/contact-source-options';
@@ -24,7 +25,8 @@ const initialForm = {
 	source: '',
 	divisionId: '',
 	ownerId: '',
-	clientId: ''
+	clientId: '',
+	customFields: {}
 };
 
 function NewContactsPageContent() {
@@ -39,6 +41,7 @@ function NewContactsPageContent() {
 	const clientLocked = Boolean(presetClientId);
 	const [actingUser, setActingUser] = useState(null);
 	const [form, setForm] = useState(initialForm);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
 	const toast = useToast();
@@ -49,6 +52,10 @@ function NewContactsPageContent() {
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
 			? 'Enter a valid LinkedIn URL, including http:// or https://.'
 			: '';
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 
 	const canSave = useMemo(
 		() =>
@@ -61,9 +68,10 @@ function NewContactsPageContent() {
 					form.ownerId &&
 					form.clientId &&
 					(!isAdmin || form.divisionId) &&
+					customFieldsComplete &&
 					hasValidLinkedinUrl
 			),
-		[form, hasValidLinkedinUrl, isAdmin]
+		[customFieldsComplete, form, hasValidLinkedinUrl, isAdmin]
 	);
 
 	useEffect(() => {
@@ -404,6 +412,17 @@ function NewContactsPageContent() {
 								disabled={clientLocked || (isAdmin && !form.divisionId)}
 							/>
 						</FormField>
+						<CustomFieldsSection
+							moduleKey="contacts"
+							values={form.customFields}
+							onChange={(nextCustomFields) =>
+								setForm((f) => ({
+									...f,
+									customFields: nextCustomFields
+								}))
+							}
+							onDefinitionsChange={setCustomFieldDefinitions}
+						/>
 						<button type="submit" disabled={saving || !canSave}>
 							{saving ? 'Saving...' : 'Save Contact'}
 						</button>

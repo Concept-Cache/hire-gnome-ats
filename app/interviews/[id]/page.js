@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Lock, MoreVertical } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import EmailChipInput from '@/app/components/email-chip-input';
 import LoadingIndicator from '@/app/components/loading-indicator';
@@ -40,7 +41,8 @@ const initialForm = {
 	videoLink: '',
 	optionalParticipantEmails: [],
 	candidateId: '',
-	jobOrderId: ''
+	jobOrderId: '',
+	customFields: {}
 };
 
 function toLocalDateTime(value) {
@@ -89,7 +91,11 @@ function toForm(row) {
 		videoLink: row.videoLink || '',
 		optionalParticipantEmails,
 		candidateId: String(row.candidateId || ''),
-		jobOrderId: String(row.jobOrderId || '')
+		jobOrderId: String(row.jobOrderId || ''),
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -126,6 +132,7 @@ export default function InterviewDetailsPage() {
 	const [cancelState, setCancelState] = useState({ canceling: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { markAsClean } = useUnsavedChangesGuard(form, {
@@ -141,7 +148,11 @@ export default function InterviewDetailsPage() {
 	);
 	const hasValidEmail = /\S+@\S+\.\S+/.test(form.interviewerEmail.trim());
 	const hasValidVideoLink = isValidOptionalHttpUrl(form.videoLink);
-	const canSave = hasRequiredFields && hasValidEmail && hasValidVideoLink;
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
+	const canSave = hasRequiredFields && hasValidEmail && hasValidVideoLink && customFieldsComplete;
 	const relationshipsLocked = Boolean(interview?.id);
 	const isCancelled = form.status === 'cancelled';
 	const emailError =
@@ -230,7 +241,7 @@ export default function InterviewDetailsPage() {
 			setSaveState({
 				saving: false,
 				error:
-					'Complete required fields (Subject, Candidate, Job Order, Interviewer, Interviewer Email) and use a valid interviewer email address.',
+					'Complete required fields (Subject, Candidate, Job Order, Interviewer, Interviewer Email), required custom fields, and use a valid interviewer email address.',
 				success: ''
 			});
 			return;
@@ -665,6 +676,17 @@ export default function InterviewDetailsPage() {
 						</div>
 						{emailError ? <p className="panel-subtext error">{emailError}</p> : null}
 						{videoLinkError ? <p className="panel-subtext error">{videoLinkError}</p> : null}
+						<CustomFieldsSection
+							moduleKey="interviews"
+							values={form.customFields}
+							onChange={(nextCustomFields) =>
+								setForm((f) => ({
+									...f,
+									customFields: nextCustomFields
+								}))
+							}
+							onDefinitionsChange={setCustomFieldDefinitions}
+						/>
 					</section>
 
 					<div className="form-actions">

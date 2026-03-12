@@ -20,6 +20,7 @@ import { logUpdate } from '@/lib/audit-log';
 import { createRecordId } from '@/lib/record-id';
 import { parseJsonBody, parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function isBlank(value) {
@@ -201,16 +202,49 @@ async function postCandidates_id_mergeHandler(req, { params }) {
 		if (!parsed.success) {
 			return NextResponse.json({ errors: parsed.error.flatten() }, { status: 400 });
 		}
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'candidates',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const parsedDataWithCustomFields = {
+			...parsed.data,
+			customFields: customFieldValidation.customFields
+		};
 
-		const stageChangeReason = normalizeStageChangeReason(parsed.data.stageChangeReason);
-		const normalizedIncoming = await withInferredCityStateFromZip(prisma, normalizeCandidateData(parsed.data));
+		const stageChangeReason = normalizeStageChangeReason(parsedDataWithCustomFields.stageChangeReason);
+		const normalizedIncoming = await withInferredCityStateFromZip(
+			prisma,
+			normalizeCandidateData(parsedDataWithCustomFields)
+		);
 		const mergedStatus = chooseMostAdvancedCandidateStatus(existing.status, normalizedIncoming.status);
 		const statusDidChange = String(existing.status || '').trim() !== String(mergedStatus || '').trim();
 
-		const resolvedSkills = await resolveCandidateSkills(parsed.data.skillIds, parsed.data.parsedSkillNames);
-		const normalizedEducationRecords = normalizeCandidateEducationRecords(parsed.data.educationRecords);
+		const resolvedSkills = await resolveCandidateSkills(
+			parsedDataWithCustomFields.skillIds,
+			parsedDataWithCustomFields.parsedSkillNames
+		);
+		const normalizedEducationRecords = normalizeCandidateEducationRecords(
+			parsedDataWithCustomFields.educationRecords
+		);
 		const normalizedWorkExperienceRecords = normalizeCandidateWorkExperienceRecords(
-			parsed.data.workExperienceRecords
+			parsedDataWithCustomFields.workExperienceRecords
 		);
 		const incomingResolvedSkillSet = await resolveSkillSetForWrite({
 			normalizedSkillSet: normalizedIncoming.skillSet,
@@ -253,6 +287,7 @@ async function postCandidates_id_mergeHandler(req, { params }) {
 			linkedinUrl: pickExistingOrIncoming(existing.linkedinUrl, normalizedIncoming.linkedinUrl),
 			skillSet: mergeDelimitedText(existing.skillSet, incomingResolvedSkillSet),
 			summary: mergeSummary(existing.summary, normalizedIncoming.summary),
+			customFields: normalizedIncoming.customFields,
 			ownerId: ownership.ownerId,
 			divisionId: ownership.divisionId
 		};

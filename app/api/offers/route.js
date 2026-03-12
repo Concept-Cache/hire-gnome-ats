@@ -7,6 +7,7 @@ import { getCandidateJobOrderScope, validateScopedCandidateAndJobOrder } from '@
 import { logCreate } from '@/lib/audit-log';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const offerInclude = {
@@ -64,17 +65,31 @@ async function postOffersHandler(req) {
 			candidateId: parsed.data.candidateId,
 			jobOrderId: parsed.data.jobOrderId
 		});
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'placements',
+			customFieldsInput: parsed.data.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
 
-			const offer = await prisma.offer.create({
-				data: normalizeOfferData(parsed.data),
-				include: offerInclude
-			});
-			await logCreate({
-				actorUserId: actingUser?.id,
-				entityType: 'PLACEMENT',
-				entity: offer
-			});
-			return NextResponse.json(offer, { status: 201 });
+		const offer = await prisma.offer.create({
+			data: normalizeOfferData({
+				...parsed.data,
+				customFields: customFieldValidation.customFields
+			}),
+			include: offerInclude
+		});
+		await logCreate({
+			actorUserId: actingUser?.id,
+			entityType: 'PLACEMENT',
+			entity: offer
+		});
+		return NextResponse.json(offer, { status: 201 });
 	} catch (error) {
 		return handleError(error, 'Failed to create placement.');
 	}

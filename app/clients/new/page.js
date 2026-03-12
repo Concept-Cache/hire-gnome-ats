@@ -7,6 +7,7 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import PhoneInput from '@/app/components/phone-input';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { INDUSTRY_OPTIONS } from '@/app/constants/industry-options';
@@ -26,7 +27,8 @@ const initialForm = {
 	state: '',
 	zipCode: '',
 	website: '',
-	description: ''
+	description: '',
+	customFields: {}
 };
 
 function normalizeZipFromPlace(postalCode) {
@@ -38,18 +40,24 @@ function NewClientsPageContent() {
 	const router = useRouter();
 	const [actingUser, setActingUser] = useState(null);
 	const [form, setForm] = useState(initialForm);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
 	const toast = useToast();
 	const { markAsClean } = useUnsavedChangesGuard(form);
 	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
 	const hasValidWebsite = isValidOptionalHttpUrl(form.website);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 	const canSave = Boolean(
 		form.name.trim() &&
 		form.status &&
 		form.ownerId &&
 		form.zipCode.trim() &&
 		hasValidWebsite &&
+		customFieldsComplete &&
 		(!isAdmin || form.divisionId)
 	);
 	const websiteError =
@@ -307,6 +315,17 @@ function NewClientsPageContent() {
 								onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
 							/>
 						</FormField>
+						<CustomFieldsSection
+							moduleKey="clients"
+							values={form.customFields}
+							onChange={(nextCustomFields) =>
+								setForm((f) => ({
+									...f,
+									customFields: nextCustomFields
+								}))
+							}
+							onDefinitionsChange={setCustomFieldDefinitions}
+						/>
 						<button type="submit" disabled={saving || !canSave}>
 							{saving ? 'Saving...' : 'Save Client'}
 						</button>

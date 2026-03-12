@@ -11,6 +11,7 @@ import { createNotificationsForUsers } from '@/lib/notifications';
 import { logError, requestLogContext } from '@/lib/logger';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function handleError(error, fallbackMessage) {
@@ -74,9 +75,23 @@ async function postInterviews(req) {
 				400
 			);
 		}
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'interviews',
+			customFieldsInput: parsed.data.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
 
 		const interview = await prisma.interview.create({
-			data: normalizeInterviewData(parsed.data),
+			data: normalizeInterviewData({
+				...parsed.data,
+				customFields: customFieldValidation.customFields
+			}),
 			include: { candidate: true, jobOrder: { include: { client: true } } }
 		});
 		await logCreate({

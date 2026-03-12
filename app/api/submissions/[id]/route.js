@@ -6,6 +6,7 @@ import { getCandidateJobOrderScope, validateScopedCandidateAndJobOrder } from '@
 import { logUpdate } from '@/lib/audit-log';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const submissionInclude = {
@@ -89,23 +90,24 @@ async function patchSubmissions_idHandler(req, { params }) {
 		const id = parseRouteId(awaitedParams);
 
 		const actingUser = await getActingUser(req, { allowFallback: false });
-			const existing = await prisma.submission.findFirst({
-				where: addScopeToWhere({ id }, getCandidateJobOrderScope(actingUser)),
-				select: {
-					id: true,
-					status: true,
-					notes: true,
-					candidateId: true,
-					jobOrderId: true,
-					createdByUserId: true,
-					createdAt: true,
-					offer: {
-						select: {
-							id: true
-						}
+		const existing = await prisma.submission.findFirst({
+			where: addScopeToWhere({ id }, getCandidateJobOrderScope(actingUser)),
+			select: {
+				id: true,
+				status: true,
+				notes: true,
+				customFields: true,
+				candidateId: true,
+				jobOrderId: true,
+				createdByUserId: true,
+				createdAt: true,
+				offer: {
+					select: {
+						id: true
 					}
 				}
-			});
+			}
+		});
 		if (!existing) {
 			return NextResponse.json({ error: 'Submission not found.' }, { status: 404 });
 		}
@@ -143,25 +145,47 @@ async function patchSubmissions_idHandler(req, { params }) {
 			candidateId: existing.candidateId,
 			jobOrderId: existing.jobOrderId
 		});
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'submissions',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
 
-			const submission = await prisma.submission.update({
+		const submission = await prisma.submission.update({
 			where: { id },
 			data: {
 				candidateId: existing.candidateId,
 				jobOrderId: existing.jobOrderId,
 				status: parsed.data.status,
-				notes: parsed.data.notes || null
+				notes: parsed.data.notes || null,
+				customFields: customFieldValidation.customFields
 			},
 			include: submissionInclude
-			});
-			await logUpdate({
-				actorUserId: actingUser?.id,
-				entityType: 'SUBMISSION',
-				before: existing,
-				after: submission
-			});
+		});
+		await logUpdate({
+			actorUserId: actingUser?.id,
+			entityType: 'SUBMISSION',
+			before: existing,
+			after: submission
+		});
 
-			return NextResponse.json(submission);
+		return NextResponse.json(submission);
 	} catch (error) {
 		return handleError(error, 'Failed to update submission.');
 	}

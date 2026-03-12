@@ -10,6 +10,7 @@ import { createNotificationsForUsers } from '@/lib/notifications';
 import { logError, requestLogContext } from '@/lib/logger';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 function handleError(error, fallbackMessage) {
@@ -87,6 +88,7 @@ async function patchInterviewById(req, { params }) {
 				locationLatitude: true,
 				locationLongitude: true,
 				videoLink: true,
+				customFields: true,
 				feedback: true,
 				evaluationScore: true,
 				recommendation: true,
@@ -119,13 +121,35 @@ async function patchInterviewById(req, { params }) {
 			candidateId: existing.candidateId,
 			jobOrderId: existing.jobOrderId
 		});
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'interviews',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
 
 		const interview = await prisma.interview.update({
 			where: { id },
 			data: normalizeInterviewData({
 				...parsed.data,
 				candidateId: existing.candidateId,
-				jobOrderId: existing.jobOrderId
+				jobOrderId: existing.jobOrderId,
+				customFields: customFieldValidation.customFields
 			}),
 			include: { candidate: true, jobOrder: { include: { client: true } } }
 		});

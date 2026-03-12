@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowUpRight, Lock, MoreVertical } from 'lucide-react';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
@@ -16,7 +17,8 @@ const initialForm = {
 	candidateId: '',
 	jobOrderId: '',
 	status: 'submitted',
-	notes: ''
+	notes: '',
+	customFields: {}
 };
 
 function formatSubmissionStatusLabel(value) {
@@ -37,7 +39,11 @@ function toForm(row) {
 		candidateId: String(row.candidateId || ''),
 		jobOrderId: String(row.jobOrderId || ''),
 		status: row.status || 'submitted',
-		notes: row.notes || ''
+		notes: row.notes || '',
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -57,12 +63,17 @@ export default function SubmissionDetailsPage() {
 	const [convertState, setConvertState] = useState({ converting: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(submission)
 	});
 	const isConvertedToPlacement = Boolean(submission?.offer?.id);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 
 	async function load() {
 		setLoading(true);
@@ -143,6 +154,10 @@ export default function SubmissionDetailsPage() {
 
 		if (!form.candidateId || !form.jobOrderId) {
 			setSaveState({ saving: false, error: 'Candidate and Job Order are required.', success: '' });
+			return;
+		}
+		if (!customFieldsComplete) {
+			setSaveState({ saving: false, error: 'Complete all required custom fields before saving.', success: '' });
 			return;
 		}
 
@@ -448,10 +463,25 @@ export default function SubmissionDetailsPage() {
 								disabled={isConvertedToPlacement}
 							/>
 						</FormField>
+						<CustomFieldsSection
+							moduleKey="submissions"
+							values={form.customFields}
+							onChange={(nextCustomFields) =>
+								setForm((f) => ({
+									...f,
+									customFields: nextCustomFields
+								}))
+							}
+							onDefinitionsChange={setCustomFieldDefinitions}
+							disabled={isConvertedToPlacement}
+						/>
 					</section>
 
 					<div className="form-actions">
-						<button type="submit" disabled={saveState.saving || isConvertedToPlacement}>
+						<button
+							type="submit"
+							disabled={saveState.saving || isConvertedToPlacement || !customFieldsComplete}
+						>
 							{saveState.saving ? 'Saving...' : 'Save Submission'}
 						</button>
 						<p className="form-actions-meta">

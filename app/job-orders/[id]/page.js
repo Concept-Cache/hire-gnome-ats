@@ -8,6 +8,7 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import RichTextEditor from '@/app/components/rich-text-editor';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
@@ -51,7 +52,8 @@ const initialForm = {
 	divisionId: '',
 	ownerId: '',
 	clientId: '',
-	contactId: ''
+	contactId: '',
+	customFields: {}
 };
 
 const initialSubmissionForm = {
@@ -96,7 +98,11 @@ function toForm(row) {
 		divisionId: row.divisionId == null ? '' : String(row.divisionId),
 		ownerId: row.ownerId == null ? '' : String(row.ownerId),
 		clientId: String(row.clientId || ''),
-		contactId: row.contactId ? String(row.contactId) : ''
+		contactId: row.contactId ? String(row.contactId) : '',
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -147,6 +153,7 @@ export default function JobOrderDetailsPage() {
 	});
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [closeState, setCloseState] = useState({ closing: false, error: '' });
 	const [enhanceState, setEnhanceState] = useState({ enhancing: false, error: '', success: '' });
 	const [workspaceTab, setWorkspaceTab] = useState('submissions');
@@ -876,6 +883,10 @@ export default function JobOrderDetailsPage() {
 	const salaryMaxValue = parseCurrencyInput(form.salaryMax);
 	const hasSalaryRangeError =
 		salaryMinValue != null && salaryMaxValue != null && salaryMinValue > salaryMaxValue;
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 	const canEnhancePublicPosting =
 		careerSiteEnabled &&
 		!enhanceState.enhancing &&
@@ -897,6 +908,7 @@ export default function JobOrderDetailsPage() {
 		Boolean(form.contactId) &&
 		Boolean(form.zipCode.trim()) &&
 		!hasSalaryRangeError &&
+		customFieldsComplete &&
 		(!requiresPublicDescription || hasPublicDescription) &&
 		!saveState.saving;
 
@@ -1277,6 +1289,17 @@ export default function JobOrderDetailsPage() {
 							</>
 						) : null}
 					</section>
+					<CustomFieldsSection
+						moduleKey="jobOrders"
+						values={form.customFields}
+						onChange={(nextCustomFields) =>
+							setForm((f) => ({
+								...f,
+								customFields: nextCustomFields
+							}))
+						}
+						onDefinitionsChange={setCustomFieldDefinitions}
+					/>
 
 						<div className="form-actions">
 							<button type="submit" disabled={!canSaveJobOrder}>

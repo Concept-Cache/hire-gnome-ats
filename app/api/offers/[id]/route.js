@@ -7,6 +7,7 @@ import { getCandidateJobOrderScope, validateScopedCandidateAndJobOrder } from '@
 import { logUpdate } from '@/lib/audit-log';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const offerInclude = {
@@ -112,6 +113,7 @@ async function patchOffers_idHandler(req, { params }) {
 					endDate: true,
 					withdrawnReason: true,
 					notes: true,
+					customFields: true,
 					submissionId: true,
 					candidateId: true,
 					jobOrderId: true,
@@ -165,19 +167,43 @@ async function patchOffers_idHandler(req, { params }) {
 			candidateId: parsed.data.candidateId,
 			jobOrderId: parsed.data.jobOrderId
 		});
+		const existingCustomFields =
+			existing?.customFields && typeof existing.customFields === 'object' && !Array.isArray(existing.customFields)
+				? existing.customFields
+				: {};
+		const incomingCustomFields =
+			parsed.data.customFields &&
+			typeof parsed.data.customFields === 'object' &&
+			!Array.isArray(parsed.data.customFields)
+				? parsed.data.customFields
+				: {};
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'placements',
+			customFieldsInput: { ...existingCustomFields, ...incomingCustomFields }
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
 
-			const offer = await prisma.offer.update({
+		const offer = await prisma.offer.update({
 			where: { id },
-			data: normalizeOfferData(parsed.data),
+			data: normalizeOfferData({
+				...parsed.data,
+				customFields: customFieldValidation.customFields
+			}),
 			include: offerInclude
-			});
-			await logUpdate({
-				actorUserId: actingUser?.id,
-				entityType: 'PLACEMENT',
-				before: existing,
-				after: offer
-			});
-			return NextResponse.json(offer);
+		});
+		await logUpdate({
+			actorUserId: actingUser?.id,
+			entityType: 'PLACEMENT',
+			before: existing,
+			after: offer
+		});
+		return NextResponse.json(offer);
 	} catch (error) {
 		return handleError(error, 'Failed to update placement.');
 	}

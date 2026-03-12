@@ -401,6 +401,18 @@ function dateYearsAgo(years, month = 0) {
 	return d;
 }
 
+async function clearCustomFieldDefinitions() {
+	try {
+		await prisma.customFieldDefinition.deleteMany({});
+	} catch (error) {
+		if (error?.code === 'P2021' || error?.code === 'P2022') {
+			console.warn('Skipping custom field definition reset: table not found in current schema.');
+			return;
+		}
+		throw error;
+	}
+}
+
 async function cleanupSeedData() {
 	const seedUsers = await prisma.user.findMany({
 		where: {
@@ -560,6 +572,8 @@ async function cleanupSeedData() {
 			where: { id: { in: seedDivisionIds } }
 		});
 	}
+
+	await clearCustomFieldDefinitions();
 }
 
 async function main() {

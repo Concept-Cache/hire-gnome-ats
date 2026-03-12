@@ -8,10 +8,17 @@ import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 import { normalizeCandidateSourceValue } from '@/app/constants/candidate-source-options';
 import { normalizeContactSourceValue } from '@/app/constants/contact-source-options';
 import { toJobOrderStatusValue } from '@/lib/job-order-options';
+import {
+	normalizeCustomFieldKey,
+	normalizeCustomFieldModuleKey,
+	normalizeCustomFieldSelectOptions,
+	normalizeCustomFieldType
+} from '@/lib/custom-fields';
 
 export const dynamic = 'force-dynamic';
 
 const SUPPORTED_IMPORT_ENTITY_KEYS = Object.freeze([
+	'customFieldDefinitions',
 	'clients',
 	'contacts',
 	'candidates',
@@ -161,6 +168,13 @@ function normalizeZipCode(value) {
 		return digits.slice(0, 5);
 	}
 	return raw;
+}
+
+function normalizeCustomFieldValues(value) {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const entries = Object.entries(value);
+	if (entries.length <= 0) return null;
+	return Object.fromEntries(entries);
 }
 
 function parseBooleanFlag(value, fallback = false) {
@@ -810,6 +824,7 @@ async function parseUploadedZohoCsvFile(file, zohoProfile) {
 
 function buildPreviewSummary(data) {
 	return {
+		customFieldDefinitions: data.customFieldDefinitions.length,
 		clients: data.clients.length,
 		contacts: data.contacts.length,
 		candidates: data.candidates.length,
@@ -850,6 +865,7 @@ function resolveTargetIdFromSource({
 async function importData(tx, data, actingUser) {
 	const summary = {
 		created: {
+			customFieldDefinitions: 0,
 			clients: 0,
 			contacts: 0,
 			candidates: 0,
@@ -859,6 +875,7 @@ async function importData(tx, data, actingUser) {
 			placements: 0
 		},
 		updated: {
+			customFieldDefinitions: 0,
 			clients: 0,
 			contacts: 0,
 			candidates: 0,
@@ -868,6 +885,7 @@ async function importData(tx, data, actingUser) {
 			placements: 0
 		},
 		skipped: {
+			customFieldDefinitions: 0,
 			clients: 0,
 			contacts: 0,
 			candidates: 0,
@@ -989,6 +1007,74 @@ async function importData(tx, data, actingUser) {
 		return null;
 	}
 
+	for (const row of data.customFieldDefinitions) {
+		const moduleKey = normalizeCustomFieldModuleKey(row?.moduleKey);
+		const label = toTrimmedString(row?.label);
+		const fieldKey = normalizeCustomFieldKey(row?.fieldKey || label);
+		if (!moduleKey || !label || !fieldKey) {
+			summary.skipped.customFieldDefinitions += 1;
+			pushError('Skipped custom field definition row with missing module, label, or field key.');
+			continue;
+		}
+
+		const fieldType = normalizeCustomFieldType(row?.fieldType);
+		const selectOptions = normalizeCustomFieldSelectOptions(row?.selectOptions);
+		if (fieldType === 'select' && selectOptions.length <= 0) {
+			summary.skipped.customFieldDefinitions += 1;
+			pushError(`Skipped custom field definition "${label}": select fields require options.`);
+			continue;
+		}
+
+		const recordId = toTrimmedString(row?.recordId) || createRecordId('CFD');
+		const existingByRecordId = recordId
+			? await tx.customFieldDefinition.findUnique({
+				where: { recordId },
+				select: { id: true }
+			})
+			: null;
+		const existingByKey = existingByRecordId
+			? null
+			: await tx.customFieldDefinition.findUnique({
+				where: {
+					moduleKey_fieldKey: {
+						moduleKey,
+						fieldKey
+					}
+				},
+				select: { id: true }
+			});
+		const existing = existingByRecordId || existingByKey;
+
+		const payload = {
+			moduleKey,
+			fieldKey,
+			label,
+			fieldType,
+			selectOptions: fieldType === 'select' ? selectOptions : [],
+			placeholder: toTrimmedString(row?.placeholder),
+			helpText: toTrimmedString(row?.helpText),
+			isRequired: parseBooleanFlag(row?.isRequired, false),
+			isActive: parseBooleanFlag(row?.isActive, true),
+			sortOrder: toOptionalInt(row?.sortOrder, 0) || 0
+		};
+
+		if (existing) {
+			await tx.customFieldDefinition.update({
+				where: { id: existing.id },
+				data: payload
+			});
+			summary.updated.customFieldDefinitions += 1;
+		} else {
+			await tx.customFieldDefinition.create({
+				data: {
+					recordId,
+					...payload
+				}
+			});
+			summary.created.customFieldDefinitions += 1;
+		}
+	}
+
 	const existingClients = await tx.client.findMany({
 		select: {
 			id: true,
@@ -1043,6 +1129,7 @@ async function importData(tx, data, actingUser) {
 			zipCode: normalizeZipCode(row?.zipCode),
 			website: toTrimmedString(row?.website),
 			description: toTrimmedString(row?.description),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			ownerId: actingUser.id,
 			divisionId: actingUser.divisionId || null
 		};
@@ -1125,6 +1212,7 @@ async function importData(tx, data, actingUser) {
 			linkedinUrl: toTrimmedString(row?.linkedinUrl),
 			source: normalizeContactSourceValue(toTrimmedString(row?.source)) || null,
 			address: toTrimmedString(row?.address),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			ownerId: actingUser.id,
 			divisionId: actingUser.divisionId || null,
 			clientId
@@ -1200,6 +1288,7 @@ async function importData(tx, data, actingUser) {
 			linkedinUrl: toTrimmedString(row?.linkedinUrl),
 			skillSet: toTrimmedString(row?.skillSet),
 			summary: toTrimmedString(row?.summary),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			experienceYears: toOptionalNumber(row?.experienceYears),
 			ownerId: actingUser.id,
 			divisionId: actingUser.divisionId || null
@@ -1276,6 +1365,7 @@ async function importData(tx, data, actingUser) {
 			salaryMin: toOptionalNumber(row?.salaryMin),
 			salaryMax: toOptionalNumber(row?.salaryMax),
 			publishToCareerSite: parseBooleanFlag(row?.publishToCareerSite),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			ownerId: actingUser.id,
 			divisionId: actingUser.divisionId || null,
 			clientId,
@@ -1339,6 +1429,7 @@ async function importData(tx, data, actingUser) {
 		const payload = {
 			status: toTrimmedString(row?.status) || 'submitted',
 			notes: toTrimmedString(row?.notes),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			candidateId,
 			jobOrderId,
 			createdByUserId: actingUser.id
@@ -1402,6 +1493,7 @@ async function importData(tx, data, actingUser) {
 			endsAt: toOptionalDate(row?.endsAt),
 			location: toTrimmedString(row?.location),
 			videoLink: toTrimmedString(row?.videoLink),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			candidateId,
 			jobOrderId
 		};
@@ -1469,6 +1561,7 @@ async function importData(tx, data, actingUser) {
 			hourlyOtPayRate: toOptionalNumber(row?.hourlyOtPayRate),
 			dailyBillRate: toOptionalNumber(row?.dailyBillRate),
 			dailyPayRate: toOptionalNumber(row?.dailyPayRate),
+			customFields: normalizeCustomFieldValues(row?.customFields),
 			candidateId,
 			jobOrderId,
 			submissionId: submissionId || null

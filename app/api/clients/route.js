@@ -14,6 +14,7 @@ import { logCreate } from '@/lib/audit-log';
 import { ensureDefaultUnassignedDivision } from '@/lib/default-division';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const clientListInclude = {
@@ -72,8 +73,26 @@ async function postClientsHandler(req) {
 		if (!parsed.data.ownerId) {
 			return NextResponse.json({ error: 'Owner is required.' }, { status: 400 });
 		}
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'clients',
+			customFieldsInput: clientInput.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const clientInputWithCustomFields = {
+			...clientInput,
+			customFields: customFieldValidation.customFields
+		};
 
-		const normalized = await withInferredCityStateFromZip(prisma, normalizeClientData(clientInput));
+		const normalized = await withInferredCityStateFromZip(
+			prisma,
+			normalizeClientData(clientInputWithCustomFields)
+		);
 		const ownership = await resolveOwnershipForWrite({
 			actingUser,
 			ownerIdInput: normalized.ownerId,

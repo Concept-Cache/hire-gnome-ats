@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
@@ -27,7 +28,8 @@ const initialForm = {
 	withdrawnReason: '',
 	notes: '',
 	candidateId: '',
-	jobOrderId: ''
+	jobOrderId: '',
+	customFields: {}
 };
 
 function withCompensationType(formValues, nextCompensationType) {
@@ -84,6 +86,7 @@ function NewPlacementPageContent() {
 	});
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	useUnsavedChangesGuard(form);
 
@@ -131,6 +134,10 @@ function NewPlacementPageContent() {
 		form.dailyPayRate,
 		form.yearlyCompensation
 	]);
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
 
 	useEffect(() => {
 		if (form.placementType !== 'perm') return;
@@ -153,6 +160,10 @@ function NewPlacementPageContent() {
 		}
 		if (!form.offeredOn || !form.expectedJoinDate) {
 			setError('Offer date and start date are required.');
+			return;
+		}
+		if (!customFieldsComplete) {
+			setError('Complete all required custom fields before saving.');
 			return;
 		}
 		setSaving(true);
@@ -420,6 +431,17 @@ function NewPlacementPageContent() {
 							onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))}
 						/>
 					</FormField>
+					<CustomFieldsSection
+						moduleKey="placements"
+						values={form.customFields}
+						onChange={(nextCustomFields) =>
+							setForm((current) => ({
+								...current,
+								customFields: nextCustomFields
+							}))
+						}
+						onDefinitionsChange={setCustomFieldDefinitions}
+					/>
 					<button
 						type="submit"
 						disabled={
@@ -428,7 +450,8 @@ function NewPlacementPageContent() {
 							!form.jobOrderId ||
 							!form.offeredOn ||
 							!form.expectedJoinDate ||
-							!compensationComplete
+							!compensationComplete ||
+							!customFieldsComplete
 						}
 					>
 						{saving ? 'Saving...' : 'Save Placement'}

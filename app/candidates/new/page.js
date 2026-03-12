@@ -7,6 +7,7 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
+import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import SkillChipSelect from '@/app/components/skill-chip-select';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -47,7 +48,8 @@ const initialForm = {
 	linkedinUrl: '',
 	skillIds: undefined,
 	skillSet: '',
-	summary: ''
+	summary: '',
+	customFields: {}
 };
 
 function toForm(row) {
@@ -78,7 +80,11 @@ function toForm(row) {
 					.map((skillId) => String(skillId))
 			: undefined,
 		skillSet: row.skillSet || '',
-		summary: row.summary || ''
+		summary: row.summary || '',
+		customFields:
+			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
+				? row.customFields
+				: {}
 	};
 }
 
@@ -163,6 +169,7 @@ function NewCandidatePageContent() {
 	const [parsedWorkExperienceRecords, setParsedWorkExperienceRecords] = useState([]);
 	const [parsedResumeAttachmentFile, setParsedResumeAttachmentFile] = useState(null);
 	const [duplicateMatches, setDuplicateMatches] = useState([]);
+	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
 	const [parseState, setParseState] = useState({ parsing: false, error: '', success: '', warnings: [] });
@@ -195,7 +202,16 @@ function NewCandidatePageContent() {
 	const hasValidEmail = isValidEmailAddress(form.email);
 	const hasValidWebsite = isValidOptionalHttpUrl(form.website);
 	const hasValidLinkedinUrl = isValidOptionalHttpUrl(form.linkedinUrl);
-	const canSaveCandidate = hasRequiredFields && hasValidEmail && hasValidWebsite && hasValidLinkedinUrl;
+	const customFieldsComplete = areRequiredCustomFieldsComplete(
+		customFieldDefinitions,
+		form.customFields
+	);
+	const canSaveCandidate =
+		hasRequiredFields &&
+		hasValidEmail &&
+		hasValidWebsite &&
+		hasValidLinkedinUrl &&
+		customFieldsComplete;
 	const emailError =
 		form.email.trim() && !hasValidEmail ? 'Enter a valid email address.' : '';
 	const websiteError =
@@ -857,6 +873,17 @@ function NewCandidatePageContent() {
 									onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
 								/>
 							</section>
+							<CustomFieldsSection
+								moduleKey="candidates"
+								values={form.customFields}
+								onChange={(nextCustomFields) =>
+									setForm((f) => ({
+										...f,
+										customFields: nextCustomFields
+									}))
+								}
+								onDefinitionsChange={setCustomFieldDefinitions}
+							/>
 							<button type="submit" disabled={saving || !canSaveCandidate}>
 								{saving ? 'Saving...' : 'Save Candidate'}
 							</button>

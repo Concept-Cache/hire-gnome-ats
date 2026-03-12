@@ -7,6 +7,7 @@ import { logCreate } from '@/lib/audit-log';
 import { formatCandidateStatusLabel, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const submissionInclude = {
@@ -87,24 +88,36 @@ async function postSubmissionsHandler(req) {
 				400
 			);
 		}
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'submissions',
+			customFieldsInput: parsed.data.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
 
-			const submission = await prisma.submission.create({
+		const submission = await prisma.submission.create({
 			data: {
 				candidateId: parsed.data.candidateId,
 				jobOrderId: parsed.data.jobOrderId,
 				status: parsed.data.status,
 				notes: parsed.data.notes || null,
+				customFields: customFieldValidation.customFields,
 				createdByUserId: actingUser.id
 			},
 			include: submissionInclude
-			});
-			await logCreate({
-				actorUserId: actingUser?.id,
-				entityType: 'SUBMISSION',
-				entity: submission
-			});
+		});
+		await logCreate({
+			actorUserId: actingUser?.id,
+			entityType: 'SUBMISSION',
+			entity: submission
+		});
 
-			return NextResponse.json(submission, { status: 201 });
+		return NextResponse.json(submission, { status: 201 });
 	} catch (error) {
 		return handleError(error, 'Failed to create submission.');
 	}

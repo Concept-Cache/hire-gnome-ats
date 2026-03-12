@@ -13,6 +13,7 @@ import { logCreate } from '@/lib/audit-log';
 import { ensureDefaultUnassignedDivision } from '@/lib/default-division';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const contactListInclude = {
@@ -142,8 +143,23 @@ async function postContactsHandler(req) {
 		const contactInput = defaultDivisionForAdmin
 			? { ...parsed.data, divisionId: defaultDivisionForAdmin.id }
 			: parsed.data;
+		const customFieldValidation = await validateAndNormalizeCustomFieldValues({
+			prisma,
+			moduleKey: 'contacts',
+			customFieldsInput: contactInput.customFields
+		});
+		if (customFieldValidation.errors.length > 0) {
+			return NextResponse.json(
+				{ error: customFieldValidation.errors.join(' ') },
+				{ status: 400 }
+			);
+		}
+		const contactInputWithCustomFields = {
+			...contactInput,
+			customFields: customFieldValidation.customFields
+		};
 
-		const normalized = normalizeContactData(contactInput);
+		const normalized = normalizeContactData(contactInputWithCustomFields);
 		const ownership = await resolveOwnershipForWrite({
 			actingUser,
 			ownerIdInput: normalized.ownerId,
