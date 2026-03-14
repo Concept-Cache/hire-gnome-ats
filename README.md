@@ -383,7 +383,9 @@ Archive behavior:
 
 Demo instance reset behavior:
 - `demo:reset` preserves `System Settings` (branding/theme/integration keys) by default.
+- If no `System Settings` row exists, demo seeding creates one with default branding and enables the public career site.
 - Seed creates realistic linked records across all core modules.
+- Seeded public job postings include richer, role-aligned career-site descriptions.
 - Seed avoids duplicate human-readable names across seeded users, contacts, and candidates.
 - Seed-mode reset clears all `customFieldDefinitions` so custom fields do not persist between demo reset cycles.
 - Default seeded login users use `AUTH_DEFAULT_PASSWORD`.

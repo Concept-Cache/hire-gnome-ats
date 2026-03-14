@@ -5,9 +5,11 @@ require('./load-env.cjs');
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('node:crypto');
 const { SKILLS_TO_SEED } = require('./seed-skills');
+const { buildPublicJobDescription } = require('./demo-job-description');
 
 const RECORD_ID_PREFIX_BY_MODEL = Object.freeze({
 	Division: 'DIV',
+	SystemSetting: 'SYS',
 	User: 'USR',
 	AuditLog: 'AUD',
 	BillingSeatSyncEvent: 'BIL',
@@ -82,6 +84,8 @@ const prisma = new PrismaClient().$extends({
 const PERSON_EMAIL_DOMAIN = 'demoats.com';
 const DIVISION_PREFIX = 'HG Seed - ';
 const DEFAULT_LOGIN_PASSWORD = String(process.env.AUTH_DEFAULT_PASSWORD || 'Welcome123!').trim() || 'Welcome123!';
+const DEMO_SITE_NAME = 'Hire Gnome ATS';
+const DEMO_THEME_KEY = 'classic_blue';
 
 const SOURCE_OPTIONS = [
 	'CareerBuilder',
@@ -652,6 +656,21 @@ async function main() {
 	console.log('Resetting and seeding realistic demo data...');
 	await cleanupSeedData();
 
+	const existingSystemSetting = await prisma.systemSetting.findFirst({
+		orderBy: { id: 'asc' },
+		select: { id: true }
+	});
+	if (!existingSystemSetting) {
+		await prisma.systemSetting.create({
+			data: {
+				siteName: DEMO_SITE_NAME,
+				siteTitle: DEMO_SITE_NAME,
+				themeKey: DEMO_THEME_KEY,
+				careerSiteEnabled: true
+			}
+		});
+	}
+
 	await prisma.skill.createMany({
 		data: SKILLS_TO_SEED.map((skill) => ({
 			name: skill.name,
@@ -921,10 +940,15 @@ async function main() {
 		const owner = divisionUsers[(i + 1) % divisionUsers.length] || null;
 		const relatedContacts = contacts.filter((contact) => contact.clientId === client.id);
 		const hiringContact = relatedContacts[i % relatedContacts.length] || null;
-		const title = `${pick(JOB_ORDER_TITLES, i)} - ${client.name}`;
+		const baseTitle = pick(JOB_ORDER_TITLES, i);
+		const title = baseTitle;
 		const market = pick(MARKET_LOCATIONS, i);
 		const location = `${market.city}, ${market.state}`;
 		const publishToCareerSite = i % 3 !== 0;
+		const employmentType = pick(EMPLOYMENT_TYPES, i);
+		const openings = (i % 3) + 1;
+		const salaryMin = 85000 + i * 3500;
+		const salaryMax = 115000 + i * 3500;
 		const openedAt = buildSeedTimestamp(i, {
 			windowSize: 16,
 			salt: 7,
@@ -938,19 +962,27 @@ async function main() {
 		const jobOrder = await prisma.jobOrder.create({
 			data: {
 				title,
-				description: `Internal brief: ${title}. Prioritize candidates with strong stakeholder communication, domain familiarity, and stable tenure.`,
+				description: `Internal brief: ${title} for ${client.name}. Prioritize candidates with strong stakeholder communication, domain familiarity, and stable tenure.`,
 				publicDescription: publishToCareerSite
-					? `<p><strong>${title}</strong></p><p>Join a high-performing team and deliver measurable outcomes in a fast-paced environment.</p>`
+					? buildPublicJobDescription({
+						jobTitle: baseTitle,
+						clientName: client.name,
+						location,
+						employmentType,
+						openings,
+						salaryMin,
+						salaryMax
+					})
 					: null,
 				location,
 				city: market.city,
 				state: market.state,
 				zipCode: market.zipCode,
 				status: pick(JOB_STATUSES, i),
-				employmentType: pick(EMPLOYMENT_TYPES, i),
-				openings: (i % 3) + 1,
-				salaryMin: 85000 + i * 3500,
-				salaryMax: 115000 + i * 3500,
+				employmentType,
+				openings,
+				salaryMin,
+				salaryMax,
 				publishToCareerSite,
 				publishedAt,
 				openedAt,
