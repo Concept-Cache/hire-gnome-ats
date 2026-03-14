@@ -129,7 +129,7 @@ Set `CAREERS_APPLY_MIN_FORM_FILL_SECONDS=0` to disable timing checks.
 
 Use this after upgrades, environment migrations, or backup/restore tests.
 
-1. In `Admin > Custom Fields`, confirm at least one custom field exists for each target module (`Candidates`, `Clients`, `Contacts`, `Job Orders`).
+1. In `Admin > Custom Fields`, confirm at least one custom field exists for each target module (`Candidates`, `Clients`, `Contacts`, `Job Orders`, `Submissions`, `Interviews`, `Placements`).
 2. In `Admin > Data Export`, run a `ZIP` export and download the file.
 3. Verify the export contains `data/customFieldDefinitions.json`.
 4. In a test environment, go to `Admin > Data Import`, upload the export file, and run `Preview Import`.
@@ -144,4 +144,4 @@ Use this after upgrades, environment migrations, or backup/restore tests.
 Import behavior notes:
 - Custom field definitions are applied before entity upserts.
 - Definitions are upserted by `recordId` first, then by `(moduleKey, fieldKey)`.
-- Entity `customFields` payloads for clients/contacts/candidates/job orders are imported when present.
+- Entity `customFields` payloads for clients, contacts, candidates, job orders, submissions, interviews, and placements are imported when present.

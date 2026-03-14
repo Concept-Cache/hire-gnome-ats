@@ -48,6 +48,12 @@ export const MODULE_HELP_DOCS = [
 		docFile: 'placements.md'
 	},
 	{
+		slug: 'reports',
+		title: 'Reports',
+		moduleHref: '/reports',
+		docFile: 'reports.md'
+	},
+	{
 		slug: 'archive',
 		title: 'Archive',
 		moduleHref: '/archive',

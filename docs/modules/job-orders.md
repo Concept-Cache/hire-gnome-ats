@@ -7,6 +7,7 @@ Job Orders defines open hiring demand and serves as the center for submissions a
 - Title
 - Owner (required)
 - Status (required)
+- Employment type (required)
 - Client
 - Hiring manager contact
 - Division
@@ -22,6 +23,8 @@ Location support:
 ## Career Site Publishing
 If career site is enabled in system settings:
 - Publish toggle becomes available
+- Publish stays off by default on new job orders
+- Publish cannot be enabled until public description is filled in
 - Public description is required before publish can be enabled
 - Internal description remains internal-only
 

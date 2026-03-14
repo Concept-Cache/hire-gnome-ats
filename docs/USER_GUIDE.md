@@ -30,6 +30,7 @@ Use this sequence as your default process:
 - Access is controlled by division mode:
 - `Collaborative` division: sees all records in that division.
 - `Owner Only` division: sees records they own (plus records explicitly linked by workflow).
+- Reporting is stricter: recruiters only see their own data in the `Reports` module.
 
 ## 3) Navigation Basics
 
@@ -189,14 +190,37 @@ Common actions:
 2. Optionally include related child records when prompted.
 3. Use `Archive` module to review and restore.
 
+## Reports
+
+Primary purpose:
+- Provide operational reporting for hiring activity, throughput, and team accountability.
+
+Common actions:
+1. Open `Reports`.
+2. Set a date range.
+3. If your role allows it, filter by division and/or owner.
+4. Review summary KPIs, current pipeline counts, daily trend, and owner performance.
+5. Use `Export Excel` to download the current report as a multi-sheet workbook with a `Summary` tab and one tab per entity (`Candidates`, `Job Orders`, `Submissions`, `Interviews`, `Placements`). Each entity tab mirrors the detail shown in the report modal and is sorted by status, then alphabetically.
+6. Click cards or pipeline counts to drill into the matching records in a modal.
+
+Behavior notes:
+- Administrators can report across all divisions.
+- Directors can report on users and records in their division.
+- Recruiters are locked to their own data only in reporting.
+- Archived records are excluded.
+
 ## 6) Dashboard
 
 Dashboard is designed for action, not reporting noise.
 
 Expect to see:
+- Key metric cards for:
+	- Interviews Today
+	- Awaiting Feedback
+	- Open Jobs Stalled 7d
+	- Placements This Month
 - Priority queue items requiring attention.
 - Upcoming interview schedule.
-- Recent/important accessible records.
 
 Data shown is scoped to your permissions and division access rules.
 
