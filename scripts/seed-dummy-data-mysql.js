@@ -4,10 +4,13 @@ require('./load-env.cjs');
 
 const mysql = require('mysql2/promise');
 const { SKILLS_TO_SEED } = require('./seed-skills');
+const { buildPublicJobDescription } = require('./demo-job-description');
 
 const PERSON_EMAIL_DOMAIN = 'demoats.com';
 const DIVISION_PREFIX = 'HG Demo - ';
 const CLIENT_PREFIX = 'HG Demo Client ';
+const DEMO_SITE_NAME = 'Hire Gnome ATS';
+const DEMO_THEME_KEY = 'classic_blue';
 
 const SOURCE_OPTIONS = [
 	'CareerBuilder',
@@ -47,6 +50,22 @@ const JOB_STATUSES = ['open', 'on_hold', 'open'];
 const SUBMISSION_STATUSES = ['submitted', 'under_review', 'qualified', 'offered'];
 const INTERVIEW_TYPES = ['phone', 'video', 'in_person'];
 const INTERVIEW_STATUSES = ['scheduled', 'completed'];
+const JOB_ORDER_TITLES = [
+	'Senior Backend Engineer',
+	'Cloud Infrastructure Engineer',
+	'Data Warehouse Engineer',
+	'Technical Project Manager',
+	'Product Owner',
+	'Senior Financial Analyst',
+	'Accounting Manager',
+	'Clinical Systems Analyst',
+	'Nurse Case Manager',
+	'Medical Billing Specialist',
+	'EHR Integration Analyst',
+	'Security Operations Engineer',
+	'QA Automation Engineer',
+	'IT Support Manager'
+];
 
 function pick(list, index) {
 	return list[index % list.length];
@@ -96,7 +115,6 @@ function getConnectionConfig() {
 
 async function cleanup(connection) {
 	const emailLike = `%@${PERSON_EMAIL_DOMAIN}`;
-	const jobLike = 'HG Demo Job Order %';
 	const clientLike = `${CLIENT_PREFIX}%`;
 	const divisionLike = `${DIVISION_PREFIX}%`;
 
@@ -104,27 +122,33 @@ async function cleanup(connection) {
 		`DELETE o FROM \`Offer\` o
 		 LEFT JOIN \`Candidate\` c ON c.id = o.candidateId
 		 LEFT JOIN \`JobOrder\` j ON j.id = o.jobOrderId
-		 WHERE c.email LIKE ? OR j.title LIKE ?`,
-		[emailLike, jobLike]
+		 LEFT JOIN \`Client\` cl ON cl.id = j.clientId
+		 WHERE c.email LIKE ? OR cl.name LIKE ?`,
+		[emailLike, clientLike]
 	);
 
 	await connection.query(
 		`DELETE i FROM \`Interview\` i
 		 LEFT JOIN \`Candidate\` c ON c.id = i.candidateId
 		 LEFT JOIN \`JobOrder\` j ON j.id = i.jobOrderId
-		 WHERE c.email LIKE ? OR j.title LIKE ?`,
-		[emailLike, jobLike]
+		 LEFT JOIN \`Client\` cl ON cl.id = j.clientId
+		 WHERE c.email LIKE ? OR cl.name LIKE ?`,
+		[emailLike, clientLike]
 	);
 
 	await connection.query(
 		`DELETE s FROM \`Submission\` s
 		 LEFT JOIN \`Candidate\` c ON c.id = s.candidateId
 		 LEFT JOIN \`JobOrder\` j ON j.id = s.jobOrderId
-		 WHERE c.email LIKE ? OR j.title LIKE ?`,
-		[emailLike, jobLike]
+		 LEFT JOIN \`Client\` cl ON cl.id = j.clientId
+		 WHERE c.email LIKE ? OR cl.name LIKE ?`,
+		[emailLike, clientLike]
 	);
 
-	await connection.query('DELETE FROM `JobOrder` WHERE title LIKE ?', [jobLike]);
+	await connection.query(
+		'DELETE j FROM `JobOrder` j INNER JOIN `Client` c ON c.id = j.clientId WHERE c.name LIKE ?',
+		[clientLike]
+	);
 	await connection.query(
 		'DELETE cn FROM `ClientNote` cn INNER JOIN `Client` c ON c.id = cn.clientId WHERE c.name LIKE ?',
 		[clientLike]
@@ -189,6 +213,23 @@ async function seedSkills(connection) {
 	return rows;
 }
 
+async function ensureDemoSystemSettings(connection) {
+	const [rows] = await connection.query(
+		'SELECT id FROM `SystemSetting` ORDER BY id ASC LIMIT 1'
+	);
+	if (Array.isArray(rows) && rows.length > 0) {
+		return rows[0];
+	}
+
+	const [result] = await connection.query(
+		`INSERT INTO \`SystemSetting\`
+		(\`recordId\`, \`siteName\`, \`siteTitle\`, \`themeKey\`, \`careerSiteEnabled\`, \`createdAt\`, \`updatedAt\`)
+		VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
+		['SYS-DEMO', DEMO_SITE_NAME, DEMO_SITE_NAME, DEMO_THEME_KEY]
+	);
+	return { id: result.insertId };
+}
+
 async function main() {
 	console.log('Seeding linked demo data via mysql2...');
 	const connection = await mysql.createConnection(getConnectionConfig());
@@ -196,6 +237,7 @@ async function main() {
 	try {
 		await connection.beginTransaction();
 		await cleanup(connection);
+		await ensureDemoSystemSettings(connection);
 		const skills = await seedSkills(connection);
 
 		const divisions = [];
@@ -369,25 +411,41 @@ async function main() {
 			const clientContacts = contacts.filter((c) => c.clientId === client.id);
 			const contact = clientContacts[i % clientContacts.length];
 			const market = pick(MARKET_LOCATIONS, i);
+			const baseTitle = pick(JOB_ORDER_TITLES, i);
+			const employmentType = i % 3 === 0 ? 'Permanent' : i % 3 === 1 ? 'Temporary - W2' : 'Temporary - 1099';
+			const salaryMin = 90000 + i * 2500;
+			const salaryMax = 120000 + i * 2500;
+			const publishToCareerSite = i % 2 === 0 ? 1 : 0;
+			const location = `${market.city}, ${market.state}`;
 			const [result] = await connection.query(
 				`INSERT INTO \`JobOrder\`
 				(\`title\`, \`description\`, \`publicDescription\`, \`location\`, \`city\`, \`state\`, \`zipCode\`, \`status\`, \`employmentType\`, \`openings\`, \`salaryMin\`, \`salaryMax\`, \`publishToCareerSite\`, \`publishedAt\`, \`ownerId\`, \`divisionId\`, \`clientId\`, \`contactId\`, \`openedAt\`, \`createdAt\`, \`updatedAt\`)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
 				[
-					`HG Demo Job Order ${i + 1}`,
-					`Internal details for demo job ${i + 1}.`,
-					i % 2 === 0 ? `<p>Public demo description for job ${i + 1}.</p>` : null,
-					`${market.city}, ${market.state}`,
+					baseTitle,
+					`Internal details for ${baseTitle} supporting ${client.name}. Prioritize candidates with strong communication, dependable execution, and relevant domain exposure.`,
+					publishToCareerSite
+						? buildPublicJobDescription({
+							jobTitle: baseTitle,
+							clientName: client.name,
+							location,
+							employmentType,
+							openings: (i % 3) + 1,
+							salaryMin,
+							salaryMax
+						})
+						: null,
+					location,
 					market.city,
 					market.state,
 					market.zipCode,
 					pick(JOB_STATUSES, i),
-					i % 3 === 0 ? 'Permanent' : i % 3 === 1 ? 'Temporary - W2' : 'Temporary - 1099',
+					employmentType,
 					(i % 3) + 1,
-					90000 + i * 2500,
-					120000 + i * 2500,
-					i % 2 === 0 ? 1 : 0,
-					i % 2 === 0 ? daysFromToday(-1) : null,
+					salaryMin,
+					salaryMax,
+					publishToCareerSite,
+					publishToCareerSite ? daysFromToday(-1) : null,
 					owner.id,
 					client.divisionId,
 					client.id,
