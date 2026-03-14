@@ -27,7 +27,7 @@ Currency selection supports:
 Currency values are formatted during entry and in list displays.
 
 ## Date Fields
-- Offer Date (required)
+- Offered On (required)
 - Start Date (required)
 - End Date (optional)
 

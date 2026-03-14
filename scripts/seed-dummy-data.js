@@ -364,6 +364,31 @@ function makeEmail(kind, _firstName, _lastName, index) {
 	return `${kind}${index + 1}@${PERSON_EMAIL_DOMAIN}`;
 }
 
+function normalizeNameKey(firstName, lastName) {
+	return `${String(firstName || '').trim().toLowerCase()}::${String(lastName || '').trim().toLowerCase()}`;
+}
+
+function claimUsedName(usedNames, firstName, lastName) {
+	usedNames.add(normalizeNameKey(firstName, lastName));
+}
+
+function buildUniqueSeedName({ firstNames, lastNames, index, usedNames }) {
+	const firstCount = firstNames.length;
+	const lastCount = lastNames.length;
+	const total = firstCount * lastCount;
+	for (let offset = 0; offset < total; offset += 1) {
+		const position = (index + offset) % total;
+		const firstName = firstNames[position % firstCount];
+		const lastName = lastNames[Math.floor(position / firstCount) % lastCount];
+		const key = normalizeNameKey(firstName, lastName);
+		if (!usedNames.has(key)) {
+			usedNames.add(key);
+			return { firstName, lastName };
+		}
+	}
+	throw new Error('Unable to generate a unique seeded name.');
+}
+
 function buildSeedUserEmail(userSeed, index, state) {
 	if (userSeed?.role === 'ADMINISTRATOR' && !state.adminAssigned) {
 		state.adminAssigned = true;
@@ -389,6 +414,14 @@ function dateDaysFromToday(offset, hour = 10, minute = 0) {
 	return d;
 }
 
+function addHours(date, hours) {
+	return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function subtractMinutes(date, minutes) {
+	return new Date(date.getTime() - minutes * 60 * 1000);
+}
+
 function addMinutes(date, minutes) {
 	return new Date(date.getTime() + minutes * 60 * 1000);
 }
@@ -399,6 +432,45 @@ function dateYearsAgo(years, month = 0) {
 	d.setHours(9, 0, 0, 0);
 	d.setFullYear(d.getFullYear() - years);
 	return d;
+}
+
+function irregularPastOffset(index, windowSize, salt = 0) {
+	const bucketCount = Math.max(1, Number(windowSize) || 1);
+	const multipliers = [3, 5, 9, 11, 13];
+	const multiplier = multipliers[Math.abs(Number(salt) || 0) % multipliers.length];
+	return ((index * multiplier) + Math.floor(index / 2) + salt) % bucketCount;
+}
+
+function buildSeedTimestamp(index, {
+	windowSize = 14,
+	salt = 0,
+	baseHour = 9,
+	hourSpan = 8,
+	minuteStep = 7
+} = {}) {
+	const offset = irregularPastOffset(index, windowSize, salt);
+	const hour = baseHour + ((index * 3 + salt) % Math.max(1, hourSpan));
+	const minute = ((index * minuteStep) + salt * 13) % 60;
+	return dateDaysFromToday(-offset, hour, minute);
+}
+
+function buildAcceptedTimestamp(createdAt, index, salt = 0) {
+	const target = buildSeedTimestamp(index, {
+		windowSize: 14,
+		salt,
+		baseHour: 10,
+		hourSpan: 7,
+		minuteStep: 23
+	});
+	if (target >= createdAt) {
+		return target;
+	}
+	const fallback = addHours(createdAt, 8 + ((index + salt) % 60));
+	const nowCeiling = subtractMinutes(new Date(), 10 + ((index + salt) % 45));
+	if (fallback > nowCeiling) {
+		return nowCeiling > createdAt ? nowCeiling : addHours(createdAt, 1);
+	}
+	return fallback;
 }
 
 async function clearCustomFieldDefinitions() {
@@ -605,9 +677,11 @@ async function main() {
 		adminAssigned: false,
 		recruiterAssigned: false
 	};
+	const usedPersonNames = new Set();
 	for (let i = 0; i < USERS_TO_SEED.length; i += 1) {
 		const userSeed = USERS_TO_SEED[i];
 		const division = divisions[userSeed.divisionIndex];
+		claimUsedName(usedPersonNames, userSeed.firstName, userSeed.lastName);
 		const created = await prisma.user.create({
 			data: {
 				firstName: userSeed.firstName,
@@ -674,8 +748,12 @@ async function main() {
 
 		for (let j = 0; j < 2; j += 1) {
 			const idx = i * 2 + j;
-			const firstName = pick(CONTACT_FIRST_NAMES, idx);
-			const lastName = pick(CONTACT_LAST_NAMES, idx * 2 + 1);
+			const { firstName, lastName } = buildUniqueSeedName({
+				firstNames: CONTACT_FIRST_NAMES,
+				lastNames: CONTACT_LAST_NAMES,
+				index: idx,
+				usedNames: usedPersonNames
+			});
 			const owner = divisionUsers[(idx + 1) % divisionUsers.length] || null;
 			const title = pick(CONTACT_TITLES, idx);
 
@@ -708,14 +786,26 @@ async function main() {
 
 	const candidates = [];
 	for (let i = 0; i < 48; i += 1) {
-		const firstName = pick(CANDIDATE_FIRST_NAMES, i);
-		const lastName = pick(CANDIDATE_LAST_NAMES, i * 3 + 1);
+		const { firstName, lastName } = buildUniqueSeedName({
+			firstNames: CANDIDATE_FIRST_NAMES,
+			lastNames: CANDIDATE_LAST_NAMES,
+			index: i * 3 + 1,
+			usedNames: usedPersonNames
+		});
 		const division = divisions[CANDIDATE_DIVISION_SEQUENCE[i % CANDIDATE_DIVISION_SEQUENCE.length]];
 		const divisionUsers = usersByDivision.get(division.id) || [];
 		const owner = divisionUsers[(i + 2) % divisionUsers.length] || null;
 		const market = pick(MARKET_LOCATIONS, i);
 		const title = pick(CANDIDATE_TITLE_OPTIONS, i);
 		const employer = pick(EMPLOYER_OPTIONS, i + 1);
+		const createdAt = buildSeedTimestamp(i, {
+			windowSize: 14,
+			salt: 3,
+			baseHour: 8,
+			hourSpan: 9,
+			minuteStep: 11
+		});
+		const updatedAt = addHours(createdAt, 4 + ((i * 5) % 36));
 
 		const candidate = await prisma.candidate.create({
 			data: {
@@ -736,7 +826,9 @@ async function main() {
 				website: `https://portfolio.${slug(firstName)}${i + 1}.com`,
 				linkedinUrl: `https://linkedin.com/in/${slug(firstName)}-${slug(lastName)}-${i + 1}`,
 				skillSet: i % 9 === 0 ? 'Additional niche tooling available on request.' : null,
-				summary: `${title} with strong delivery history across cross-functional teams in ${market.city}. Open to hybrid and remote opportunities.`
+				summary: `${title} with strong delivery history across cross-functional teams in ${market.city}. Open to hybrid and remote opportunities.`,
+				createdAt,
+				updatedAt
 			}
 		});
 		candidates.push(candidate);
@@ -833,6 +925,15 @@ async function main() {
 		const market = pick(MARKET_LOCATIONS, i);
 		const location = `${market.city}, ${market.state}`;
 		const publishToCareerSite = i % 3 !== 0;
+		const openedAt = buildSeedTimestamp(i, {
+			windowSize: 16,
+			salt: 7,
+			baseHour: 8,
+			hourSpan: 8,
+			minuteStep: 9
+		});
+		const publishedAt = publishToCareerSite ? addHours(openedAt, 2 + (i % 5)) : null;
+		const updatedAt = addHours(openedAt, 6 + ((i * 3) % 48));
 
 		const jobOrder = await prisma.jobOrder.create({
 			data: {
@@ -851,12 +952,13 @@ async function main() {
 				salaryMin: 85000 + i * 3500,
 				salaryMax: 115000 + i * 3500,
 				publishToCareerSite,
-				publishedAt: publishToCareerSite ? dateDaysFromToday(-(i % 7) - 1, 8) : null,
-				openedAt: dateDaysFromToday(-(i % 14) - 2, 9),
+				publishedAt,
+				openedAt,
 				ownerId: owner?.id ?? null,
 				divisionId: client.divisionId,
 				clientId: client.id,
-				contactId: hiringContact?.id ?? null
+				contactId: hiringContact?.id ?? null,
+				updatedAt
 			}
 		});
 		jobOrders.push(jobOrder);
@@ -880,19 +982,37 @@ async function main() {
 
 		for (let j = 0; j < candidatesForJob.length; j += 1) {
 			const candidate = candidatesForJob[j];
+			const submissionCreatedAt = buildSeedTimestamp((i * 5) + (j * 11), {
+				windowSize: 14,
+				salt: 17,
+				baseHour: 8,
+				hourSpan: 9,
+				minuteStep: 5
+			});
+			const submissionUpdatedAt = addHours(submissionCreatedAt, 2 + ((i + j) % 30));
 			const submission = await prisma.submission.create({
 				data: {
 					candidateId: candidate.id,
 					jobOrderId: jobOrder.id,
 					status: pick(SUBMISSION_STATUSES, i + j),
 					notes: 'Submitted with updated resume, compensation targets, and interview availability.',
-					createdByUserId: createdByUser?.id ?? null
+					createdByUserId: createdByUser?.id ?? null,
+					createdAt: submissionCreatedAt,
+					updatedAt: submissionUpdatedAt
 				}
 			});
 			submissionCount += 1;
 
 			if ((i + j) % 2 === 0) {
-				const startsAt = dateDaysFromToday((i + j) % 10 + 1, 9 + ((i + j) % 5));
+				const interviewCreatedAt = buildSeedTimestamp((i * 7) + (j * 13), {
+					windowSize: 14,
+					salt: 23,
+					baseHour: 8,
+					hourSpan: 8,
+					minuteStep: 17
+				});
+				const startsAt = addHours(interviewCreatedAt, 18 + ((i + j) % 48));
+				const interviewUpdatedAt = addHours(interviewCreatedAt, 1 + ((i + j) % 10));
 				await prisma.interview.create({
 					data: {
 						candidateId: candidate.id,
@@ -904,7 +1024,9 @@ async function main() {
 						interviewerEmail: `interviewer${i + 1}${j + 1}@${PERSON_EMAIL_DOMAIN}`,
 						startsAt,
 						endsAt: addMinutes(startsAt, pick([30, 45, 60, 90], i + j)),
-						location: pick(['Video', 'Phone', 'Client HQ'], i + j)
+						location: pick(['Video', 'Phone', 'Client HQ'], i + j),
+						createdAt: interviewCreatedAt,
+						updatedAt: interviewUpdatedAt
 					}
 				});
 				interviewCount += 1;
@@ -912,6 +1034,16 @@ async function main() {
 
 			if ((i + j) % 4 === 0) {
 				const isTempPlacement = (i + j) % 2 === 0;
+				const placementCreatedAt = buildSeedTimestamp((i * 9) + (j * 5), {
+					windowSize: 14,
+					salt: 31,
+					baseHour: 9,
+					hourSpan: 7,
+					minuteStep: 19
+				});
+				const offeredOn = addHours(placementCreatedAt, 4 + ((i + j) % 12));
+				const expectedJoinDate = dateDaysFromToday(10 + irregularPastOffset(i + j, 9, 4), 9, 0);
+				const placementUpdatedAt = buildAcceptedTimestamp(placementCreatedAt, (i * 11) + (j * 7), 41);
 				await prisma.offer.create({
 					data: {
 						submissionId: submission.id,
@@ -926,9 +1058,11 @@ async function main() {
 						hourlyOtBillRate: isTempPlacement ? 135 + (i % 7) : null,
 						hourlyOtPayRate: isTempPlacement ? 96 + (i % 5) : null,
 						yearlyCompensation: isTempPlacement ? null : 132000 + i * 1800,
-						offeredOn: dateDaysFromToday(-3, 14),
-						expectedJoinDate: dateDaysFromToday(14 + (i % 5), 9),
-						notes: 'Placement finalized after client panel interviews and compensation alignment.'
+						offeredOn,
+						expectedJoinDate,
+						notes: 'Placement finalized after client panel interviews and compensation alignment.',
+						createdAt: placementCreatedAt,
+						updatedAt: placementUpdatedAt
 					}
 				});
 				placementCount += 1;

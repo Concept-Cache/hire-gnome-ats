@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
 	Archive,
+	BarChart3,
 	BookOpenText,
 	Building2,
 	BookUser,
@@ -40,6 +41,7 @@ const modules = [
 	{ label: 'Submissions', href: '/submissions', icon: Send },
 	{ label: 'Interviews', href: '/interviews', icon: CalendarClock },
 	{ label: 'Placements', href: '/placements', icon: Handshake },
+	{ label: 'Reports', href: '/reports', icon: BarChart3 },
 	{ label: 'Archive', href: '/archive', icon: Archive }
 ];
 

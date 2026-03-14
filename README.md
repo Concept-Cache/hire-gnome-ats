@@ -34,6 +34,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Authentication with first-run onboarding
 - Role and division access model (`Administrator`, `Director`, `Recruiter`)
 - Core modules: Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, Placements
+- Operational Reporting module with scoped KPIs, pipeline totals, drill-through detail, daily trend, owner performance, and Excel export with summary + entity tabs that mirror report-modal detail
 - List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
@@ -58,6 +59,10 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Module guides: [`docs/modules`](docs/modules)
 - Operations runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - In-app help route: `/help` and `/help/[module]`
+- Reports access rules:
+	- `Administrator`: all data
+	- `Director`: division-scoped data
+	- `Recruiter`: own data only
 
 ## Quick Start
 
@@ -378,6 +383,7 @@ Archive behavior:
 Demo instance reset behavior:
 - `demo:reset` preserves `System Settings` (branding/theme/integration keys) by default.
 - Seed creates realistic linked records across all core modules.
+- Seed avoids duplicate human-readable names across seeded users, contacts, and candidates.
 - Seed-mode reset clears all `customFieldDefinitions` so custom fields do not persist between demo reset cycles.
 - Default seeded login users use `AUTH_DEFAULT_PASSWORD`.
 - For interval resets, either:

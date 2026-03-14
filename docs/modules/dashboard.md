@@ -5,6 +5,13 @@ The dashboard is your launchpad for daily execution. It surfaces what needs atte
 
 ## Main Sections
 
+### Key Metrics
+The top row shows quick operational counts with direct links into the related module:
+- Interviews Today
+- Awaiting Feedback
+- Open Jobs Stalled 7d
+- Placements This Month
+
 ### Priority Queue
 Shows actionable items that need follow-up, based on lifecycle and date logic.
 
