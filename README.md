@@ -34,6 +34,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Authentication with first-run onboarding
 - Role and division access model (`Administrator`, `Director`, `Recruiter`)
 - Core modules: Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, Placements
+- Action-oriented dashboard with KPI drill-through, 7-day activity strip, needs attention, upcoming interviews, recent candidates, recent job orders, and fixed-height section paging
 - Operational Reporting module with scoped KPIs, pipeline totals, drill-through detail, daily trend, owner performance, and Excel export with summary + entity tabs that mirror report-modal detail
 - List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements

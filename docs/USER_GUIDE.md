@@ -219,8 +219,12 @@ Expect to see:
 	- Awaiting Feedback
 	- Open Jobs Stalled 7d
 	- Placements This Month
-- Priority queue items requiring attention.
+- A compact 7-day activity strip for candidates, job orders, submissions, interviews, and placements
+- Needs Attention items requiring follow-up.
 - Upcoming interview schedule.
+- Recently added candidates.
+- Recently opened job orders.
+- Fixed-height dashboard sections with paging when a section has too many rows.
 
 Data shown is scoped to your permissions and division access rules.
 
