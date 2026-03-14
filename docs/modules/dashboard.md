@@ -12,7 +12,19 @@ The top row shows quick operational counts with direct links into the related mo
 - Open Jobs Stalled 7d
 - Placements This Month
 
-### Priority Queue
+Clicking a metric opens a detail modal so users can see the actual records behind the count without leaving the dashboard.
+
+### 7-Day Activity
+The activity strip shows a compact daily rollup for:
+- Candidates
+- Job Orders
+- Submissions
+- Interviews
+- Placements
+
+This is meant to show short-term direction, not replace formal reporting.
+
+### Needs Attention
 Shows actionable items that need follow-up, based on lifecycle and date logic.
 
 Typical examples:
@@ -28,16 +40,29 @@ Each row focuses on:
 - Interview type
 - Date/time in app display format (`M/D/YYYY @ h:mm A`)
 
+### Recently Added Candidates
+Shows the newest accessible candidate records with owner and status context.
+
+### Recently Opened Job Orders
+Shows recently opened active job orders with client, owner, and status context.
+
+## Paging Behavior
+- Dashboard sections use fixed-height panels on desktop
+- Longer sections page within the card instead of pushing the next section off-screen
+- `View All` still opens the full matching set in a modal
+
 ## How To Use It Well
-1. Work top-down through Priority Queue first.
-2. Confirm interview readiness for the next 24-72 hours.
-3. Click directly into records from each row to update status or add notes.
+1. Work top-down through Needs Attention first.
+2. Use the KPI cards when you want a quick drill-through into matching records.
+3. Confirm interview readiness for the next 24-72 hours.
+4. Use recent adds for situational awareness without opening list views.
 
 ## Recommended Daily Routine
 1. Start with queue items.
-2. Resolve blockers.
-3. Update submissions/interviews/placements before end of day.
-4. Leave notes for team visibility and accountability.
+2. Check the 7-day activity strip for short-term pace.
+3. Resolve blockers.
+4. Update submissions/interviews/placements before end of day.
+5. Leave notes for team visibility and accountability.
 
 ## Notes
 - Data shown is permission-scoped.

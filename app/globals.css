@@ -2317,6 +2317,58 @@ p {
 	border: 1px solid var(--line);
 }
 
+.dashboard-metric-grid {
+	margin-top: 0.7rem;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard-metric-button {
+	display: block;
+	width: 100%;
+	position: relative;
+	overflow: hidden;
+	padding: 0.95rem 1rem 0.9rem;
+	text-align: left;
+	color: inherit;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	box-shadow: none;
+}
+
+.dashboard-metric-button::before {
+	content: '';
+	position: absolute;
+	inset: 0 0 auto 0;
+	height: 4px;
+	background: linear-gradient(90deg, var(--ui-primary-start) 0%, var(--ui-primary-end) 100%);
+	opacity: 0.9;
+}
+
+.dashboard-metric-button:hover:not(:disabled),
+.dashboard-metric-button:focus-visible {
+	background: color-mix(in srgb, var(--panel) 88%, var(--accent-soft) 12%);
+	border-color: color-mix(in srgb, var(--line) 68%, var(--accent) 32%);
+	color: inherit;
+	transform: none;
+}
+
+.dashboard-metric-button .metric-label {
+	font-size: 0.76rem;
+	line-height: 1.15;
+}
+
+.dashboard-metric-button .metric-value {
+	margin-top: 0.55rem;
+	font-size: 1.95rem;
+	line-height: 1;
+}
+
+.dashboard-metric-button .metric-link {
+	margin-top: 0.65rem;
+	font-size: 0.76rem;
+	letter-spacing: 0.02em;
+}
+
 .metric-label {
 	font-size: 0.8rem;
 	color: var(--muted);
@@ -2377,6 +2429,166 @@ p {
 
 .dashboard-focus-grid {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-section-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.8rem;
+}
+
+.dashboard-section-span-full {
+	grid-column: 1 / -1;
+}
+
+.dashboard-section-head {
+	margin-bottom: 0.85rem;
+}
+
+.dashboard-section-panel {
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr) auto;
+	min-height: 29.5rem;
+}
+
+.dashboard-section-body {
+	min-height: 0;
+}
+
+.dashboard-section-empty-state {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100%;
+}
+
+.dashboard-section-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.65rem;
+	margin-top: 0.85rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+}
+
+.dashboard-section-pagination-copy {
+	font-size: 0.76rem;
+	font-weight: 600;
+	color: var(--muted);
+}
+
+.dashboard-section-pagination-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.38rem;
+}
+
+.dashboard-section-pagination-actions .btn-compact {
+	min-width: 2rem;
+	padding-inline: 0.45rem;
+}
+
+.dashboard-trend-panel h3 {
+	margin-bottom: 0.9rem;
+}
+
+.dashboard-trend-strip {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+	gap: 0.7rem;
+}
+
+.dashboard-trend-day {
+	padding: 0.72rem 0.75rem;
+	border-radius: 14px;
+	border: 1px solid var(--line);
+	background: color-mix(in srgb, var(--panel) 94%, var(--accent-soft) 6%);
+	display: grid;
+	gap: 0.5rem;
+	box-shadow: 0 8px 18px -18px color-mix(in srgb, var(--accent-ink) 75%, transparent);
+}
+
+.dashboard-trend-day-label {
+	margin: 0;
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.dashboard-trend-day-total {
+	margin: 0;
+	font-size: 1.6rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.dashboard-trend-mini-chips {
+	justify-content: flex-start;
+}
+
+.dashboard-trend-mini-chips .report-trend-chip {
+	min-width: 2.4rem;
+	padding-inline: 0.35rem;
+	font-size: 0.68rem;
+}
+
+.dashboard-focus-list {
+	margin-top: 0.1rem;
+	gap: 0.55rem;
+}
+
+.dashboard-focus-list li {
+	padding: 0.72rem 0.75rem;
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--panel) 94%, var(--accent-soft) 6%);
+	border-color: color-mix(in srgb, var(--line) 78%, var(--accent-soft) 22%);
+}
+
+.dashboard-item-headline {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin-bottom: 0.45rem;
+}
+
+.dashboard-focus-list li strong {
+	font-size: 0.94rem;
+}
+
+.dashboard-focus-list li p {
+	margin-top: 0.18rem;
+}
+
+.dashboard-focus-list .simple-list-meta,
+.dashboard-focus-list li p:last-child {
+	font-size: 0.75rem;
+}
+
+.dashboard-focus-list .simple-list-actions {
+	align-self: center;
+}
+
+.dashboard-focus-list .chip {
+	width: fit-content;
+	max-width: 100%;
+	padding-inline: 0.72rem;
+	padding-block: 0.32rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--panel) 65%, var(--accent-soft) 35%);
+	white-space: nowrap;
+}
+
+.dashboard-focus-list a,
+.dashboard-trend-panel a,
+.dashboard-metric-button .metric-link {
+	text-underline-offset: 0.18em;
+}
+
+.dashboard-empty-state {
+	padding: 0.35rem 0 0.1rem;
 }
 
 .report-filter-form {
@@ -2661,9 +2873,9 @@ p {
 
 .report-owner-chips .report-owner-chip-placements,
 .report-trend-chips .report-owner-chip-placements {
-	background: #ffe4e6;
-	color: #be185d;
-	border: 1px solid #fda4af;
+	background: #fae8ff;
+	color: #a21caf;
+	border: 1px solid #f0abfc;
 }
 
 .report-owner-chips .report-owner-chip-accepted,
@@ -2694,6 +2906,7 @@ p {
 	max-width: 72rem;
 	max-height: min(80vh, 52rem);
 	padding: 1rem 1rem 1.1rem;
+	overflow: hidden;
 }
 
 .report-detail-modal-head {
@@ -2701,16 +2914,19 @@ p {
 	align-items: center;
 	justify-content: space-between;
 	gap: 0.75rem;
+	flex: 0 0 auto;
 }
 
 .report-detail-modal-close {
 	flex: 0 0 auto;
 }
 
+.report-detail-modal-body,
 .report-detail-list-modal {
 	max-height: calc(80vh - 7rem);
 	overflow-y: auto;
 	padding-right: 0.2rem;
+	min-height: 0;
 }
 
 .dashboard-quick-actions {
@@ -4894,6 +5110,18 @@ button:disabled {
 	.dashboard-split-list .chip {
 		width: fit-content;
 	}
+
+	.dashboard-section-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.dashboard-section-span-full {
+		grid-column: auto;
+	}
+
+	.dashboard-section-panel {
+		min-height: auto;
+	}
 }
 
 .simple-list-toolbar {
@@ -5803,6 +6031,10 @@ small {
 	}
 
 	.metric-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.dashboard-trend-strip {
 		grid-template-columns: 1fr 1fr;
 	}
 
