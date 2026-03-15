@@ -2,6 +2,16 @@
 
 This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
 
+## [1.3.2] - 2026-03-15
+
+#### Changed
+- Standardized fallback actor labels so `Unknown User` is capitalized consistently anywhere the UI shows missing authorship information.
+
+## [1.3.1] - 2026-03-15
+
+#### Changed
+- Clarified demo welcome copy and user docs so inbound Postmark testing explicitly requires an email address in the forwarded message that matches an existing candidate or contact record.
+
 ## [1.3.0] - 2026-03-15
 
 #### Added
@@ -10,11 +20,6 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 
 #### Changed
 - Demo documentation now calls out the one-time welcome prompt and the inbound email test path explicitly.
-
-## [1.3.1] - 2026-03-15
-
-#### Changed
-- Clarified demo welcome copy and user docs so inbound Postmark testing explicitly requires an email address in the forwarded message that matches an existing candidate or contact record.
 
 ## [1.2.0] - 2026-03-15
 

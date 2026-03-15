@@ -652,7 +652,7 @@ export default function ContactDetailsPage() {
 														By{' '}
 														{note.createdByUser
 															? `${note.createdByUser.firstName} ${note.createdByUser.lastName}`
-															: 'Unknown user'}{' '}
+															: 'Unknown User'}{' '}
 														@ {formatDate(note.createdAt)}
 													</p>
 												</div>
