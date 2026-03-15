@@ -42,6 +42,22 @@ function toDiagnosticsStatusLabel(status) {
 	return 'Info';
 }
 
+function toInboundEventStatusLabel(status) {
+	const normalized = String(status || '').trim().toLowerCase();
+	if (normalized === 'processed') return 'Processed';
+	if (normalized === 'no_match') return 'No Match';
+	if (normalized === 'failed') return 'Failed';
+	return normalized ? normalized.replace(/_/g, ' ') : 'Unknown';
+}
+
+function toInboundEventStatusClassName(status) {
+	const normalized = String(status || '').trim().toLowerCase();
+	if (normalized === 'processed') return 'settings-diagnostics-status-pass';
+	if (normalized === 'no_match') return 'settings-diagnostics-status-warn';
+	if (normalized === 'failed') return 'settings-diagnostics-status-fail';
+	return '';
+}
+
 export default function AdminSettingsPage() {
 	const toast = useToast();
 	const [loading, setLoading] = useState(true);
@@ -765,6 +781,47 @@ export default function AdminSettingsPage() {
 											</li>
 										))}
 									</ul>
+								) : null}
+								{diagnosticsState.loaded ? (
+									<div className="settings-diagnostics-inbound-block">
+										<h5>Recent Inbound Email Events</h5>
+										{Array.isArray(diagnosticsState.result?.recentInboundEmails)
+											&& diagnosticsState.result.recentInboundEmails.length > 0 ? (
+												<ul className="settings-diagnostics-list">
+													{diagnosticsState.result.recentInboundEmails.map((event) => (
+														<li key={event.id} className="settings-diagnostics-item">
+															<div className="settings-diagnostics-head">
+																<strong>{event.subject || '(No subject)'}</strong>
+																<span
+																	className={`settings-diagnostics-status ${toInboundEventStatusClassName(event.status)}`.trim()}
+																>
+																	{toInboundEventStatusLabel(event.status)}
+																</span>
+															</div>
+															<p className="panel-subtext">
+																From: <strong>{event.fromEmail || '-'}</strong>
+															</p>
+															<p className="panel-subtext">
+																Matches: Candidates {event.matchedCandidates ?? 0} | Contacts {event.matchedContacts ?? 0}
+															</p>
+															<p className="panel-subtext">
+																Notes: {event.notesCreated ?? 0} | Candidate Files: {event.attachmentsSaved ?? 0}
+															</p>
+															{event.attachmentDiagnosticsSummary ? (
+																<p className="panel-subtext">
+																	Attachment diagnostics: <strong>{event.attachmentDiagnosticsSummary}</strong>
+																</p>
+															) : null}
+															<p className="panel-subtext">
+																Received: <strong>{formatDateTimeAt(event.createdAt)}</strong>
+															</p>
+														</li>
+													))}
+												</ul>
+											) : (
+												<p className="panel-subtext">No inbound email events recorded yet.</p>
+											)}
+									</div>
 								) : null}
 							</section>
 						</article>

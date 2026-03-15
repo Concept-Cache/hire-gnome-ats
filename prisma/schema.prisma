@@ -331,6 +331,7 @@ model CandidateSkill {
 model CandidateNote {
 	id              Int       @id @default(autoincrement())
 	recordId        String    @unique
+	noteType        String    @default("manual")
 	content         String    @db.Text
 	createdAt       DateTime  @default(now())
 	updatedAt       DateTime  @updatedAt
@@ -410,6 +411,26 @@ model CandidateAttachment {
 
 	@@index([candidateId])
 	@@index([uploadedByUserId])
+}
+
+model InboundEmailEvent {
+	id                Int      @id @default(autoincrement())
+	recordId          String   @unique
+	provider          String   @default("postmark")
+	externalMessageId String
+	status            String   @default("processed")
+	subject           String?
+	fromEmail         String?
+	matchedCandidates Int      @default(0)
+	matchedContacts   Int      @default(0)
+	notesCreated      Int      @default(0)
+	attachmentsSaved  Int      @default(0)
+	payload           Json?
+	createdAt         DateTime @default(now())
+	updatedAt         DateTime @updatedAt
+
+	@@unique([provider, externalMessageId])
+	@@index([status])
 }
 
 model PasswordResetToken {
@@ -518,6 +539,7 @@ model ClientNote {
 model ContactNote {
 	id              Int      @id @default(autoincrement())
 	recordId        String   @unique
+	noteType        String   @default("manual")
 	content         String   @db.Text
 	createdAt       DateTime @default(now())
 	updatedAt       DateTime @updatedAt

@@ -43,6 +43,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
 - Candidate and job-order match workspaces (top matches, sortable/paged)
 - Audit trails on records and admin diagnostics
+- Admin diagnostics includes recent inbound email webhook visibility
 - Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering (includes `customFieldDefinitions`)
 - Admin data import module:
 	- Hire Gnome export re-import (`JSON`, `NDJSON`, `ZIP`)
@@ -253,6 +254,7 @@ Use `.env` for:
 |---|---|---|
 | `DB_BACKUP_DIR` | `.backups` | Directory used by backup scripts and diagnostics checks. |
 | `DB_BACKUP_RETENTION_DAYS` | `14` | Retention policy for scheduled backup cleanup. |
+| `POSTMARK_INBOUND_WEBHOOK_SECRET` | empty | Optional shared secret for `/api/inbound/postmark` via query string or header. |
 | `ERROR_ALERT_WEBHOOK_URL` | empty | Webhook endpoint for runtime/API error alerts. |
 | `ERROR_ALERT_MIN_LEVEL` | `error` | Minimum log severity that triggers error webhook alert. |
 | `ERROR_ALERT_COOLDOWN_SECONDS` | `300` | Alert cooldown period to suppress webhook spam. |
@@ -392,6 +394,16 @@ Demo instance reset behavior:
 - For interval resets, either:
 	- run `npm run demo:reset:loop` (uses `DEMO_RESET_INTERVAL_MINUTES`), or
 	- schedule `npm run demo:reset` with cron/systemd (for example every 6 hours).
+
+Inbound email webhook:
+- Postmark inbound webhook endpoint: `/api/inbound/postmark`
+- The route extracts email addresses from the payload, matches `Candidate.email` and `Contact.email`, creates cleaned `Email` notes on matches, and saves supported attachments to matched candidates only.
+- Contact matches receive notes only. Attachments are not saved to contacts.
+- Duplicate inbound processing is suppressed by Postmark `MessageID`.
+- Matching is based on any email addresses found in the inbound JSON payload, including common reply/forward content.
+- Candidate attachments are saved only when the inbound payload includes attachment bytes, not just metadata.
+- Recent inbound events and attachment skip reasons are visible in `Admin Area > System Settings > System Diagnostics`.
+- If `POSTMARK_INBOUND_WEBHOOK_SECRET` is set, include it either as `?secret=...` on the webhook URL or as the `x-webhook-secret` header.
 
 ## Production Checklist
 - Set strong unique values for:

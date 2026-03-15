@@ -98,6 +98,7 @@ function isPublicApiPath(pathname) {
 		pathname === '/api/onboarding/status' ||
 		pathname === '/api/onboarding/setup' ||
 		pathname === '/api/health' ||
+		pathname === '/api/inbound/postmark' ||
 		pathname === '/api/session/login' ||
 		pathname === '/api/session/logout' ||
 		pathname === '/api/session/acting-user' ||

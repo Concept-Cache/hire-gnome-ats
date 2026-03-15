@@ -58,6 +58,7 @@ async function getCandidates_id_notesHandler(req, { params }) {
 				orderBy: { createdAt: 'desc' },
 				select: {
 					id: true,
+					noteType: true,
 					content: true,
 					createdAt: true,
 					updatedAt: true,
@@ -97,6 +98,7 @@ async function postCandidates_id_notesHandler(req, { params }) {
 				data: {
 					candidateId,
 					content: parsed.data.content,
+					noteType: parsed.data.noteType || 'manual',
 					createdByUserId: actingUser.id
 				},
 				include: {
@@ -113,10 +115,12 @@ async function postCandidates_id_notesHandler(req, { params }) {
 			note = await prisma.candidateNote.create({
 				data: {
 					candidateId,
-					content: parsed.data.content
+					content: parsed.data.content,
+					noteType: parsed.data.noteType || 'manual'
 				},
 				select: {
 					id: true,
+					noteType: true,
 					content: true,
 					createdAt: true,
 					updatedAt: true,

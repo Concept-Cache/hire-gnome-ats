@@ -58,6 +58,7 @@ async function getContacts_id_notesHandler(req, { params }) {
 				orderBy: { createdAt: 'desc' },
 				select: {
 					id: true,
+					noteType: true,
 					content: true,
 					createdAt: true,
 					updatedAt: true,
@@ -97,6 +98,7 @@ async function postContacts_id_notesHandler(req, { params }) {
 				data: {
 					contactId,
 					content: parsed.data.content,
+					noteType: parsed.data.noteType || 'manual',
 					createdByUserId: actingUser.id
 				},
 				include: {
@@ -113,10 +115,12 @@ async function postContacts_id_notesHandler(req, { params }) {
 			note = await prisma.contactNote.create({
 				data: {
 					contactId,
-					content: parsed.data.content
+					content: parsed.data.content,
+					noteType: parsed.data.noteType || 'manual'
 				},
 				select: {
 					id: true,
+					noteType: true,
 					content: true,
 					createdAt: true,
 					updatedAt: true,

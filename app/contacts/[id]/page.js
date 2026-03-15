@@ -619,6 +619,7 @@ export default function ContactDetailsPage() {
 										{sortedNotes.map((note) => (
 											<li key={note.id}>
 												<div>
+													{note.noteType === 'email' ? <span className="chip inbound-email-note-chip">Email</span> : null}
 													<p>{note.content}</p>
 													<p className="simple-list-meta">
 														By{' '}
