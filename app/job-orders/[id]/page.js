@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, MoreVertical, RefreshCcw } from 'lucide-react';
+import { ArrowUpRight, MoreVertical, RefreshCcw, Sparkles } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
@@ -12,6 +12,7 @@ import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/comp
 import RichTextEditor from '@/app/components/rich-text-editor';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import MatchExplanationModal from '@/app/components/match-explanation-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -141,6 +142,7 @@ export default function JobOrderDetailsPage() {
 	const [ownerDivisionId, setOwnerDivisionId] = useState(null);
 	const [selectedClientDivisionId, setSelectedClientDivisionId] = useState(null);
 	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
+	const [aiAvailable, setAiAvailable] = useState(false);
 	const [form, setForm] = useState(initialForm);
 	const [submissionForm, setSubmissionForm] = useState(initialSubmissionForm);
 	const [loading, setLoading] = useState(true);
@@ -157,6 +159,7 @@ export default function JobOrderDetailsPage() {
 	const [closeState, setCloseState] = useState({ closing: false, error: '' });
 	const [enhanceState, setEnhanceState] = useState({ enhancing: false, error: '', success: '' });
 	const [workspaceTab, setWorkspaceTab] = useState('submissions');
+	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [submissionSort, setSubmissionSort] = useState({ field: 'createdAt', direction: 'desc' });
 	const [interviewSort, setInterviewSort] = useState({ field: 'startsAt', direction: 'desc' });
@@ -168,6 +171,7 @@ export default function JobOrderDetailsPage() {
 		computedAt: '',
 		requiredSkillNames: [],
 		totalCandidatesEvaluated: 0,
+		matchEligibility: '',
 		matches: [],
 		submittingCandidateId: ''
 	});
@@ -289,6 +293,7 @@ export default function JobOrderDetailsPage() {
 		]);
 		const settingsData = await settingsRes.json().catch(() => ({}));
 		setCareerSiteEnabled(toBooleanFlag(settingsData?.careerSiteEnabled, false));
+		setAiAvailable(Boolean(settingsData?.aiAvailable));
 
 		if (!jobRes.ok) {
 			setError('Job order not found.');
@@ -339,6 +344,7 @@ export default function JobOrderDetailsPage() {
 			computedAt: data.computedAt || '',
 			requiredSkillNames: Array.isArray(data.requiredSkillNames) ? data.requiredSkillNames : [],
 			totalCandidatesEvaluated: Number(data.totalCandidatesEvaluated || 0),
+			matchEligibility: data.matchEligibility || '',
 			matches: Array.isArray(data.matches) ? data.matches : []
 		}));
 	}
@@ -888,6 +894,7 @@ export default function JobOrderDetailsPage() {
 		form.customFields
 	);
 	const canEnhancePublicPosting =
+		aiAvailable &&
 		careerSiteEnabled &&
 		!enhanceState.enhancing &&
 		!saveState.saving &&
@@ -1277,7 +1284,9 @@ export default function JobOrderDetailsPage() {
 												key: 'enhance-public-posting',
 												label: 'Enhance with AI',
 												loadingLabel: 'Enhancing...',
-												title: 'Enhance with AI',
+												title: aiAvailable
+													? 'Enhance with AI'
+													: 'Enable OpenAI in Admin Area > System Settings to use this.',
 												onClick: onEnhancePublicPosting,
 												disabled: !canEnhancePublicPosting,
 												loading: enhanceState.enhancing
@@ -1286,6 +1295,9 @@ export default function JobOrderDetailsPage() {
 										ariaLabel="Public Description"
 									/>
 								</FormField>
+								{!aiAvailable ? (
+									<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+								) : null}
 							</>
 						) : null}
 					</section>
@@ -1586,87 +1598,125 @@ export default function JobOrderDetailsPage() {
 									</span>
 								) : null}
 							</div>
-							{matchState.requiredSkillNames.length > 0 ? (
+							{!matchState.matchEligibility && matchState.requiredSkillNames.length > 0 ? (
 								<p className="panel-subtext">
 									Required skills inferred: {matchState.requiredSkillNames.join(', ')}
 								</p>
 							) : null}
 							{matchState.error ? <p className="panel-subtext error">{matchState.error}</p> : null}
 							<div className="workspace-scroll-area">
-								<ListSortControls
-									label="Sort Matches"
-									value={matchesSort.field}
-									direction={matchesSort.direction}
-									onValueChange={(field) => setMatchesSort((current) => ({ ...current, field }))}
-									onDirectionToggle={() =>
-										setMatchesSort((current) => ({
-											...current,
-											direction: current.direction === 'asc' ? 'desc' : 'asc'
-										}))
-									}
-									options={[
-										{ value: 'scorePercent', label: 'Match Score' },
-										{ value: 'candidate', label: 'Candidate' },
-										{ value: 'owner', label: 'Owner' }
-									]}
-									disabled={sortedMatches.length < 2}
-								/>
-								{!matchState.loading && matchState.matches.length === 0 ? (
-									<p className="panel-subtext">
-										No matches available. Try refreshing after adding more candidate detail.
-									</p>
+								{matchState.matchEligibility ? (
+									<p className="panel-subtext">{matchState.matchEligibility}</p>
 								) : (
-									<ul className="simple-list">
-										{sortedMatches.map((match) => {
-											const isSubmitting =
-												matchState.submittingCandidateId === String(match.candidateId);
-											return (
-												<li key={match.candidateId}>
-													<div>
-														<strong>
-															<Link href={`/candidates/${match.candidateId}`}>{match.candidateName}</Link>
-														</strong>
-														<p>
-															{match.currentJobTitle || 'No current title'} | Owner: {match.ownerName || '-'}
-														</p>
-														<p>
-															Match score: <strong>{match.scorePercent}%</strong>
-														</p>
-														{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
-															<p>{match.reasons.join(' • ')}</p>
-														) : null}
-														{Array.isArray(match.risks) && match.risks.length > 0 ? (
-															<p className="panel-subtext error">{match.risks.join(' • ')}</p>
-														) : null}
-													</div>
-													<div className="simple-list-actions">
-														<button
-															type="button"
-															onClick={() => onCreateMatchedSubmission(match)}
-															disabled={
-																isSubmitting ||
-																matchState.loading ||
-																submittedCandidateIds.has(String(match.candidateId))
-															}
-														>
-															{isSubmitting ? 'Submitting...' : 'Add Submission'}
-														</button>
-													</div>
-												</li>
-											);
-										})}
-									</ul>
+									<>
+										<ListSortControls
+											label="Sort Matches"
+											value={matchesSort.field}
+											direction={matchesSort.direction}
+											onValueChange={(field) => setMatchesSort((current) => ({ ...current, field }))}
+											onDirectionToggle={() =>
+												setMatchesSort((current) => ({
+													...current,
+													direction: current.direction === 'asc' ? 'desc' : 'asc'
+												}))
+											}
+											options={[
+												{ value: 'scorePercent', label: 'Match Score' },
+												{ value: 'candidate', label: 'Candidate' },
+												{ value: 'owner', label: 'Owner' }
+											]}
+											disabled={sortedMatches.length < 2}
+										/>
+										{!matchState.loading && matchState.matches.length === 0 ? (
+											<p className="panel-subtext">
+												No matches available. Try refreshing after adding more candidate detail.
+											</p>
+										) : (
+											<ul className="simple-list">
+												{sortedMatches.map((match) => {
+													const isSubmitting =
+														matchState.submittingCandidateId === String(match.candidateId);
+													return (
+														<li key={match.candidateId}>
+															<div>
+																<strong>
+																	<Link href={`/candidates/${match.candidateId}`}>{match.candidateName}</Link>
+																</strong>
+																<p>
+																	{match.currentJobTitle || 'No current title'} | Owner: {match.ownerName || '-'}
+																</p>
+																<p>
+																	Match score: <strong>{match.scorePercent}%</strong>
+																</p>
+																{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
+																	<p>{match.reasons.join(' • ')}</p>
+																) : null}
+															</div>
+															<div className="simple-list-actions">
+																<div className="row-actions row-actions-right">
+																	<button
+																		type="button"
+																		className="row-action-icon"
+																		aria-label="Explain match"
+																		title={aiAvailable ? 'Explain match' : 'Enable OpenAI in Admin Area > System Settings to use this.'}
+																		onClick={() =>
+																			setMatchExplanationTarget({
+																				candidateId: match.candidateId,
+																				candidateName: match.candidateName,
+																				jobOrderId: Number(id),
+																				jobOrderTitle: jobOrder.title,
+																				scorePercent: match.scorePercent,
+																				reasons: match.reasons || [],
+																				risks: match.risks || []
+																			})
+																		}
+																		disabled={!aiAvailable || matchState.loading}
+																	>
+																		<Sparkles aria-hidden="true" className="row-action-lucide" />
+																	</button>
+																	<button
+																		type="button"
+																		onClick={() => onCreateMatchedSubmission(match)}
+																		disabled={
+																			isSubmitting ||
+																			matchState.loading ||
+																			submittedCandidateIds.has(String(match.candidateId))
+																		}
+																	>
+																		{isSubmitting ? 'Submitting...' : 'Add Submission'}
+																	</button>
+																</div>
+															</div>
+														</li>
+													);
+												})}
+											</ul>
+										)}
+									</>
 								)}
 							</div>
-							<p className="panel-subtext">
-								Evaluated {matchState.totalCandidatesEvaluated} candidate
-								{matchState.totalCandidatesEvaluated === 1 ? '' : 's'}.
-							</p>
+							{!matchState.matchEligibility ? (
+								<p className="panel-subtext">
+									Evaluated {matchState.totalCandidatesEvaluated} candidate
+									{matchState.totalCandidatesEvaluated === 1 ? '' : 's'}.
+								</p>
+							) : null}
 						</div>
 					) : null}
 				</article>
 			</div>
 			<AuditTrailPanel entityType="JOB_ORDER" entityId={id} visible={showAuditTrail} />
+			<MatchExplanationModal
+				open={Boolean(matchExplanationTarget)}
+				onClose={() => setMatchExplanationTarget(null)}
+				candidateId={matchExplanationTarget?.candidateId}
+				candidateName={matchExplanationTarget?.candidateName}
+				jobOrderId={matchExplanationTarget?.jobOrderId}
+				jobOrderTitle={matchExplanationTarget?.jobOrderTitle}
+				scorePercent={matchExplanationTarget?.scorePercent}
+				reasons={matchExplanationTarget?.reasons}
+				risks={matchExplanationTarget?.risks}
+			/>
 		</section>
 	);
 }

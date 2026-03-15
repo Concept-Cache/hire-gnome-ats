@@ -46,6 +46,9 @@ async function getInterviewById(req, { params }) {
 					include: {
 						client: true
 					}
+				},
+				aiQuestionSetGeneratedByUser: {
+					select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
 				}
 			}
 		});
@@ -88,6 +91,10 @@ async function patchInterviewById(req, { params }) {
 				locationLatitude: true,
 				locationLongitude: true,
 				videoLink: true,
+				aiQuestionSet: true,
+				aiQuestionSetGeneratedAt: true,
+				aiQuestionSetGeneratedByUserId: true,
+				aiQuestionSetModelName: true,
 				customFields: true,
 				feedback: true,
 				evaluationScore: true,
@@ -151,7 +158,13 @@ async function patchInterviewById(req, { params }) {
 				jobOrderId: existing.jobOrderId,
 				customFields: customFieldValidation.customFields
 			}),
-			include: { candidate: true, jobOrder: { include: { client: true } } }
+			include: {
+				candidate: true,
+				jobOrder: { include: { client: true } },
+				aiQuestionSetGeneratedByUser: {
+					select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
+				}
+			}
 		});
 		await logUpdate({
 			actorUserId: actingUser?.id,

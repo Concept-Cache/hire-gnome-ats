@@ -87,10 +87,14 @@ model User {
 	ownedContacts    Contact[]   @relation("ContactOwner")
 	ownedJobOrders   JobOrder[]  @relation("JobOrderOwner")
 	createdSubmissions Submission[] @relation("SubmissionCreatedBy")
+	generatedSubmissionWriteUps Submission[] @relation("SubmissionWriteUpGeneratedBy")
+	generatedInterviewQuestions Interview[] @relation("InterviewQuestionsGeneratedBy")
 	createdCandidateNotes CandidateNote[] @relation("CandidateNoteCreatedBy")
 	createdClientNotes ClientNote[] @relation("ClientNoteCreatedBy")
 	createdContactNotes ContactNote[] @relation("ContactNoteCreatedBy")
 	uploadedCandidateAttachments CandidateAttachment[] @relation("CandidateAttachmentUploadedBy")
+	generatedCandidateSummaries CandidateAiSummary[]
+	generatedMatchExplanations MatchExplanation[]
 	candidateStatusChanges CandidateStatusChange[] @relation("CandidateStatusChangedBy")
 	auditLogs       AuditLog[]  @relation("AuditLogActor")
 	passwordResetTokens PasswordResetToken[]
@@ -257,6 +261,8 @@ model Candidate {
 	candidateSkills CandidateSkill[]
 	attachments     CandidateAttachment[]
 	statusChanges   CandidateStatusChange[]
+	aiSummary       CandidateAiSummary?
+	matchExplanations MatchExplanation[]
 
 	@@index([firstName, lastName])
 	@@index([mobile])
@@ -411,6 +417,24 @@ model CandidateAttachment {
 
 	@@index([candidateId])
 	@@index([uploadedByUserId])
+}
+
+model CandidateAiSummary {
+	id                Int       @id @default(autoincrement())
+	recordId          String    @unique
+	candidateId       Int       @unique
+	overview          String    @db.Text
+	strengths         Json?
+	concerns          Json?
+	suggestedNextStep String?   @db.Text
+	modelName         String?
+	generatedByUserId Int?
+	createdAt         DateTime  @default(now())
+	updatedAt         DateTime  @updatedAt
+	candidate         Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	generatedByUser   User?     @relation(fields: [generatedByUserId], references: [id], onDelete: SetNull)
+
+	@@index([generatedByUserId])
 }
 
 model InboundEmailEvent {
@@ -591,6 +615,7 @@ model JobOrder {
 	submissions Submission[]
 	interviews  Interview[]
 	offers      Offer[]
+	matchExplanations MatchExplanation[]
 
 	@@index([title])
 	@@index([status])
@@ -608,11 +633,16 @@ model Submission {
 	recordId   String   @unique
 	status     String   @default("submitted")
 	notes      String?   @db.Text
+	aiWriteUp  String?   @db.Text
+	aiWriteUpGeneratedAt DateTime?
+	aiWriteUpGeneratedByUserId Int?
+	aiWriteUpModelName String?
 	customFields Json?
 	createdAt  DateTime @default(now())
 	updatedAt  DateTime @updatedAt
 	createdByUserId Int?
 	createdByUser   User? @relation("SubmissionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+	aiWriteUpGeneratedByUser User? @relation("SubmissionWriteUpGeneratedBy", fields: [aiWriteUpGeneratedByUserId], references: [id], onDelete: SetNull)
 	offer      Offer?
 
 	candidateId Int
@@ -625,6 +655,7 @@ model Submission {
 	@@index([candidateId, status])
 	@@index([jobOrderId, status])
 	@@index([createdByUserId])
+	@@index([aiWriteUpGeneratedByUserId])
 }
 
 model Interview {
@@ -643,6 +674,10 @@ model Interview {
 	locationLatitude Float?
 	locationLongitude Float?
 	videoLink       String?
+	aiQuestionSet   String?   @db.Text
+	aiQuestionSetGeneratedAt DateTime?
+	aiQuestionSetGeneratedByUserId Int?
+	aiQuestionSetModelName String?
 	customFields    Json?
 	feedback        String?   @db.Text
 	evaluationScore Float?
@@ -655,10 +690,39 @@ model Interview {
 
 	jobOrderId Int
 	jobOrder   JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Restrict)
+	aiQuestionSetGeneratedByUser User? @relation("InterviewQuestionsGeneratedBy", fields: [aiQuestionSetGeneratedByUserId], references: [id], onDelete: SetNull)
 
 	@@index([candidateId, startsAt])
 	@@index([jobOrderId, startsAt])
 	@@index([status, startsAt])
+	@@index([aiQuestionSetGeneratedByUserId])
+}
+
+model MatchExplanation {
+	id                     Int      @id @default(autoincrement())
+	recordId               String   @unique
+	whyItMatches           String   @db.Text
+	potentialGaps          String   @db.Text
+	whatToValidate         String   @db.Text
+	recommendedPositioning String?  @db.Text
+	scorePercent           Int?
+	candidateUpdatedAt     DateTime?
+	jobOrderUpdatedAt      DateTime?
+	modelName              String?
+	createdAt              DateTime @default(now())
+	updatedAt              DateTime @updatedAt
+	candidateId            Int
+	jobOrderId             Int
+	generatedByUserId      Int?
+
+	candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+	jobOrder        JobOrder  @relation(fields: [jobOrderId], references: [id], onDelete: Cascade)
+	generatedByUser User?     @relation(fields: [generatedByUserId], references: [id], onDelete: SetNull)
+
+	@@unique([candidateId, jobOrderId])
+	@@index([generatedByUserId])
+	@@index([candidateId])
+	@@index([jobOrderId])
 }
 
 model Offer {

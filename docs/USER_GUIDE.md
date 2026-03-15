@@ -49,6 +49,7 @@ Use this sequence as your default process:
 - Email and URL fields are validated.
 - Phone and currency fields auto-format while typing.
 - Zip-based city/state inference is applied where configured.
+- AI features show a disabled control plus a hint when OpenAI has not been configured in `Admin Area > System Settings`.
 
 ## 5) Module Guides
 
@@ -82,10 +83,12 @@ Common actions:
 2. Fill required identity fields.
 3. Add status, source, owner, and current employment details.
 4. Add notes, education, work history, and file attachments.
-5. Use `Actions` for fast create:
+5. Use the `AI Summary` workspace tab to generate a recruiter-facing summary of the candidate.
+6. Use `Actions` for fast create:
 - Add submission
 - Add interview
 - Add placement
+- Draft email
 
 Resume parsing:
 - Choose upload or paste mode.
@@ -93,9 +96,25 @@ Resume parsing:
 - Falls back to built-in parser if AI is unavailable.
 - Parsed resumes can auto-populate candidate data and attach source file.
 
+AI summary:
+- Generated on demand from the candidate profile, resume text, skills, education, work history, and recent notes.
+- Stored separately from the resume field.
+- Shows:
+	- overview
+	- strengths
+	- concerns
+	- suggested next step
+- Matched job orders also support `Explain Match`, which stores a reusable explanation of fit, likely gaps, and what the recruiter should validate.
+
 Duplicate handling:
 - Candidate creation includes duplicate checks.
 - Merge option is available when duplicate confidence is high.
+
+Email drafting:
+- Candidate actions include `Draft Email`.
+- Choose purpose and tone, optionally add instructions, then generate a reusable draft.
+- Copy the generated subject/body directly to the clipboard.
+- If OpenAI is not configured, the action stays visible but disabled with a hint.
 
 ## Clients
 
@@ -129,6 +148,8 @@ Common actions:
 Behavior notes:
 - When creating from a client route, client is locked.
 - For existing contact records, client is not editable.
+- Contact actions include `Draft Email` for recruiter-facing outbound draft generation.
+- If OpenAI is not configured, the action stays visible but disabled with a hint.
 
 ## Job Orders
 
@@ -147,6 +168,7 @@ Submission workflow:
 - Add submissions directly from job order detail workspace.
 - Duplicate submissions for same candidate + job are blocked.
 - Candidate suggestions use qualification scoring and typeahead safeguards.
+- Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.
 
 ## Submissions
 
@@ -156,13 +178,16 @@ Primary purpose:
 Common actions:
 1. Create submission from candidate or job order flow.
 2. Update status through lifecycle.
-3. Use actions menu for:
+3. Use the `Client Write-Up` toolbar icons to generate or copy the AI write-up.
+4. Use actions menu for:
 - Convert to placement (with confirmation)
 - Schedule interview
 
 Behavior notes:
 - Candidate/job become locked after creation.
 - If converted to placement, submission becomes non-editable.
+- `Client Write-Up` can be AI-generated from the candidate and job order, then edited before saving.
+- The write-up toolbar sits above the field and supports regenerate + copy to clipboard.
 
 ## Interviews
 
@@ -178,6 +203,7 @@ Common actions:
 3. Set duration; end time auto-calculates.
 4. Set type (`Phone`, `Video`, `In Person`) and location.
 5. Add optional participants and optional video link.
+6. Use `Interview Questions` to generate a saved question set from the candidate and job order context.
 
 Calendar + email behavior:
 - `.ics` generation is available from interview actions.
@@ -185,6 +211,7 @@ Calendar + email behavior:
 - In test mode, all emails route to `EMAIL_TEST_RECIPIENT`.
 - Status `Completed` does not trigger invite update emails.
 - Cancel interview action requires confirmation and marks status accordingly.
+- `Interview Questions` are generated on demand, saved on the record, editable, and can be refreshed or copied later.
 
 ## Placements
 

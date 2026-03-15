@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Lock, MoreVertical } from 'lucide-react';
+import { Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
@@ -39,6 +39,7 @@ const initialForm = {
 	locationLongitude: '',
 	videoCallProvider: '',
 	videoLink: '',
+	aiQuestionSet: '',
 	optionalParticipantEmails: [],
 	candidateId: '',
 	jobOrderId: '',
@@ -89,6 +90,7 @@ function toForm(row) {
 		locationLongitude: row.locationLongitude ?? '',
 		videoCallProvider: inferVideoCallProviderFromLink(row.videoLink),
 		videoLink: row.videoLink || '',
+		aiQuestionSet: row.aiQuestionSet || '',
 		optionalParticipantEmails,
 		candidateId: String(row.candidateId || ''),
 		jobOrderId: String(row.jobOrderId || ''),
@@ -124,12 +126,14 @@ export default function InterviewDetailsPage() {
 	const router = useRouter();
 	const actionsMenuRef = useRef(null);
 	const [interview, setInterview] = useState(null);
+	const [aiAvailable, setAiAvailable] = useState(false);
 	const [form, setForm] = useState(initialForm);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [saveState, setSaveState] = useState({ saving: false, error: '', success: '' });
 	const [inviteState, setInviteState] = useState({ downloading: false, error: '' });
 	const [cancelState, setCancelState] = useState({ canceling: false, error: '' });
+	const [questionState, setQuestionState] = useState({ generating: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
@@ -166,7 +170,10 @@ export default function InterviewDetailsPage() {
 		setLoading(true);
 		setError('');
 
-		const interviewRes = await fetch(`/api/interviews/${id}`);
+		const [interviewRes, settingsRes] = await Promise.all([
+			fetch(`/api/interviews/${id}`),
+			fetch('/api/system-settings', { cache: 'no-store' })
+		]);
 
 		if (!interviewRes.ok) {
 			setError('Interview not found.');
@@ -175,8 +182,10 @@ export default function InterviewDetailsPage() {
 		}
 
 		const interviewData = await interviewRes.json();
+		const settingsData = settingsRes.ok ? await settingsRes.json().catch(() => ({})) : {};
 
 		const nextForm = toForm(interviewData);
+		setAiAvailable(Boolean(settingsData?.aiAvailable));
 		setInterview(interviewData);
 		setForm(nextForm);
 		markAsClean(nextForm);
@@ -234,6 +243,12 @@ export default function InterviewDetailsPage() {
 			toast.error(cancelState.error);
 		}
 	}, [cancelState.error, toast]);
+
+	useEffect(() => {
+		if (questionState.error) {
+			toast.error(questionState.error);
+		}
+	}, [questionState.error, toast]);
 
 	async function onSave(e) {
 		e.preventDefault();
@@ -352,6 +367,49 @@ export default function InterviewDetailsPage() {
 			setSaveState({ saving: false, error: '', success: 'Interview cancelled.' });
 		} catch {
 			setCancelState({ canceling: false, error: 'Failed to cancel interview.' });
+		}
+	}
+
+	async function onGenerateQuestions() {
+		setActionsOpen(false);
+		setQuestionState({ generating: true, error: '' });
+		setSaveState((current) => ({ ...current, error: '', success: '' }));
+
+		try {
+			const response = await fetch(`/api/interviews/${id}/generate-questions`, {
+				method: 'POST'
+			});
+
+			if (!response.ok) {
+				const data = await response.json().catch(() => ({}));
+				setQuestionState({
+					generating: false,
+					error: data.error || 'Failed to generate interview questions.'
+				});
+				return;
+			}
+
+			const updated = await response.json();
+			const nextForm = toForm(updated);
+			setInterview((current) => (current ? { ...current, ...updated } : current));
+			setForm(nextForm);
+			markAsClean(nextForm);
+			setQuestionState({ generating: false, error: '' });
+			toast.success(form.aiQuestionSet ? 'Interview questions refreshed.' : 'Interview questions generated.');
+		} catch {
+			setQuestionState({ generating: false, error: 'Failed to generate interview questions.' });
+		}
+	}
+
+	async function onCopyQuestions() {
+		const value = form.aiQuestionSet.trim();
+		if (!value) return;
+
+		try {
+			await navigator.clipboard.writeText(value);
+			toast.success('Interview questions copied.');
+		} catch {
+			toast.error('Failed to copy interview questions.');
 		}
 	}
 
@@ -687,6 +745,67 @@ export default function InterviewDetailsPage() {
 							}
 							onDefinitionsChange={setCustomFieldDefinitions}
 						/>
+						<div className="form-field">
+							<div className="form-label-row submission-write-up-label-row">
+								<label className="form-label">Interview Questions</label>
+								<div className="submission-write-up-toolbar">
+									<button
+										type="button"
+										className="row-action-icon submission-write-up-action"
+										onClick={onGenerateQuestions}
+										disabled={
+											saveState.saving ||
+											inviteState.downloading ||
+											cancelState.canceling ||
+											questionState.generating ||
+											!aiAvailable
+										}
+										aria-label={form.aiQuestionSet ? 'Refresh interview questions' : 'Generate interview questions'}
+										title={
+											aiAvailable
+												? form.aiQuestionSet
+													? 'Refresh interview questions'
+													: 'Generate interview questions'
+												: 'Enable OpenAI in Admin Area > System Settings to use this.'
+										}
+									>
+										{questionState.generating ? (
+											<LoaderCircle aria-hidden="true" className="row-action-icon-spinner" />
+										) : (
+											<Sparkles aria-hidden="true" />
+										)}
+									</button>
+									<button
+										type="button"
+										className="row-action-icon submission-write-up-action"
+										onClick={onCopyQuestions}
+										disabled={!form.aiQuestionSet.trim()}
+										aria-label="Copy interview questions"
+										title="Copy interview questions"
+									>
+										<Copy aria-hidden="true" />
+									</button>
+								</div>
+							</div>
+							{!aiAvailable ? (
+								<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+							) : null}
+							<textarea
+								rows={12}
+								placeholder="Use the tools above to generate or copy the interview question set."
+								value={form.aiQuestionSet}
+								onChange={(e) => setForm((f) => ({ ...f, aiQuestionSet: e.target.value }))}
+							/>
+						</div>
+						{interview.aiQuestionSetGeneratedAt ? (
+							<p className="simple-list-meta submission-ai-meta">
+								Generated by{' '}
+								{interview.aiQuestionSetGeneratedByUser
+									? `${interview.aiQuestionSetGeneratedByUser.firstName} ${interview.aiQuestionSetGeneratedByUser.lastName}`
+									: 'Unknown user'}{' '}
+								@ {formatDate(interview.aiQuestionSetGeneratedAt)}
+							</p>
+						) : null}
 					</section>
 
 					<div className="form-actions">

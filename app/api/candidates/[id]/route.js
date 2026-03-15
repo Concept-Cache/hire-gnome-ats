@@ -32,7 +32,7 @@ function hasStatusChanged(previousStatus, nextStatus) {
 	return String(previousStatus || '').trim() !== String(nextStatus || '').trim();
 }
 
-function buildCandidateDetailInclude(entityScope, includeNoteAuthor = true) {
+function buildCandidateDetailInclude(entityScope, includeNoteAuthor = true, includeAiSummary = true) {
 	const relatedJobOrderScope = !entityScope || isObjectEmpty(entityScope) ? undefined : { jobOrder: entityScope };
 	const notesInclude = includeNoteAuthor
 		? {
@@ -53,7 +53,7 @@ function buildCandidateDetailInclude(entityScope, includeNoteAuthor = true) {
 				}
 			};
 
-	return {
+	const include = {
 		ownerUser: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true } },
 		division: { select: { id: true, name: true, accessMode: true } },
 		candidateSkills: {
@@ -109,6 +109,18 @@ function buildCandidateDetailInclude(entityScope, includeNoteAuthor = true) {
 			}
 		}
 	};
+
+	if (includeAiSummary) {
+		include.aiSummary = {
+			include: {
+				generatedByUser: {
+					select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
+				}
+			}
+		};
+	}
+
+	return include;
 }
 
 function handleError(error, fallbackMessage) {
@@ -137,6 +149,13 @@ function isMissingNoteAuthorColumnError(error) {
 	return message.includes('createdByUserId') || message.includes('createdByUser');
 }
 
+function isMissingCandidateAiSummaryTableError(error) {
+	if (!error) return false;
+	if (error.code === 'P2021') return true;
+	const message = `${error.message || ''}`;
+	return message.includes('CandidateAiSummary') || message.includes('aiSummary');
+}
+
 async function getCandidates_idHandler(req, { params }) {
 	try {
 		const awaitedParams = await params;
@@ -149,17 +168,22 @@ async function getCandidates_idHandler(req, { params }) {
 		try {
 			candidate = await prisma.candidate.findFirst({
 				where: addScopeToWhere({ id }, entityScope),
-				include: buildCandidateDetailInclude(entityScope, true)
+				include: buildCandidateDetailInclude(entityScope, true, true)
 			});
 		} catch (error) {
-			if (!isMissingNoteAuthorColumnError(error)) {
+			if (isMissingCandidateAiSummaryTableError(error)) {
+				candidate = await prisma.candidate.findFirst({
+					where: addScopeToWhere({ id }, entityScope),
+					include: buildCandidateDetailInclude(entityScope, true, false)
+				});
+			} else if (!isMissingNoteAuthorColumnError(error)) {
 				throw error;
+			} else {
+				candidate = await prisma.candidate.findFirst({
+					where: addScopeToWhere({ id }, entityScope),
+					include: buildCandidateDetailInclude(entityScope, false, true)
+				});
 			}
-
-			candidate = await prisma.candidate.findFirst({
-				where: addScopeToWhere({ id }, entityScope),
-				include: buildCandidateDetailInclude(entityScope, false)
-			});
 		}
 
 		if (!candidate) {

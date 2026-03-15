@@ -10,7 +10,21 @@ import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
 
 import { withApiLogging } from '@/lib/api-logging';
 const submissionInclude = {
-	candidate: true,
+	candidate: {
+		include: {
+			candidateSkills: {
+				include: {
+					skill: {
+						select: { id: true, name: true, category: true, isActive: true }
+					}
+				},
+				orderBy: { createdAt: 'asc' }
+			},
+			candidateWorkExperiences: {
+				orderBy: [{ endDate: 'desc' }, { startDate: 'desc' }, { createdAt: 'desc' }]
+			}
+		}
+	},
 	jobOrder: {
 		include: {
 			client: true,
@@ -18,6 +32,9 @@ const submissionInclude = {
 		}
 	},
 	createdByUser: {
+		select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
+	},
+	aiWriteUpGeneratedByUser: {
 		select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
 	},
 	offer: {
@@ -96,6 +113,10 @@ async function patchSubmissions_idHandler(req, { params }) {
 				id: true,
 				status: true,
 				notes: true,
+				aiWriteUp: true,
+				aiWriteUpGeneratedAt: true,
+				aiWriteUpGeneratedByUserId: true,
+				aiWriteUpModelName: true,
 				customFields: true,
 				candidateId: true,
 				jobOrderId: true,
@@ -174,6 +195,7 @@ async function patchSubmissions_idHandler(req, { params }) {
 				jobOrderId: existing.jobOrderId,
 				status: parsed.data.status,
 				notes: parsed.data.notes || null,
+				aiWriteUp: parsed.data.aiWriteUp || null,
 				customFields: customFieldValidation.customFields
 			},
 			include: submissionInclude

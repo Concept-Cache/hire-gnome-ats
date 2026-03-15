@@ -361,6 +361,10 @@ async function getCandidates_id_matchesHandler(req, { params }) {
 			computedAt: new Date().toISOString(),
 			totalJobOrdersEvaluated: scored.length,
 			activeHiringJobOrders: filtered.length,
+			matchEligibility:
+				scored.length === 0
+					? 'Matches are unavailable because there are no open active job orders for this candidate right now.'
+					: '',
 			matches: sorted
 		});
 	} catch (error) {

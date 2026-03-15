@@ -468,7 +468,9 @@ async function main() {
 				candidatesInDivision[i % candidatesInDivision.length],
 				candidatesInDivision[(i + 4) % candidatesInDivision.length],
 				candidatesInDivision[(i + 8) % candidatesInDivision.length]
-			];
+			]
+				.filter(Boolean)
+				.slice(0, [0, 1, 1, 2, 2, 3][i % 6]);
 
 			for (let j = 0; j < picks.length; j += 1) {
 				const candidate = picks[j];

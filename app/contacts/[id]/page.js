@@ -12,6 +12,7 @@ import LoadingIndicator from '@/app/components/loading-indicator';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
 import {
 	CONTACT_SOURCE_OPTIONS,
@@ -81,6 +82,8 @@ export default function ContactDetailsPage() {
 	const [noteState, setNoteState] = useState({ saving: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [emailDraftOpen, setEmailDraftOpen] = useState(false);
+	const [aiAvailable, setAiAvailable] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [workspaceTab, setWorkspaceTab] = useState('notes');
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
@@ -148,7 +151,10 @@ export default function ContactDetailsPage() {
 		setLoading(true);
 		setError('');
 
-		const contactRes = await fetch(`/api/contacts/${id}`);
+		const [contactRes, settingsRes] = await Promise.all([
+			fetch(`/api/contacts/${id}`),
+			fetch('/api/system-settings', { cache: 'no-store' })
+		]);
 
 		if (!contactRes.ok) {
 			const data = await contactRes.json().catch(() => ({}));
@@ -158,7 +164,9 @@ export default function ContactDetailsPage() {
 		}
 
 		const contactData = await contactRes.json();
+		const settingsData = settingsRes.ok ? await settingsRes.json().catch(() => ({})) : {};
 		const nextForm = toForm(contactData);
+		setAiAvailable(Boolean(settingsData?.aiAvailable));
 		setContact(contactData);
 		setForm(nextForm);
 		markAsClean(nextForm);
@@ -298,6 +306,12 @@ export default function ContactDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	function onOpenEmailDraft() {
+		setActionsOpen(false);
+		if (!aiAvailable) return;
+		setEmailDraftOpen(true);
+	}
+
 	function onAddJobOrder() {
 		setActionsOpen(false);
 		if (!contact?.clientId || !contact?.id) return;
@@ -356,6 +370,19 @@ export default function ContactDetailsPage() {
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onAddJobOrder}>
 									Add Job Order
 								</button>
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item"
+									onClick={onOpenEmailDraft}
+									disabled={!aiAvailable}
+									title={aiAvailable ? 'Draft Email' : 'Enable OpenAI in Admin Area > System Settings to use this.'}
+								>
+									Draft Email
+								</button>
+								{!aiAvailable ? (
+									<p className="actions-menu-hint">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+								) : null}
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
 								</button>
@@ -679,6 +706,14 @@ export default function ContactDetailsPage() {
 				</article>
 			</div>
 			<AuditTrailPanel entityType="CONTACT" entityId={id} visible={showAuditTrail} />
+			<EmailDraftModal
+				open={emailDraftOpen}
+				onClose={() => setEmailDraftOpen(false)}
+				entityType="contact"
+				entityId={Number(id)}
+				entityName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim()}
+				emailAddress={contact.email || ''}
+			/>
 		</section>
 	);
 }
