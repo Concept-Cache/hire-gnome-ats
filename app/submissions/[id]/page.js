@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, Lock, MoreVertical } from 'lucide-react';
+import { ArrowUpRight, Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
@@ -18,6 +18,7 @@ const initialForm = {
 	jobOrderId: '',
 	status: 'submitted',
 	notes: '',
+	aiWriteUp: '',
 	customFields: {}
 };
 
@@ -40,6 +41,7 @@ function toForm(row) {
 		jobOrderId: String(row.jobOrderId || ''),
 		status: row.status || 'submitted',
 		notes: row.notes || '',
+		aiWriteUp: row.aiWriteUp || '',
 		customFields:
 			row.customFields && typeof row.customFields === 'object' && !Array.isArray(row.customFields)
 				? row.customFields
@@ -56,11 +58,13 @@ export default function SubmissionDetailsPage() {
 	const router = useRouter();
 	const actionsMenuRef = useRef(null);
 	const [submission, setSubmission] = useState(null);
+	const [aiAvailable, setAiAvailable] = useState(false);
 	const [form, setForm] = useState(initialForm);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [saveState, setSaveState] = useState({ saving: false, error: '', success: '' });
 	const [convertState, setConvertState] = useState({ converting: false, error: '' });
+	const [writeUpState, setWriteUpState] = useState({ generating: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
@@ -79,17 +83,23 @@ export default function SubmissionDetailsPage() {
 		setLoading(true);
 		setError('');
 
-		const submissionRes = await fetch(`/api/submissions/${id}`);
+		const [submissionRes, settingsRes] = await Promise.all([
+			fetch(`/api/submissions/${id}`),
+			fetch('/api/system-settings', { cache: 'no-store' })
+		]);
 
 		if (!submissionRes.ok) {
-			setError('Submission not found.');
+			const data = await submissionRes.json().catch(() => ({}));
+			setError(data.error || 'Failed to load submission.');
 			setLoading(false);
 			return;
 		}
 
 		const submissionData = await submissionRes.json();
+		const settingsData = settingsRes.ok ? await settingsRes.json().catch(() => ({})) : {};
 
 		const nextForm = toForm(submissionData);
+		setAiAvailable(Boolean(settingsData?.aiAvailable));
 		setSubmission(submissionData);
 		setForm(nextForm);
 		markAsClean(nextForm);
@@ -140,6 +150,12 @@ export default function SubmissionDetailsPage() {
 			toast.error(convertState.error);
 		}
 	}, [convertState.error, toast]);
+
+	useEffect(() => {
+		if (writeUpState.error) {
+			toast.error(writeUpState.error);
+		}
+	}, [writeUpState.error, toast]);
 
 	async function onSave(e) {
 		e.preventDefault();
@@ -259,9 +275,51 @@ export default function SubmissionDetailsPage() {
 		}
 	}
 
+	async function onGenerateWriteUp() {
+		if (!submission || writeUpState.generating || isConvertedToPlacement) return;
+
+		setActionsOpen(false);
+		setWriteUpState({ generating: true, error: '' });
+
+		try {
+			const res = await fetch(`/api/submissions/${id}/generate-write-up`, {
+				method: 'POST'
+			});
+			const data = await res.json().catch(() => ({}));
+
+			if (!res.ok) {
+				setWriteUpState({
+					generating: false,
+					error: data.error || 'Failed to generate submission write-up.'
+				});
+				return;
+			}
+
+			const nextForm = toForm(data);
+			setSubmission(data);
+			setForm(nextForm);
+			markAsClean(nextForm);
+			setWriteUpState({ generating: false, error: '' });
+			toast.success(submission.aiWriteUp ? 'Submission write-up refreshed.' : 'Submission write-up generated.');
+		} catch {
+			setWriteUpState({ generating: false, error: 'Failed to generate submission write-up.' });
+		}
+	}
+
 	function onToggleAuditTrail() {
 		setActionsOpen(false);
 		setShowAuditTrail((current) => !current);
+	}
+
+	async function onCopyWriteUp() {
+		const value = String(form.aiWriteUp || '').trim();
+		if (!value) return;
+		try {
+			await navigator.clipboard.writeText(value);
+			toast.success('Client write-up copied.');
+		} catch {
+			toast.error('Failed to copy client write-up.');
+		}
 	}
 
 	if (loading) {
@@ -463,6 +521,72 @@ export default function SubmissionDetailsPage() {
 								disabled={isConvertedToPlacement}
 							/>
 						</FormField>
+						<div className="form-field">
+							<div className="form-label-row submission-write-up-label-row">
+								<label className="form-label">Client Write-Up</label>
+								<div className="submission-write-up-toolbar">
+									<button
+										type="button"
+										className="row-action-icon submission-write-up-action"
+										onClick={onGenerateWriteUp}
+										disabled={
+											convertState.converting ||
+											saveState.saving ||
+											writeUpState.generating ||
+											isConvertedToPlacement ||
+											!aiAvailable
+										}
+										aria-label={form.aiWriteUp ? 'Refresh client write-up' : 'Generate client write-up'}
+										title={
+											aiAvailable
+												? form.aiWriteUp
+													? 'Refresh client write-up'
+													: 'Generate client write-up'
+												: 'Enable OpenAI in Admin Area > System Settings to use this.'
+										}
+									>
+										{writeUpState.generating ? (
+											<LoaderCircle aria-hidden="true" className="row-action-icon-spinner" />
+										) : (
+											<Sparkles aria-hidden="true" />
+										)}
+									</button>
+									<button
+										type="button"
+										className="row-action-icon submission-write-up-action"
+										onClick={onCopyWriteUp}
+										disabled={!form.aiWriteUp.trim()}
+										aria-label="Copy client write-up"
+										title="Copy client write-up"
+									>
+										<Copy aria-hidden="true" />
+									</button>
+								</div>
+							</div>
+							{!aiAvailable ? (
+								<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+							) : null}
+							<textarea
+								rows={10}
+								placeholder={
+									isConvertedToPlacement
+										? 'Client write-up is locked after conversion to placement.'
+										: 'Use the tools above to generate or copy the client write-up.'
+								}
+								value={form.aiWriteUp}
+								onChange={(e) => setForm((f) => ({ ...f, aiWriteUp: e.target.value }))}
+								disabled={isConvertedToPlacement}
+							/>
+						</div>
+						{submission.aiWriteUpGeneratedAt ? (
+							<p className="simple-list-meta submission-ai-meta">
+								Generated by{' '}
+								{submission.aiWriteUpGeneratedByUser
+									? `${submission.aiWriteUpGeneratedByUser.firstName} ${submission.aiWriteUpGeneratedByUser.lastName}`
+									: 'Unknown user'}{' '}
+								@ {formatDate(submission.aiWriteUpGeneratedAt)}
+							</p>
+						) : null}
 						<CustomFieldsSection
 							moduleKey="submissions"
 							values={form.customFields}

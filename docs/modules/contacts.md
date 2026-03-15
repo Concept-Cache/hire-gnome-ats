@@ -31,8 +31,27 @@ Use workspace tabs for:
 ## Actions Menu
 Typical actions:
 - Add job order
+- Draft email
 - View audit trail
-- Archive
+
+## Email Drafting
+Contact detail actions include `Draft Email`.
+
+What it does:
+- Opens an AI drafting modal for the current contact
+- Lets the user choose:
+	- purpose
+	- tone
+	- optional additional instructions
+- Generates:
+	- subject
+	- body
+- Supports copy to clipboard
+
+Behavior:
+- On demand only; drafts are not auto-saved to the record
+- Requires an OpenAI API key in `Admin Area > System Settings`
+- If AI is unavailable, the action remains visible but disabled with a hint
 
 ## Best Practice
 1. Verify email and mobile before first outreach.

@@ -3,6 +3,8 @@
 ## What This Module Is For
 Candidates stores profile, status, ownership, resume, skills, education, work history, notes, files, and related hiring activity.
 
+It also includes an on-demand AI summary view that turns the current candidate profile into a concise recruiter-facing brief.
+
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.
 
@@ -38,19 +40,74 @@ What parsing can populate:
 
 ## Candidate Workspace
 The workspace provides linked execution views:
+- AI Summary
 - Submissions
 - Interviews
 - Placements
 - Notes
 - Activities
 - Files
+- Matched Job Orders
+
+## AI Summary
+Use `AI Summary` on the candidate detail workspace to generate a structured summary from the current candidate record.
+
+The generated summary includes:
+- Overview
+- Strengths
+- Concerns
+- Suggested next step
+
+Behavior:
+- Generation is manual, not automatic.
+- Existing summaries can be refreshed.
+- Requires an OpenAI API key in `Admin Area > System Settings`.
+- The summary is stored separately from the resume text.
+- If OpenAI is not configured, the AI controls remain visible but disabled with an inline hint.
+
+## Match Explanations
+The matched job orders workspace supports `Explain Match`.
+
+What it does:
+- Saves an AI explanation for the current candidate/job pair
+- Explains:
+	- why the role fits
+	- likely gaps
+	- what to validate
+	- how to position the candidate honestly
+
+Behavior:
+- Generated on demand
+- Saved and reusable for that candidate/job pair
+- Can be refreshed when the candidate or job order changes
+- If OpenAI is not configured, `Explain Match` remains visible but disabled with a tooltip/hint.
 
 ## Actions Menu
 From candidate detail, actions can launch:
 - New submission
 - New interview
 - New placement
+- Draft email
 - Audit trail
+
+## Email Drafting
+Candidate detail actions include `Draft Email`.
+
+What it does:
+- Opens an AI drafting modal for the current candidate
+- Lets the user choose:
+	- purpose
+	- tone
+	- optional additional instructions
+- Generates:
+	- subject
+	- body
+- Supports copy to clipboard
+
+Behavior:
+- On demand only; drafts are not auto-saved to the record
+- Requires an OpenAI API key in `Admin Area > System Settings`
+- If AI is unavailable, the action remains visible but disabled with a hint
 
 ## Duplicate Protection
 Candidate creation includes duplicate checks and merge support when likely duplicates are detected.

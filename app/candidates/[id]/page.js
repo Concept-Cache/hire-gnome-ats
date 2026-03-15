@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Download, LoaderCircle, MoreVertical, RefreshCcw, Trash2 } from 'lucide-react';
+import { Download, LoaderCircle, MoreVertical, RefreshCcw, Sparkles, Trash2 } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
@@ -13,6 +13,8 @@ import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/comp
 import SkillChipSelect from '@/app/components/skill-chip-select';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import MatchExplanationModal from '@/app/components/match-explanation-modal';
+import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import {
@@ -56,6 +58,13 @@ const initialWorkExperienceForm = {
 	isCurrent: false,
 	description: ''
 };
+
+function normalizeSummaryItems(values) {
+	if (!Array.isArray(values)) return [];
+	return values
+		.map((value) => String(value || '').trim())
+		.filter(Boolean);
+}
 
 const initialEditForm = {
 	firstName: '',
@@ -224,6 +233,9 @@ export default function CandidateDetailsPage() {
 	const [attachmentFile, setAttachmentFile] = useState(null);
 	const [attachmentInputKey, setAttachmentInputKey] = useState(0);
 	const [workspaceTab, setWorkspaceTab] = useState('notes');
+	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
+	const [summaryState, setSummaryState] = useState({ generating: false });
+	const [aiAvailable, setAiAvailable] = useState(false);
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [notesSort, setNotesSort] = useState({ field: 'createdAt', direction: 'desc' });
 	const [activitiesSort, setActivitiesSort] = useState({ field: 'createdAt', direction: 'desc' });
@@ -238,6 +250,7 @@ export default function CandidateDetailsPage() {
 		computedAt: '',
 		totalJobOrdersEvaluated: 0,
 		activeHiringJobOrders: 0,
+		matchEligibility: '',
 		matches: [],
 		submittingJobOrderId: ''
 	});
@@ -245,6 +258,7 @@ export default function CandidateDetailsPage() {
 	const actionsMenuRef = useRef(null);
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [emailDraftOpen, setEmailDraftOpen] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
@@ -413,22 +427,26 @@ export default function CandidateDetailsPage() {
 		setLoading(true);
 		setError('');
 
-		const [candidateRes, skillsRes] = await Promise.all([
+		const [candidateRes, skillsRes, settingsRes] = await Promise.all([
 			fetch(`/api/candidates/${id}`),
-			fetch('/api/skills?active=true')
+			fetch('/api/skills?active=true'),
+			fetch('/api/system-settings', { cache: 'no-store' })
 		]);
 		if (!candidateRes.ok) {
-			setError('Candidate not found.');
+			const data = await candidateRes.json().catch(() => ({}));
+			setError(data.error || 'Failed to load candidate.');
 			setLoading(false);
 			return;
 		}
 
-		const [candidateData, skillData] = await Promise.all([
+		const [candidateData, skillData, settingsData] = await Promise.all([
 			candidateRes.json(),
-			skillsRes.ok ? skillsRes.json() : Promise.resolve([])
+			skillsRes.ok ? skillsRes.json() : Promise.resolve([]),
+			settingsRes.ok ? settingsRes.json().catch(() => ({})) : Promise.resolve({})
 		]);
 		const normalizedSkills = Array.isArray(skillData) ? skillData : [];
 		const nextEditForm = toForm(candidateData, normalizedSkills);
+		setAiAvailable(Boolean(settingsData?.aiAvailable));
 		setCandidate(candidateData);
 		setSkills(normalizedSkills);
 		setEditForm(nextEditForm);
@@ -439,11 +457,23 @@ export default function CandidateDetailsPage() {
 	async function loadJobMatches(options = {}) {
 		if (!id) return;
 		const { keepResults = true } = options;
+		if (!candidateQualifiedForSubmissionInterview) {
+			setJobMatchState((current) => ({
+				...current,
+				loading: false,
+				error: '',
+				matchEligibility: 'Matches are unavailable until this candidate reaches Qualified status or beyond.',
+				matches: [],
+				submittingJobOrderId: ''
+			}));
+			return;
+		}
 
 		setJobMatchState((current) => ({
 			...current,
 			loading: true,
 			error: '',
+			matchEligibility: '',
 			matches: keepResults ? current.matches : []
 		}));
 
@@ -466,6 +496,7 @@ export default function CandidateDetailsPage() {
 			computedAt: data.computedAt || '',
 			totalJobOrdersEvaluated: Number(data.totalJobOrdersEvaluated || 0),
 			activeHiringJobOrders: Number(data.activeHiringJobOrders || 0),
+			matchEligibility: data.matchEligibility || '',
 			matches: Array.isArray(data.matches) ? data.matches : []
 		}));
 	}
@@ -626,9 +657,35 @@ export default function CandidateDetailsPage() {
 		router.push(`/placements/new?${query.toString()}`);
 	}
 
+	async function onGenerateAiSummary() {
+		if (!candidate?.id || summaryState.generating) return;
+
+		setSummaryState({ generating: true });
+		const res = await fetch(`/api/candidates/${id}/ai-summary`, {
+			method: 'POST'
+		});
+		const data = await res.json().catch(() => ({}));
+
+		if (!res.ok) {
+			setSummaryState({ generating: false });
+			toast.error(data.error || 'Failed to generate candidate summary.');
+			return;
+		}
+
+		setCandidate((current) => (current ? { ...current, aiSummary: data.aiSummary || null } : current));
+		setSummaryState({ generating: false });
+		toast.success(candidate.aiSummary ? 'Candidate summary refreshed.' : 'Candidate summary generated.');
+	}
+
 	function onToggleAuditTrail() {
 		setActionsOpen(false);
 		setShowAuditTrail((current) => !current);
+	}
+
+	function onOpenEmailDraft() {
+		setActionsOpen(false);
+		if (!aiAvailable) return;
+		setEmailDraftOpen(true);
 	}
 
 	async function onCreateMatchedSubmission(match) {
@@ -1069,6 +1126,19 @@ export default function CandidateDetailsPage() {
 										type="button"
 										role="menuitem"
 										className="actions-menu-item"
+										onClick={onOpenEmailDraft}
+										disabled={!aiAvailable}
+										title={aiAvailable ? 'Draft Email' : 'Enable OpenAI in Admin Area > System Settings to use this.'}
+									>
+										Draft Email
+									</button>
+									{!aiAvailable ? (
+										<p className="actions-menu-hint">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+									) : null}
+									<button
+										type="button"
+										role="menuitem"
+										className="actions-menu-item"
 										onClick={onToggleAuditTrail}
 									>
 										{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
@@ -1388,6 +1458,16 @@ export default function CandidateDetailsPage() {
 						<button
 							type="button"
 							role="tab"
+							aria-selected={workspaceTab === 'ai-summary'}
+							className={workspaceTab === 'ai-summary' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('ai-summary')}
+						>
+							<span>AI Summary</span>
+							<span className="side-tab-count" aria-hidden="true">{candidate.aiSummary ? 1 : 0}</span>
+						</button>
+						<button
+							type="button"
+							role="tab"
 							aria-selected={workspaceTab === 'activities'}
 							className={workspaceTab === 'activities' ? 'side-tab active' : 'side-tab'}
 							onClick={() => setWorkspaceTab('activities')}
@@ -1458,6 +1538,79 @@ export default function CandidateDetailsPage() {
 								</span>
 							</button>
 						</div>
+
+					{workspaceTab === 'ai-summary' ? (
+						<div className="side-tab-content side-tab-content-with-scroll">
+							<div className="ai-summary-toolbar">
+								<button
+									type="button"
+									onClick={onGenerateAiSummary}
+									disabled={summaryState.generating || !aiAvailable}
+									title={aiAvailable ? undefined : 'Enable OpenAI in Admin Area > System Settings to use this.'}
+								>
+									{summaryState.generating
+										? 'Generating...'
+										: candidate.aiSummary
+											? 'Refresh Summary'
+											: 'Generate Summary'}
+								</button>
+							</div>
+							<h4 className="side-section-title">AI Candidate Summary</h4>
+							<div className="workspace-scroll-area">
+								{!aiAvailable ? (
+									<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+								) : null}
+								{candidate.aiSummary ? (
+									<div className="ai-summary-sections">
+										<section className="ai-summary-section">
+											<h5>Overview</h5>
+											<p>{candidate.aiSummary.overview}</p>
+										</section>
+										<section className="ai-summary-section">
+											<h5>Strengths</h5>
+											{normalizeSummaryItems(candidate.aiSummary.strengths).length > 0 ? (
+												<ul className="ai-summary-list">
+													{normalizeSummaryItems(candidate.aiSummary.strengths).map((item) => (
+														<li key={item}>{item}</li>
+													))}
+												</ul>
+											) : (
+												<p className="panel-subtext">No strengths generated.</p>
+											)}
+										</section>
+										<section className="ai-summary-section">
+											<h5>Concerns</h5>
+											{normalizeSummaryItems(candidate.aiSummary.concerns).length > 0 ? (
+												<ul className="ai-summary-list">
+													{normalizeSummaryItems(candidate.aiSummary.concerns).map((item) => (
+														<li key={item}>{item}</li>
+													))}
+												</ul>
+											) : (
+												<p className="panel-subtext">No concerns generated.</p>
+											)}
+										</section>
+										<section className="ai-summary-section">
+											<h5>Suggested Next Step</h5>
+											<p>{candidate.aiSummary.suggestedNextStep || 'No next step generated.'}</p>
+										</section>
+										<p className="simple-list-meta">
+											Generated by{' '}
+											{candidate.aiSummary.generatedByUser
+												? `${candidate.aiSummary.generatedByUser.firstName} ${candidate.aiSummary.generatedByUser.lastName}`
+												: 'Unknown user'}{' '}
+											@ {formatDate(candidate.aiSummary.updatedAt)}
+										</p>
+									</div>
+								) : (
+									<p className="panel-subtext">
+										No AI summary has been generated yet. Use Generate Summary to create one from the candidate profile,
+										resume, history, skills, and recent notes.
+									</p>
+								)}
+							</div>
+						</div>
+					) : null}
 
 					{workspaceTab === 'notes' ? (
 						<div className="side-tab-content side-tab-content-with-scroll">
@@ -2076,73 +2229,100 @@ export default function CandidateDetailsPage() {
 									) : null}
 								</div>
 								<div className="workspace-scroll-area">
-									<ListSortControls
-										label="Sort Matches"
-										value={jobMatchesSort.field}
-										direction={jobMatchesSort.direction}
-										onValueChange={(field) => setJobMatchesSort((current) => ({ ...current, field }))}
-										onDirectionToggle={() =>
-											setJobMatchesSort((current) => ({
-												...current,
-												direction: current.direction === 'asc' ? 'desc' : 'asc'
-											}))
-										}
-										options={[
-											{ value: 'scorePercent', label: 'Match Score' },
-											{ value: 'jobOrder', label: 'Job Order' },
-											{ value: 'client', label: 'Client' },
-											{ value: 'location', label: 'Location' }
-										]}
-										disabled={sortedJobMatches.length < 2}
-									/>
-									{!jobMatchState.loading && sortedJobMatches.length === 0 ? (
-										<p className="panel-subtext">
-											No open active job order matches available for this candidate.
-										</p>
+									{jobMatchState.matchEligibility ? (
+										<p className="panel-subtext">{jobMatchState.matchEligibility}</p>
 									) : (
-										<ul className="simple-list">
-											{sortedJobMatches.map((match) => {
-												const isSubmitting =
-													jobMatchState.submittingJobOrderId === String(match.jobOrderId);
-												return (
-													<li key={match.jobOrderId}>
-														<div>
-															<strong>
-																<Link href={`/job-orders/${match.jobOrderId}`}>{match.jobOrderTitle}</Link>
-															</strong>
-															<p>
-																{match.clientName || '-'}
-																{match.contactName ? ` | ${match.contactName}` : ''}
-															</p>
-															<p>
-																Match score: <strong>{match.scorePercent}%</strong>
-															</p>
-															{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
-																<p>{match.reasons.join(' • ')}</p>
-															) : null}
-															{Array.isArray(match.risks) && match.risks.length > 0 ? (
-																<p className="panel-subtext error">{match.risks.join(' • ')}</p>
-															) : null}
-														</div>
-														<div className="simple-list-actions">
-															<button
-																type="button"
-																onClick={() => onCreateMatchedSubmission(match)}
-																disabled={isSubmitting || jobMatchState.loading}
-															>
-																{isSubmitting ? 'Submitting...' : 'Add Submission'}
-															</button>
-														</div>
-													</li>
-												);
-											})}
-										</ul>
+										<>
+											<ListSortControls
+												label="Sort Matches"
+												value={jobMatchesSort.field}
+												direction={jobMatchesSort.direction}
+												onValueChange={(field) => setJobMatchesSort((current) => ({ ...current, field }))}
+												onDirectionToggle={() =>
+													setJobMatchesSort((current) => ({
+														...current,
+														direction: current.direction === 'asc' ? 'desc' : 'asc'
+													}))
+												}
+												options={[
+													{ value: 'scorePercent', label: 'Match Score' },
+													{ value: 'jobOrder', label: 'Job Order' },
+													{ value: 'client', label: 'Client' },
+													{ value: 'location', label: 'Location' }
+												]}
+												disabled={sortedJobMatches.length < 2}
+											/>
+											{!jobMatchState.loading && sortedJobMatches.length === 0 ? (
+												<p className="panel-subtext">
+													No open active job order matches available for this candidate.
+												</p>
+											) : (
+												<ul className="simple-list">
+													{sortedJobMatches.map((match) => {
+														const isSubmitting =
+															jobMatchState.submittingJobOrderId === String(match.jobOrderId);
+														return (
+															<li key={match.jobOrderId}>
+																<div>
+																	<strong>
+																		<Link href={`/job-orders/${match.jobOrderId}`}>{match.jobOrderTitle}</Link>
+																	</strong>
+																	<p>
+																		{match.clientName || '-'}
+																		{match.contactName ? ` | ${match.contactName}` : ''}
+																	</p>
+																	<p>
+																		Match score: <strong>{match.scorePercent}%</strong>
+																	</p>
+																	{Array.isArray(match.reasons) && match.reasons.length > 0 ? (
+																		<p>{match.reasons.join(' • ')}</p>
+																	) : null}
+																</div>
+																<div className="simple-list-actions">
+																	<div className="row-actions row-actions-right">
+																		<button
+																			type="button"
+																		className="row-action-icon"
+																		aria-label="Explain match"
+																		title={aiAvailable ? 'Explain match' : 'Enable OpenAI in Admin Area > System Settings to use this.'}
+																			onClick={() =>
+																				setMatchExplanationTarget({
+																					candidateId: Number(id),
+																					candidateName: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
+																					jobOrderId: match.jobOrderId,
+																					jobOrderTitle: match.jobOrderTitle,
+																					scorePercent: match.scorePercent,
+																					reasons: match.reasons || [],
+																					risks: match.risks || []
+																				})
+																			}
+																			disabled={!aiAvailable || jobMatchState.loading}
+																		>
+																			<Sparkles aria-hidden="true" className="row-action-lucide" />
+																		</button>
+																		<button
+																			type="button"
+																			onClick={() => onCreateMatchedSubmission(match)}
+																			disabled={isSubmitting || jobMatchState.loading}
+																		>
+																			{isSubmitting ? 'Submitting...' : 'Add Submission'}
+																		</button>
+																	</div>
+																</div>
+															</li>
+														);
+													})}
+												</ul>
+											)}
+										</>
 									)}
 								</div>
-								<p className="panel-subtext">
-									Evaluated {jobMatchState.totalJobOrdersEvaluated} open job orders;{' '}
-									{jobMatchState.activeHiringJobOrders} currently active for hiring.
-								</p>
+								{!jobMatchState.matchEligibility ? (
+									<p className="panel-subtext">
+										Evaluated {jobMatchState.totalJobOrdersEvaluated} open job orders;{' '}
+										{jobMatchState.activeHiringJobOrders} currently active for hiring.
+									</p>
+								) : null}
 							</div>
 						) : null}
 
@@ -2182,6 +2362,25 @@ export default function CandidateDetailsPage() {
 					</article>
 			</div>
 			<AuditTrailPanel entityType="CANDIDATE" entityId={id} visible={showAuditTrail} />
+			<EmailDraftModal
+				open={emailDraftOpen}
+				onClose={() => setEmailDraftOpen(false)}
+				entityType="candidate"
+				entityId={Number(id)}
+				entityName={`${candidate.firstName || ''} ${candidate.lastName || ''}`.trim()}
+				emailAddress={candidate.email || ''}
+			/>
+			<MatchExplanationModal
+				open={Boolean(matchExplanationTarget)}
+				onClose={() => setMatchExplanationTarget(null)}
+				candidateId={matchExplanationTarget?.candidateId}
+				candidateName={matchExplanationTarget?.candidateName}
+				jobOrderId={matchExplanationTarget?.jobOrderId}
+				jobOrderTitle={matchExplanationTarget?.jobOrderTitle}
+				scorePercent={matchExplanationTarget?.scorePercent}
+				reasons={matchExplanationTarget?.reasons}
+				risks={matchExplanationTarget?.risks}
+			/>
 		</section>
 	);
 }

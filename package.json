@@ -1,6 +1,6 @@
 {
 	"name": "hire-gnome-ats",
-	"version": "1.0.0",
+	"version": "1.2.0",
 	"private": true,
 	"license": "AGPL-3.0-only",
 	"scripts": {
@@ -34,6 +34,7 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.997.0",
+		"@fontsource/ibm-plex-mono": "^5.2.7",
 		"@prisma/client": "^6.4.1",
 		"exceljs": "^4.4.0",
 		"jszip": "^3.10.1",

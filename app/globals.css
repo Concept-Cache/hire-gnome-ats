@@ -1,3 +1,27 @@
+@font-face {
+	font-family: "IBM Plex Mono";
+	src: url("/fonts/ibm-plex-mono-400.woff2") format("woff2");
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "IBM Plex Mono";
+	src: url("/fonts/ibm-plex-mono-500.woff2") format("woff2");
+	font-style: normal;
+	font-weight: 500;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "IBM Plex Mono";
+	src: url("/fonts/ibm-plex-mono-600.woff2") format("woff2");
+	font-style: normal;
+	font-weight: 600;
+	font-display: swap;
+}
+
 :root {
 	--bg: #eef3f8;
 	--shell: #0a2647;
@@ -710,6 +734,7 @@ html[data-theme='high_contrast'] {
 	--career-apply-copy-ink: #222222;
 	--career-apply-label-ink: #222222;
 	--career-apply-file-ink: #222222;
+	--font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 * {
@@ -2929,6 +2954,71 @@ p {
 	min-height: 0;
 }
 
+.email-draft-modal {
+	width: min(44rem, calc(100vw - 2rem));
+	max-width: 44rem;
+}
+
+.email-draft-body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.8rem;
+}
+
+.email-draft-controls {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.8rem;
+}
+
+.email-draft-controls label,
+.email-draft-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.32rem;
+}
+
+.email-draft-toolbar {
+	justify-content: flex-end;
+	margin-top: -0.15rem;
+}
+
+.match-explanation-modal {
+	width: min(58rem, 94vw);
+	max-width: 58rem;
+}
+
+.match-explanation-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0.15rem;
+	flex: 0 0 auto;
+}
+
+.match-explanation-body {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.match-explanation-summary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.match-explanation-sections {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.match-explanation-sections .panel h4 {
+	margin-bottom: 0.35rem;
+}
+
+.match-explanation-sections .panel p {
+	line-height: 1.45;
+}
+
 .dashboard-quick-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -3313,10 +3403,12 @@ button:disabled {
 	align-items: center;
 	gap: 0.3rem;
 	font-size: 0.8rem;
+	font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 	color: var(--muted);
 }
 
 .form-actions-meta strong {
+	font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 	color: var(--ink);
 	font-weight: 600;
 }
@@ -3518,6 +3610,14 @@ button:disabled {
 .actions-menu-item-danger:hover:not(:disabled) {
 	background: #fef3f2;
 	color: #912018;
+}
+
+.actions-menu-hint {
+	margin: -0.12rem 0 0.15rem;
+	padding: 0 0.85rem;
+	font-size: 0.72rem;
+	line-height: 1.35;
+	color: #64748b;
 }
 
 .list-controls {
@@ -4336,6 +4436,91 @@ button:disabled {
 	padding-right: 0.2rem;
 }
 
+.ai-summary-toolbar {
+	margin-bottom: 0.35rem;
+}
+
+.ai-summary-sections {
+	display: grid;
+	gap: 0.9rem;
+}
+
+.ai-summary-section {
+	display: grid;
+	gap: 0.35rem;
+	padding: 0.8rem 0.9rem;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: #fff;
+	font-size: 0.92rem;
+}
+
+.ai-summary-section h5 {
+	margin: 0;
+	font: inherit;
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: #4b628b;
+}
+
+.ai-summary-section p {
+	margin: 0;
+	font: inherit;
+	line-height: 1.4;
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-wrap: anywhere;
+}
+
+.ai-summary-list {
+	margin: 0;
+	padding-left: 1.15rem;
+	display: grid;
+	gap: 0.32rem;
+	font: inherit;
+	line-height: 1.4;
+}
+
+.ai-summary-sections .simple-list-meta {
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+	font-size: 0.74rem;
+	margin-left: 0.3rem;
+}
+
+.submission-ai-meta {
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+	font-size: 0.74rem;
+	margin-left: 0.3rem;
+}
+
+.submission-write-up-label-row {
+	align-items: center;
+}
+
+.submission-write-up-toolbar {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 0.08rem;
+	flex-shrink: 0;
+}
+
+.submission-write-up-action {
+	padding: 0.05rem 0.12rem;
+	font-size: 1rem;
+}
+
+.submission-write-up-action span {
+	font-size: 1rem;
+}
+
+.submission-write-up-action svg {
+	width: 1rem;
+	height: 1rem;
+}
+
 .workspace-list {
 	list-style: none;
 	margin: 0;
@@ -4744,8 +4929,17 @@ button:disabled {
 .simple-list li .simple-list-meta {
 	margin-top: 0.5rem;
 	font-size: 0.74rem;
-	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+	font-variant-ligatures: none;
 	color: #5a6f93;
+}
+
+.simple-list-meta,
+.simple-list-meta *,
+.form-actions-meta,
+.form-actions-meta * {
+	font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+	font-variant-ligatures: none;
 }
 
 .error-log-toolbar {
@@ -5102,6 +5296,32 @@ button:disabled {
 	text-align: center;
 	white-space: normal;
 	line-height: 1.2;
+}
+
+.dashboard-badge-chip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: fit-content;
+	min-width: 0;
+	max-width: 11.5rem;
+	padding: 0.3rem 0.75rem;
+	border-radius: 999px;
+	border: 0;
+	background: #e5efff;
+	color: #1f4f9b;
+	white-space: normal;
+	text-align: center;
+	line-height: 1.2;
+}
+
+.dashboard-split-list .dashboard-badge-chip,
+.dashboard-focus-list .dashboard-badge-chip {
+	width: auto;
+	min-width: 0;
+	max-width: 11.5rem;
+	white-space: normal;
+	text-align: center;
 }
 
 @media (max-width: 900px) {
@@ -6004,6 +6224,10 @@ small {
 }
 
 @media (max-width: 680px) {
+	.email-draft-controls {
+		grid-template-columns: 1fr;
+	}
+
 	.topbar {
 		flex-direction: column;
 		align-items: flex-start;

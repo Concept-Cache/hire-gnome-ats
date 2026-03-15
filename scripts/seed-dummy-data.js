@@ -1010,7 +1010,9 @@ async function main() {
 			divisionCandidates[i % divisionCandidates.length],
 			divisionCandidates[(i + 5) % divisionCandidates.length],
 			divisionCandidates[(i + 11) % divisionCandidates.length]
-		].filter(Boolean);
+		]
+			.filter(Boolean)
+			.slice(0, [0, 1, 1, 2, 2, 3][i % 6]);
 
 		for (let j = 0; j < candidatesForJob.length; j += 1) {
 			const candidate = candidatesForJob[j];

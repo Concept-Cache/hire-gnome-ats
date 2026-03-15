@@ -96,7 +96,7 @@ function DashboardSection({ title, items, emptyMessage, onViewAll, currentPage, 
 								{item.dateValue ? <p>{item.dateLabel || 'Updated'}: {formatDateTime(item.dateValue)}</p> : null}
 							</div>
 							<div className="simple-list-actions simple-list-indicators">
-								<span className="chip">{item.badgeLabel || '-'}</span>
+								<span className="chip dashboard-badge-chip">{item.badgeLabel || '-'}</span>
 							</div>
 						</li>
 					))}
@@ -179,7 +179,7 @@ function DashboardDetailModal({ title, items, onClose }) {
 										) : null}
 									</div>
 									<div className="simple-list-actions simple-list-indicators">
-										<span className="chip">{item.badgeLabel || '-'}</span>
+										<span className="chip dashboard-badge-chip">{item.badgeLabel || '-'}</span>
 									</div>
 								</li>
 							))}

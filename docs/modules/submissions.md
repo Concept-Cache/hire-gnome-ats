@@ -18,8 +18,9 @@ After creation:
 ## Common Lifecycle
 1. Create submission.
 2. Add recruiter notes/context.
-3. Advance status through review/interview steps.
-4. Convert to placement when accepted.
+3. Generate or edit a client-facing write-up.
+4. Advance status through review/interview steps.
+5. Convert to placement when accepted.
 
 ## Actions Menu
 Key actions:
@@ -27,6 +28,18 @@ Key actions:
 - Convert to placement (with confirmation)
 - View audit trail
 - Archive
+
+## Client Write-Up
+Submission detail includes a dedicated `Client Write-Up` field for polished recruiter/client-facing candidate summaries.
+
+Behavior:
+- Generate or refresh from the toolbar above the field
+- Copy directly to the clipboard from the toolbar
+- Output is stored on the submission record
+- Recruiters can edit the generated text before saving
+- Uses the OpenAI API key from `Admin Area > System Settings`
+- If the submission is converted to a placement, the write-up remains visible but is locked
+- If OpenAI is not configured, the generate control remains visible but disabled with an inline hint
 
 ## Snapshot Usage
 Snapshot emphasizes immutable context and links back to source records.

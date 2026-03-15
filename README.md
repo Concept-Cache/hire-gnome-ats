@@ -18,6 +18,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 
 ## Table Of Contents
 - [Features](#features)
+- [Changelog](#changelog)
 - [User Documentation](#user-documentation)
 - [Quick Start](#quick-start)
 - [Onboarding And First Login](#onboarding-and-first-login)
@@ -39,6 +40,12 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
+- AI candidate summaries generated on demand from candidate profile, resume, history, skills, and recent notes
+- AI-generated submission write-ups for polished client-facing candidate introductions
+- AI-generated interview question sets stored on the interview record and refreshable on demand
+- AI match explanations on candidate/job-order match lists with cached, refreshable fit analysis
+- AI email drafting from candidate and contact actions menus with purpose/tone controls and copy-to-clipboard
+- AI-specific controls stay visible but are disabled with an inline hint when no OpenAI key is configured in system settings
 - Candidate file attachments with object storage (`s3`) and local fallback
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
 - Candidate and job-order match workspaces (top matches, sortable/paged)
@@ -57,6 +64,7 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 - Mobile-aware list/detail layouts
 
 ## User Documentation
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - End-user guide: [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md)
 - Module guides: [`docs/modules`](docs/modules)
 - Operations runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
@@ -65,6 +73,9 @@ Try the public demo environment: [https://demo.hiregnome.com](https://demo.hireg
 	- `Administrator`: all data
 	- `Director`: division-scoped data
 	- `Recruiter`: own data only
+
+## Changelog
+- See [`CHANGELOG.md`](CHANGELOG.md) for dated release notes and daily change summaries.
 
 ## Quick Start
 

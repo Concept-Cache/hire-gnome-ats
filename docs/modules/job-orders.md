@@ -31,6 +31,9 @@ If career site is enabled in system settings:
 ## Public Description Editor
 Rich text formatting is available for readability and candidate conversion quality.
 
+When OpenAI is configured, the editor also supports `Enhance with AI`.
+If OpenAI is not configured, that control remains visible but disabled with a hint.
+
 ## Job Workspace
 Use workspace tabs for:
 - Submissions
@@ -43,6 +46,8 @@ Use workspace tabs for:
 - New submission from job detail is supported.
 - Duplicate candidate+job submissions are blocked.
 - Candidate typeahead is optimized for larger datasets and qualification filtering.
+- Candidate match rows support `Explain Match`, which opens a saved AI explanation of fit, gaps, and recruiter validation points for that candidate/job pair.
+- If OpenAI is not configured, `Explain Match` remains visible but disabled with a tooltip/hint.
 
 ## Actions Menu
 Typical actions include:
