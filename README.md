@@ -16,6 +16,8 @@ Built for teams that want full control of their hiring stack without the cost or
 ## Live Demo
 Try the public demo environment: [https://demo.hiregnome.com](https://demo.hiregnome.com)
 
+When demo mode is enabled, authenticated demo users see a one-time welcome modal with quick guidance. Forwarding a message to `demo@hiregnome.com` triggers the Postmark inbound workflow in the demo environment, but the forwarded message must include an email address that matches an existing candidate or contact record for processing to occur.
+
 ## Table Of Contents
 - [Features](#features)
 - [Changelog](#changelog)

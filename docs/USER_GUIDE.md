@@ -42,6 +42,18 @@ Use this sequence as your default process:
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
 - Actions menu (`...`): context actions like archive, close, cancel, convert, view audit.
 
+## Demo Environment Note
+
+If you are using the public demo environment, the first authenticated login shows a one-time modal with quick guidance.
+
+Important demo-specific behavior:
+- Demo data is preloaded so you can move directly through candidate, job order, submission, interview, and placement flows.
+- Demo data resets periodically.
+- Forwarding an email to `demo@hiregnome.com` triggers the inbound Postmark workflow.
+- The forwarded message must contain an email address that matches an existing candidate or contact record.
+- When it matches, Hire Gnome creates an email note on that record.
+- Candidate matches can also receive file attachments from the inbound message.
+
 ## 4) Required Field Behavior
 
 - Required fields show a red `*`.

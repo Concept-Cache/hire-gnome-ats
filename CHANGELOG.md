@@ -1,6 +1,20 @@
 # Changelog
 
-This changelog captures the main product-facing changes that landed during the `1.2.0` iteration.
+This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
+
+## [1.3.0] - 2026-03-15
+
+#### Added
+- Demo-only first-login welcome modal for authenticated users in demo mode.
+- Guided demo messaging that points users to seeded workflows, reporting, and inbound email testing through `demo@hiregnome.com`.
+
+#### Changed
+- Demo documentation now calls out the one-time welcome prompt and the inbound email test path explicitly.
+
+## [1.3.1] - 2026-03-15
+
+#### Changed
+- Clarified demo welcome copy and user docs so inbound Postmark testing explicitly requires an email address in the forwarded message that matches an existing candidate or contact record.
 
 ## [1.2.0] - 2026-03-15
 

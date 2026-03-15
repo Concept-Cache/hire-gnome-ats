@@ -84,6 +84,7 @@ export default function AppShell({ children }) {
 	const [impersonationOpen, setImpersonationOpen] = useState(false);
 	const [logoutPending, setLogoutPending] = useState(false);
 	const [mobileNavOpen, setMobileNavOpen] = useState(false);
+	const [demoWelcomeOpen, setDemoWelcomeOpen] = useState(false);
 	const impersonationMenuRef = useRef(null);
 
 	useEffect(() => {
@@ -98,6 +99,32 @@ export default function AppShell({ children }) {
 		if (!nextTitle) return;
 		document.title = nextTitle;
 	}, [branding?.siteName]);
+
+	useEffect(() => {
+		if (isPublicCareersRoute || isAuthRoute) return;
+		if (sessionState.loading) return;
+		if (!branding?.demoMode) return;
+		if (!sessionState.authenticatedUser?.id) return;
+		if (typeof window === 'undefined') return;
+
+		const storageKey = `hg:demo-welcome:${sessionState.authenticatedUser.id}`;
+		if (window.localStorage.getItem(storageKey) !== 'seen') {
+			setDemoWelcomeOpen(true);
+		}
+	}, [
+		branding?.demoMode,
+		isAuthRoute,
+		isPublicCareersRoute,
+		sessionState.authenticatedUser?.id,
+		sessionState.loading
+	]);
+
+	function dismissDemoWelcome() {
+		if (typeof window !== 'undefined' && sessionState.authenticatedUser?.id) {
+			window.localStorage.setItem(`hg:demo-welcome:${sessionState.authenticatedUser.id}`, 'seen');
+		}
+		setDemoWelcomeOpen(false);
+	}
 
 	const activeUser = useMemo(() => {
 		if (users.length > 0) {
@@ -489,6 +516,55 @@ export default function AppShell({ children }) {
 					<main className="workspace-main">{children}</main>
 				</div>
 			</div>
+			{demoWelcomeOpen ? (
+				<div className="confirm-overlay" onClick={dismissDemoWelcome}>
+					<div
+						className="confirm-dialog demo-welcome-modal"
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby="demo-welcome-title"
+						onClick={(event) => event.stopPropagation()}
+					>
+						<div className="report-detail-modal-head">
+							<div>
+								<h3 id="demo-welcome-title" className="confirm-title">Welcome To The Demo</h3>
+								<p className="panel-subtext">
+									This workspace is preloaded so you can move through real recruiting flows quickly.
+								</p>
+							</div>
+							<button
+								type="button"
+								className="btn-secondary btn-link-icon report-detail-modal-close"
+								onClick={dismissDemoWelcome}
+								aria-label="Close demo instructions"
+								title="Close"
+							>
+								<X aria-hidden="true" className="btn-refresh-icon-svg" />
+							</button>
+						</div>
+						<div className="demo-welcome-body">
+							<ul className="demo-welcome-list">
+								<li>Open candidates, job orders, submissions, and interviews to explore the seeded workflow end to end.</li>
+								<li>Use the dashboard and reports to review live seeded activity, pipeline counts, and owner performance.</li>
+								<li>
+									Forward an email to <strong>demo@hiregnome.com</strong> to trigger the Postmark inbound workflow.
+									The forwarded message must include an email address that matches an existing candidate or contact record.
+									When it matches, Hire Gnome creates an email note on that record, and candidate attachments land in Files.
+								</li>
+								<li>Demo data resets periodically, so treat everything here as disposable.</li>
+							</ul>
+							<div className="demo-welcome-actions">
+								<Link href="/help" className="btn-secondary" onClick={dismissDemoWelcome}>
+									Open Help
+								</Link>
+								<button type="button" className="btn-primary" onClick={dismissDemoWelcome}>
+									Got It
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			) : null}
 		</ToastProvider>
 	);
 }

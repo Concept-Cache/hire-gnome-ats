@@ -8,7 +8,8 @@ const defaults = {
 	logoUrl: '/branding/hire-gnome.png',
 	themeKey: 'classic_blue',
 	hasCustomLogo: false,
-	careerSiteEnabled: false
+	careerSiteEnabled: false,
+	demoMode: false
 };
 const BRANDING_UPDATED_EVENT = 'hg:branding-updated';
 
@@ -27,7 +28,8 @@ function normalizeBranding(data) {
 		logoUrl: String(data?.logoUrl || defaults.logoUrl),
 		themeKey: String(data?.themeKey || defaults.themeKey),
 		hasCustomLogo: Boolean(data?.hasCustomLogo),
-		careerSiteEnabled: toBooleanFlag(data?.careerSiteEnabled, false)
+		careerSiteEnabled: toBooleanFlag(data?.careerSiteEnabled, false),
+		demoMode: toBooleanFlag(data?.demoMode, false)
 	};
 }
 
