@@ -44,7 +44,7 @@ export default function SubmissionsPage() {
 	}, [activeRows]);
 
 	const submitterOptions = useMemo(() => {
-		return [...new Set(activeRows.map((row) => row.submittedBy).filter((value) => value && value !== 'Unknown user'))].sort((a, b) =>
+		return [...new Set(activeRows.map((row) => row.submittedBy).filter((value) => value && value !== 'Unknown User'))].sort((a, b) =>
 			String(a).localeCompare(String(b))
 		);
 	}, [activeRows]);

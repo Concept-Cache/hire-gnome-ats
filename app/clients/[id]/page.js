@@ -651,7 +651,7 @@ export default function ClientDetailsPage() {
 														By{' '}
 														{note.createdByUser
 															? `${note.createdByUser.firstName} ${note.createdByUser.lastName}`
-															: 'Unknown user'}{' '}
+															: 'Unknown User'}{' '}
 														@ {formatDate(note.createdAt)}
 													</p>
 												</div>
