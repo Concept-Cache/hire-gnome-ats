@@ -2995,6 +2995,38 @@ p {
 	flex: 0 0 auto;
 }
 
+.demo-welcome-modal {
+	width: min(40rem, calc(100vw - 2rem));
+	max-width: 40rem;
+}
+
+.demo-welcome-body {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	margin-top: 0.9rem;
+}
+
+.demo-welcome-list {
+	margin: 0;
+	padding-left: 1.15rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+	color: #52637f;
+	line-height: 1.5;
+}
+
+.demo-welcome-list strong {
+	color: var(--ink);
+}
+
+.demo-welcome-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.65rem;
+}
+
 .match-explanation-body {
 	display: grid;
 	gap: 0.8rem;
