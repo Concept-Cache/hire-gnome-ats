@@ -145,3 +145,50 @@ Import behavior notes:
 - Custom field definitions are applied before entity upserts.
 - Definitions are upserted by `recordId` first, then by `(moduleKey, fieldKey)`.
 - Entity `customFields` payloads for clients, contacts, candidates, job orders, submissions, interviews, and placements are imported when present.
+
+## 9) Postmark Inbound Email Webhook
+
+Endpoint:
+- `POST /api/inbound/postmark`
+
+Authentication:
+- Public route by default.
+- If `POSTMARK_INBOUND_WEBHOOK_SECRET` is set, pass it either:
+	- as query string: `/api/inbound/postmark?secret=...`
+	- or header: `x-webhook-secret: ...`
+
+Processing behavior:
+- Extracts email addresses from inbound JSON payload fields.
+- Matches against:
+	- `Candidate.email`
+	- `Contact.email`
+- Creates an `Email` note on each matched candidate/contact.
+- Saves supported attachments to matched candidates only.
+- Does not save attachments to contacts.
+- Dedupes by Postmark `MessageID`.
+
+Attachment notes:
+- Candidate attachments are only saved when the inbound payload includes actual attachment bytes, not metadata-only attachment objects.
+- Common inline/signature image noise is skipped.
+- Generic email MIME types like `application/octet-stream` are accepted when the file extension is allowed.
+
+Validation and diagnostics:
+- Recent inbound events are visible in `Admin Area > System Settings > System Diagnostics`.
+- Diagnostics includes:
+	- subject
+	- sender
+	- processing status
+	- candidate/contact match counts
+	- notes created
+	- candidate files saved
+	- attachment skip reasons when applicable
+
+Recommended Postmark webhook URL:
+```text
+https://your-domain.example/api/inbound/postmark
+```
+
+Recommended secured URL when using a shared secret:
+```text
+https://your-domain.example/api/inbound/postmark?secret=YOUR_SECRET
+```

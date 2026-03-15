@@ -4724,6 +4724,10 @@ button:disabled {
 	gap: 0.65rem;
 }
 
+.simple-list li > div {
+	min-width: 0;
+}
+
 .simple-list li strong {
 	font-size: 0.86rem;
 }
@@ -4732,6 +4736,9 @@ button:disabled {
 	font-size: 0.79rem;
 	color: var(--muted);
 	margin-top: 0.2rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 .simple-list li .simple-list-meta {
@@ -5185,6 +5192,12 @@ button:disabled {
 	font-weight: 600;
 }
 
+.inbound-email-note-chip {
+	margin-bottom: 0.45rem;
+	background: #fff3dc;
+	color: #9a5f00;
+}
+
 .skill-picker {
 	display: grid;
 	gap: 0.45rem;
@@ -5365,6 +5378,15 @@ button:disabled {
 	display: grid;
 	gap: 0.55rem;
 	margin-top: 0.55rem;
+}
+
+.settings-diagnostics-inbound-block {
+	margin-top: 1.1rem;
+}
+
+.settings-diagnostics-inbound-block h5 {
+	margin: 0 0 0.7rem;
+	font-size: 0.92rem;
 }
 
 .settings-diagnostics-item {

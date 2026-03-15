@@ -20,6 +20,7 @@ Use this sequence as your default process:
 ### Administrator
 - Full access across all divisions.
 - Can manage users, divisions, system settings, billing, and diagnostics.
+- Diagnostics also surfaces recent inbound email webhook events for troubleshooting.
 - Can reassign owners and divisions.
 
 ### Director
@@ -50,6 +51,26 @@ Use this sequence as your default process:
 - Zip-based city/state inference is applied where configured.
 
 ## 5) Module Guides
+
+## Inbound Email Capture
+
+Primary purpose:
+- Turn inbound recruiting emails into structured candidate/contact history.
+
+Behavior:
+1. Postmark sends inbound email JSON to `/api/inbound/postmark`.
+2. The system extracts email addresses from the payload.
+3. If a `Candidate.email` or `Contact.email` matches, the system creates an `Email` note on that record.
+4. Candidate matches can also receive file attachments from the inbound email.
+5. Contact matches currently receive notes only, not file attachments.
+
+What users will see:
+- On candidate and contact detail views, inbound emails appear in Notes with `Email` note type styling.
+- The note body is cleaned up to remove most forwarded-header junk, external caution banners, and quoted thread noise.
+- On candidates, supported inbound attachments appear in the Files area when the email payload includes real attachment content.
+
+Admin troubleshooting:
+- `Admin Area > System Settings > System Diagnostics` shows recent inbound email events, match counts, notes created, files saved, and attachment skip reasons.
 
 ## Candidates
 

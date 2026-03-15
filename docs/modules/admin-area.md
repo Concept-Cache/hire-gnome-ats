@@ -24,6 +24,15 @@ Configuration includes:
 - Storage configuration (S3/local fallback)
 - Demo mode visibility/lock behavior
 - System diagnostics and test email tools
+- Recent inbound email event visibility inside diagnostics
+
+Inbound email diagnostics includes:
+- Postmark webhook activity for `/api/inbound/postmark`
+- Processing status (`Processed`, `No Match`, `Failed`)
+- Candidate/contact match counts
+- Notes created
+- Candidate files saved
+- Attachment skip reasons for troubleshooting metadata-only or filtered attachments
 
 ## Data Import
 Supports:

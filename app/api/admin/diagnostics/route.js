@@ -14,6 +14,12 @@ function handleError(error, fallbackMessage) {
 	return NextResponse.json({ error: fallbackMessage }, { status: 500 });
 }
 
+function isMissingInboundEmailEventTableError(error) {
+	if (!error) return false;
+	if (error.code === 'P2021') return true;
+	return String(error.message || '').includes('InboundEmailEvent');
+}
+
 function createCheckResult({ key, label, status, message, details = {} }) {
 	return {
 		key,
@@ -22,6 +28,22 @@ function createCheckResult({ key, label, status, message, details = {} }) {
 		message,
 		details
 	};
+}
+
+function summarizeAttachmentDiagnostics(payload) {
+	const diagnostics = Array.isArray(payload?.AttachmentDiagnostics) ? payload.AttachmentDiagnostics : [];
+	if (diagnostics.length === 0) return '';
+
+	const parts = diagnostics.slice(0, 3).map((entry) => {
+		const fileName = String(entry?.fileName || 'attachment').trim() || 'attachment';
+		const reason = String(entry?.reason || 'unknown').trim().replace(/_/g, ' ');
+		return `${fileName}: ${reason}`;
+	});
+	const remainder = diagnostics.length - parts.length;
+	if (remainder > 0) {
+		parts.push(`+${remainder} more`);
+	}
+	return parts.join(' | ');
 }
 
 function toBooleanFlag(value) {
@@ -39,6 +61,7 @@ function formatDiagnosticsMarkdown(result) {
 	const generatedAt = result?.generatedAt || new Date().toISOString();
 	const summary = result?.summary || {};
 	const checks = Array.isArray(result?.checks) ? result.checks : [];
+	const recentInboundEmails = Array.isArray(result?.recentInboundEmails) ? result.recentInboundEmails : [];
 	const lines = [
 		'# Hire Gnome ATS Diagnostics Report',
 		'',
@@ -64,6 +87,18 @@ function formatDiagnosticsMarkdown(result) {
 		);
 	}
 
+	lines.push('', '## Recent Inbound Email Events', '');
+	if (recentInboundEmails.length === 0) {
+		lines.push('- No inbound email events recorded.');
+	} else {
+		lines.push('| Received | Status | Subject | Matches | Notes | Attachments | Attachment Diagnostics |', '|---|---|---|---|---|---|---|');
+		for (const event of recentInboundEmails) {
+			lines.push(
+				`| ${escapeMarkdownCell(event?.createdAt || '-')} | ${escapeMarkdownCell(event?.status || '-')} | ${escapeMarkdownCell(event?.subject || '-')} | ${escapeMarkdownCell(`Candidates ${event?.matchedCandidates ?? 0}, Contacts ${event?.matchedContacts ?? 0}`)} | ${escapeMarkdownCell(String(event?.notesCreated ?? 0))} | ${escapeMarkdownCell(String(event?.attachmentsSaved ?? 0))} | ${escapeMarkdownCell(event?.attachmentDiagnosticsSummary || '-')} |`
+			);
+		}
+	}
+
 	return `${lines.join('\n')}\n`;
 }
 
@@ -83,6 +118,7 @@ function getBackupDirectoryPath() {
 async function runDiagnostics() {
 	const checks = [];
 	const generatedAt = new Date().toISOString();
+	let recentInboundEmails = [];
 
 	try {
 		await prisma.$queryRaw`SELECT 1`;
@@ -357,6 +393,62 @@ async function runDiagnostics() {
 		})
 	);
 
+	try {
+		recentInboundEmails = await prisma.inboundEmailEvent.findMany({
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: {
+				id: true,
+				status: true,
+				subject: true,
+				fromEmail: true,
+				matchedCandidates: true,
+				matchedContacts: true,
+				notesCreated: true,
+				attachmentsSaved: true,
+				createdAt: true,
+				payload: true
+			}
+		});
+		recentInboundEmails = recentInboundEmails.map((event) => ({
+			...event,
+			attachmentDiagnosticsSummary: summarizeAttachmentDiagnostics(event.payload)
+		}));
+		checks.push(
+			createCheckResult({
+				key: 'inbound_email_events',
+				label: 'Inbound Email Event Log',
+				status: 'pass',
+				message: recentInboundEmails.length > 0
+					? `Inbound email event log is available. Showing ${recentInboundEmails.length} recent events.`
+					: 'Inbound email event log is available. No events recorded yet.'
+			})
+		);
+	} catch (error) {
+		if (isMissingInboundEmailEventTableError(error)) {
+			checks.push(
+				createCheckResult({
+					key: 'inbound_email_events',
+					label: 'Inbound Email Event Log',
+					status: 'warn',
+					message: 'Inbound email event table is missing. Apply the latest migration to enable inbound email diagnostics.'
+				})
+			);
+		} else {
+			checks.push(
+				createCheckResult({
+					key: 'inbound_email_events',
+					label: 'Inbound Email Event Log',
+					status: 'fail',
+					message: 'Failed to load inbound email events.',
+					details: {
+						error: error?.message || 'Unknown error'
+					}
+				})
+			);
+		}
+	}
+
 	const passCount = checks.filter((check) => check.status === 'pass').length;
 	const warnCount = checks.filter((check) => check.status === 'warn').length;
 	const failCount = checks.filter((check) => check.status === 'fail').length;
@@ -370,7 +462,8 @@ async function runDiagnostics() {
 			warnCount,
 			failCount
 		},
-		checks
+		checks,
+		recentInboundEmails
 	};
 }
 

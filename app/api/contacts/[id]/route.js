@@ -54,6 +54,7 @@ function buildContactDetailInclude(entityScope, includeNoteAuthor = true) {
 				orderBy: { createdAt: 'desc' },
 				select: {
 					id: true,
+					noteType: true,
 					content: true,
 					createdAt: true,
 					updatedAt: true,
