@@ -2,6 +2,11 @@
 
 This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
 
+## [1.3.16] - 2026-03-16
+
+#### Added
+- Added branded custom 404 and 500 error pages with dedicated Hire Gnome artwork for not-found, route error, and global error states.
+
 ## [1.3.15] - 2026-03-16
 
 #### Changed
