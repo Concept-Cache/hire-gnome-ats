@@ -3,7 +3,7 @@
 ## What This Module Is For
 Candidates stores profile, status, ownership, resume, skills, education, work history, notes, files, and related hiring activity.
 
-It also includes an on-demand AI summary view that turns the current candidate profile into a concise recruiter-facing brief.
+It also includes an on-demand AI summary modal, opened from the candidate detail header, that turns the current candidate profile into a concise recruiter-facing brief.
 
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.
@@ -40,7 +40,6 @@ What parsing can populate:
 
 ## Candidate Workspace
 The workspace provides linked execution views:
-- AI Summary
 - Submissions
 - Interviews
 - Placements
@@ -50,7 +49,7 @@ The workspace provides linked execution views:
 - Matched Job Orders
 
 ## AI Summary
-Use `AI Summary` on the candidate detail workspace to generate a structured summary from the current candidate record.
+Use the sparkles `AI Summary` header button on candidate detail to open the summary modal. If no summary exists yet, the modal starts generating one automatically from the current candidate record.
 
 The generated summary includes:
 - Overview
@@ -59,8 +58,8 @@ The generated summary includes:
 - Suggested next step
 
 Behavior:
-- Generation is manual, not automatic.
-- Existing summaries can be refreshed.
+- Opening the modal auto-generates the first summary when none exists.
+- Existing summaries can be refreshed from the modal.
 - Requires an OpenAI API key in `Admin Area > System Settings`.
 - The summary is stored separately from the resume text.
 - If OpenAI is not configured, the AI controls remain visible but disabled with an inline hint.

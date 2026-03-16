@@ -220,13 +220,7 @@ function scoreJobOrder(candidate, jobOrder, allSkills, requiredSkillIds) {
 		titleOverlap
 	});
 
-	const submissionCount = Number(jobOrder?._count?.submissions || 0);
 	const openings = Number(jobOrder?.openings || 0);
-	const activeHiring = openings <= 0 || submissionCount < openings;
-
-	if (!activeHiring) {
-		risks.push('No open capacity remaining');
-	}
 
 	return {
 		jobOrderId: jobOrder.id,
@@ -242,8 +236,8 @@ function scoreJobOrder(candidate, jobOrder, allSkills, requiredSkillIds) {
 		score: Math.max(0, Math.min(1, weightedScore)),
 		scorePercent: toPercent(weightedScore),
 		openings: openings > 0 ? openings : null,
-		submissionCount,
-		activeHiring,
+		submissionCount: Number(jobOrder?._count?.submissions || 0),
+		activeHiring: true,
 		submittedToJobOrder: Array.isArray(jobOrder.submissions) && jobOrder.submissions.length > 0,
 		reasons,
 		risks
@@ -351,8 +345,7 @@ async function getCandidates_id_matchesHandler(req, { params }) {
 			return scoreJobOrder(candidate, jobOrder, skills, requiredSkillIds);
 		});
 
-		const filtered = scored.filter((jobOrderMatch) => jobOrderMatch.activeHiring);
-		const sorted = filtered
+		const sorted = scored
 			.sort((a, b) => b.score - a.score)
 			.slice(0, limit);
 
@@ -360,7 +353,7 @@ async function getCandidates_id_matchesHandler(req, { params }) {
 			candidateId: id,
 			computedAt: new Date().toISOString(),
 			totalJobOrdersEvaluated: scored.length,
-			activeHiringJobOrders: filtered.length,
+			activeHiringJobOrders: scored.length,
 			matchEligibility:
 				scored.length === 0
 					? 'Matches are unavailable because there are no open active job orders for this candidate right now.'

@@ -6,22 +6,17 @@ import { useRouter } from 'next/navigation';
 import { Archive, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
-import { useToast } from '@/app/components/toast-provider';
-import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
-import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { CLIENT_STATUS_OPTIONS, normalizeClientStatusValue } from '@/lib/client-status-options';
 
 export default function ClientsPage() {
 	const router = useRouter();
-	const toast = useToast();
-	const { requestConfirmWithOptions } = useConfirmDialog();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
 	const [ownerFilter, setOwnerFilter] = useState('all');
-	const { archivedIdSet, archiveEntity } = useArchivedEntities('CLIENT');
+	const { archivedIdSet } = useArchivedEntities('CLIENT');
 
 	const activeRows = useMemo(
 		() => rows.filter((row) => !archivedIdSet.has(row.id)),
@@ -73,31 +68,6 @@ export default function ClientsPage() {
 
 	function onOpen(row) {
 		router.push(`/clients/${row.id}`);
-	}
-
-	async function onArchive(row) {
-		const archiveOptions = getArchiveCascadeOptions('CLIENT');
-		const decision = await requestConfirmWithOptions({
-			title: 'Archive Client',
-			message: `Archive ${row.name}? You can restore it from Archive later.`,
-			confirmLabel: 'Archive',
-			cancelLabel: 'Cancel',
-			isDanger: true,
-			options: archiveOptions
-		});
-		if (!decision?.confirmed) return;
-		const cascade = cascadeSelectionFromIds('CLIENT', decision.selections);
-		const result = await archiveEntity(row.id, '', cascade);
-		if (!result.ok) {
-			toast.error(result.error || 'Failed to archive client.');
-			return;
-		}
-		const relatedCount = Math.max(0, Number(result.archivedCount || 1) - 1);
-		toast.success(
-			relatedCount > 0
-				? `Client archived with ${relatedCount} related record${relatedCount === 1 ? '' : 's'}.`
-				: 'Client archived.'
-		);
 	}
 
 	const columns = [
@@ -155,10 +125,7 @@ export default function ClientsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading clients"
-					rowActions={[
-						{ label: 'Open', onClick: onOpen },
-						{ label: 'Archive', onClick: onArchive }
-					]}
+					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
 		</section>

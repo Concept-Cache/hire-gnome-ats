@@ -11,6 +11,7 @@ import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 
 const initialForm = {
@@ -70,6 +71,7 @@ export default function SubmissionDetailsPage() {
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('SUBMISSION');
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(submission)
 	});
@@ -311,6 +313,26 @@ export default function SubmissionDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	async function onArchiveSubmission() {
+		if (!submission?.id) return;
+		setActionsOpen(false);
+		const confirmed = await requestConfirm({
+			title: 'Archive Submission',
+			message: `Archive ${submission.recordId || `submission #${submission.id}`}? You can restore it from Archive later.`,
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			destructive: true
+		});
+		if (!confirmed) return;
+		const result = await archiveEntity(submission.id);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive submission.');
+			return;
+		}
+		toast.success('Submission archived.');
+		router.push('/submissions');
+	}
+
 	async function onCopyWriteUp() {
 		const value = String(form.aiWriteUp || '').trim();
 		if (!value) return;
@@ -414,6 +436,14 @@ export default function SubmissionDetailsPage() {
 										{convertState.converting ? 'Converting...' : 'Convert to Placement'}
 									</button>
 								)}
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onArchiveSubmission}
+								>
+									Archive Submission
+								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
 								</button>

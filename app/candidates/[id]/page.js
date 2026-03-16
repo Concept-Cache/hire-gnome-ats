@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Download, LoaderCircle, MoreVertical, RefreshCcw, Sparkles, Trash2 } from 'lucide-react';
+import { Download, LoaderCircle, MoreVertical, RefreshCcw, Sparkles, Trash2, X } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
@@ -17,11 +17,13 @@ import MatchExplanationModal from '@/app/components/match-explanation-modal';
 import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import {
 	CANDIDATE_SOURCE_OPTIONS,
 	normalizeCandidateSourceValue
 } from '@/app/constants/candidate-source-options';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
+import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { candidateAttachmentAcceptString } from '@/lib/candidate-attachment-options';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { isValidEmailAddress } from '@/lib/email-validation';
@@ -257,11 +259,13 @@ export default function CandidateDetailsPage() {
 	const detailsPanelRef = useRef(null);
 	const actionsMenuRef = useRef(null);
 	const [actionsOpen, setActionsOpen] = useState(false);
+	const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [emailDraftOpen, setEmailDraftOpen] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
-	const { requestConfirm } = useConfirmDialog();
+	const { requestConfirm, requestConfirmWithOptions } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('CANDIDATE');
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(editForm, {
 		enabled: !loading && Boolean(candidate)
 	});
@@ -526,6 +530,19 @@ export default function CandidateDetailsPage() {
 		loadJobMatches({ keepResults: false });
 	}, [candidate?.id]);
 
+	useEffect(() => {
+		if (!aiSummaryOpen || !candidate?.id || candidate.aiSummary || !aiAvailable || summaryState.generating) {
+			return;
+		}
+		onGenerateAiSummary();
+	}, [
+		aiAvailable,
+		aiSummaryOpen,
+		candidate?.aiSummary,
+		candidate?.id,
+		summaryState.generating
+	]);
+
 		useEffect(() => {
 			const panel = detailsPanelRef.current;
 			if (!panel || typeof ResizeObserver === 'undefined') return;
@@ -677,9 +694,43 @@ export default function CandidateDetailsPage() {
 		toast.success(candidate.aiSummary ? 'Candidate summary refreshed.' : 'Candidate summary generated.');
 	}
 
+	function onOpenAiSummary() {
+		setActionsOpen(false);
+		if (!aiAvailable && !candidate?.aiSummary) return;
+		setAiSummaryOpen(true);
+	}
+
 	function onToggleAuditTrail() {
 		setActionsOpen(false);
 		setShowAuditTrail((current) => !current);
+	}
+
+	async function onArchiveCandidate() {
+		if (!candidate?.id) return;
+		setActionsOpen(false);
+		const archiveOptions = getArchiveCascadeOptions('CANDIDATE');
+		const decision = await requestConfirmWithOptions({
+			title: 'Archive Candidate',
+			message: `Archive ${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() + '? You can restore it from Archive later.',
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			isDanger: true,
+			options: archiveOptions
+		});
+		if (!decision?.confirmed) return;
+		const cascade = cascadeSelectionFromIds('CANDIDATE', decision.selections);
+		const result = await archiveEntity(candidate.id, '', cascade);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive candidate.');
+			return;
+		}
+		const relatedCount = Math.max(0, Number(result.archivedCount || 1) - 1);
+		toast.success(
+			relatedCount > 0
+				? `Candidate archived with ${relatedCount} related record${relatedCount === 1 ? '' : 's'}.`
+				: 'Candidate archived.'
+		);
+		router.push('/candidates');
 	}
 
 	function onOpenEmailDraft() {
@@ -1080,7 +1131,21 @@ export default function CandidateDetailsPage() {
 					</p>
 				</div>
 					<div className="module-header-actions">
-												<div className="actions-menu" ref={actionsMenuRef}>
+						<button
+							type="button"
+							className="btn-secondary btn-link-icon candidate-ai-summary-trigger"
+							onClick={onOpenAiSummary}
+							disabled={!aiAvailable && !candidate.aiSummary}
+							aria-label="Open AI Summary"
+							title={
+								aiAvailable || candidate.aiSummary
+									? 'Open AI Summary'
+									: 'Enable OpenAI in Admin Area > System Settings to use this.'
+							}
+						>
+							<Sparkles aria-hidden="true" className="btn-refresh-icon-svg" />
+						</button>
+						<div className="actions-menu" ref={actionsMenuRef}>
 							<button
 								type="button"
 								className="btn-secondary actions-menu-toggle"
@@ -1135,6 +1200,14 @@ export default function CandidateDetailsPage() {
 									{!aiAvailable ? (
 										<p className="actions-menu-hint">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
 									) : null}
+									<button
+										type="button"
+										role="menuitem"
+										className="actions-menu-item actions-menu-item-danger"
+										onClick={onArchiveCandidate}
+									>
+										Archive Candidate
+									</button>
 									<button
 										type="button"
 										role="menuitem"
@@ -1458,16 +1531,6 @@ export default function CandidateDetailsPage() {
 						<button
 							type="button"
 							role="tab"
-							aria-selected={workspaceTab === 'ai-summary'}
-							className={workspaceTab === 'ai-summary' ? 'side-tab active' : 'side-tab'}
-							onClick={() => setWorkspaceTab('ai-summary')}
-						>
-							<span>AI Summary</span>
-							<span className="side-tab-count" aria-hidden="true">{candidate.aiSummary ? 1 : 0}</span>
-						</button>
-						<button
-							type="button"
-							role="tab"
 							aria-selected={workspaceTab === 'activities'}
 							className={workspaceTab === 'activities' ? 'side-tab active' : 'side-tab'}
 							onClick={() => setWorkspaceTab('activities')}
@@ -1538,80 +1601,6 @@ export default function CandidateDetailsPage() {
 								</span>
 							</button>
 						</div>
-
-					{workspaceTab === 'ai-summary' ? (
-						<div className="side-tab-content side-tab-content-with-scroll">
-							<div className="ai-summary-toolbar">
-								<button
-									type="button"
-									onClick={onGenerateAiSummary}
-									disabled={summaryState.generating || !aiAvailable}
-									title={aiAvailable ? undefined : 'Enable OpenAI in Admin Area > System Settings to use this.'}
-								>
-									{summaryState.generating
-										? 'Generating...'
-										: candidate.aiSummary
-											? 'Refresh Summary'
-											: 'Generate Summary'}
-								</button>
-							</div>
-							<h4 className="side-section-title">AI Candidate Summary</h4>
-							<div className="workspace-scroll-area">
-								{!aiAvailable ? (
-									<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
-								) : null}
-								{candidate.aiSummary ? (
-									<div className="ai-summary-sections">
-										<section className="ai-summary-section">
-											<h5>Overview</h5>
-											<p>{candidate.aiSummary.overview}</p>
-										</section>
-										<section className="ai-summary-section">
-											<h5>Strengths</h5>
-											{normalizeSummaryItems(candidate.aiSummary.strengths).length > 0 ? (
-												<ul className="ai-summary-list">
-													{normalizeSummaryItems(candidate.aiSummary.strengths).map((item) => (
-														<li key={item}>{item}</li>
-													))}
-												</ul>
-											) : (
-												<p className="panel-subtext">No strengths generated.</p>
-											)}
-										</section>
-										<section className="ai-summary-section">
-											<h5>Concerns</h5>
-											{normalizeSummaryItems(candidate.aiSummary.concerns).length > 0 ? (
-												<ul className="ai-summary-list">
-													{normalizeSummaryItems(candidate.aiSummary.concerns).map((item) => (
-														<li key={item}>{item}</li>
-													))}
-												</ul>
-											) : (
-												<p className="panel-subtext">No concerns generated.</p>
-											)}
-										</section>
-										<section className="ai-summary-section">
-											<h5>Suggested Next Step</h5>
-											<p>{candidate.aiSummary.suggestedNextStep || 'No next step generated.'}</p>
-										</section>
-										<p className="simple-list-meta">
-											Generated by{' '}
-											{candidate.aiSummary.generatedByUser
-												? `${candidate.aiSummary.generatedByUser.firstName} ${candidate.aiSummary.generatedByUser.lastName}`
-												: 'Unknown User'}{' '}
-											@ {formatDate(candidate.aiSummary.updatedAt)}
-										</p>
-									</div>
-								) : (
-									<p className="panel-subtext">
-										No AI summary has been generated yet. Use Generate Summary to create one from the candidate profile,
-										resume, history, skills, and recent notes.
-									</p>
-								)}
-							</div>
-						</div>
-					) : null}
-
 					{workspaceTab === 'notes' ? (
 						<div className="side-tab-content side-tab-content-with-scroll">
 							<form onSubmit={onAddNote}>
@@ -2319,8 +2308,8 @@ export default function CandidateDetailsPage() {
 								</div>
 								{!jobMatchState.matchEligibility ? (
 									<p className="panel-subtext">
-										Evaluated {jobMatchState.totalJobOrdersEvaluated} open job orders;{' '}
-										{jobMatchState.activeHiringJobOrders} currently active for hiring.
+										Evaluated {jobMatchState.totalJobOrdersEvaluated} open job order
+										{jobMatchState.totalJobOrdersEvaluated === 1 ? '' : 's'}.
 									</p>
 								) : null}
 							</div>
@@ -2362,6 +2351,115 @@ export default function CandidateDetailsPage() {
 					</article>
 			</div>
 			<AuditTrailPanel entityType="CANDIDATE" entityId={id} visible={showAuditTrail} />
+			{aiSummaryOpen ? (
+				<div className="confirm-overlay" onClick={() => setAiSummaryOpen(false)}>
+					<div
+						className="confirm-dialog report-detail-modal candidate-ai-summary-modal"
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby="candidate-ai-summary-title"
+						onClick={(event) => event.stopPropagation()}
+					>
+						<div className="report-detail-modal-head">
+							<div>
+								<h3 id="candidate-ai-summary-title" className="confirm-title">AI Candidate Summary</h3>
+								<p className="panel-subtext">
+									{candidate.firstName} {candidate.lastName}
+								</p>
+							</div>
+							<div className="ai-summary-toolbar">
+								<button
+									type="button"
+									className="row-action-icon submission-write-up-action"
+									onClick={onGenerateAiSummary}
+									disabled={summaryState.generating || !aiAvailable}
+									aria-label={
+										summaryState.generating
+											? 'Generating summary'
+											: candidate.aiSummary
+												? 'Refresh summary'
+												: 'Generate summary'
+									}
+									title={aiAvailable ? undefined : 'Enable OpenAI in Admin Area > System Settings to use this.'}
+								>
+									{summaryState.generating ? (
+										<LoaderCircle aria-hidden="true" className="row-action-icon-spinner" />
+									) : candidate.aiSummary ? (
+										<RefreshCcw aria-hidden="true" />
+									) : (
+										<Sparkles aria-hidden="true" />
+									)}
+								</button>
+								<button
+									type="button"
+									className="btn-secondary btn-link-icon report-detail-modal-close"
+									onClick={() => setAiSummaryOpen(false)}
+									aria-label="Close AI Summary"
+									title="Close"
+								>
+									<X aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+						<div className="report-detail-modal-body">
+							{!aiAvailable ? (
+								<p className="panel-subtext">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
+							) : null}
+							{candidate.aiSummary ? (
+								<div className="ai-summary-sections">
+									<section className="ai-summary-section">
+										<h5>Overview</h5>
+										<p>{candidate.aiSummary.overview}</p>
+									</section>
+									<section className="ai-summary-section">
+										<h5>Strengths</h5>
+										{normalizeSummaryItems(candidate.aiSummary.strengths).length > 0 ? (
+											<ul className="ai-summary-list">
+												{normalizeSummaryItems(candidate.aiSummary.strengths).map((item) => (
+													<li key={item}>{item}</li>
+												))}
+											</ul>
+										) : (
+											<p className="panel-subtext">No strengths generated.</p>
+										)}
+									</section>
+									<section className="ai-summary-section">
+										<h5>Concerns</h5>
+										{normalizeSummaryItems(candidate.aiSummary.concerns).length > 0 ? (
+											<ul className="ai-summary-list">
+												{normalizeSummaryItems(candidate.aiSummary.concerns).map((item) => (
+													<li key={item}>{item}</li>
+												))}
+											</ul>
+										) : (
+											<p className="panel-subtext">No concerns generated.</p>
+										)}
+									</section>
+									<section className="ai-summary-section">
+										<h5>Suggested Next Step</h5>
+										<p>{candidate.aiSummary.suggestedNextStep || 'No next step generated.'}</p>
+									</section>
+									<p className="simple-list-meta">
+										Generated by{' '}
+										{candidate.aiSummary.generatedByUser
+											? `${candidate.aiSummary.generatedByUser.firstName} ${candidate.aiSummary.generatedByUser.lastName}`
+											: 'Unknown User'}{' '}
+										@ {formatDate(candidate.aiSummary.updatedAt)}
+									</p>
+								</div>
+							) : summaryState.generating ? (
+								<p className="panel-subtext">
+									Generating summary from the candidate profile, resume, history, skills, and recent notes.
+								</p>
+							) : (
+								<p className="panel-subtext">
+									No AI summary has been generated yet.
+								</p>
+							)}
+						</div>
+					</div>
+				</div>
+			) : null}
 			<EmailDraftModal
 				open={emailDraftOpen}
 				onClose={() => setEmailDraftOpen(false)}

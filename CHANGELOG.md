@@ -2,6 +2,73 @@
 
 This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
 
+## [1.3.15] - 2026-03-16
+
+#### Changed
+- Match explanation modals now auto-generate the explanation on open when no cached explanation exists yet.
+
+## [1.3.14] - 2026-03-16
+
+#### Changed
+- Kept open job orders matchable even when current submissions meet or exceed openings, so candidate and job-order match views continue surfacing possible fits.
+
+## [1.3.13] - 2026-03-16
+
+#### Fixed
+- Prevented workspace save/action buttons from stretching full width so note and other inline actions keep consistent content-width sizing.
+
+## [1.3.12] - 2026-03-16
+
+#### Fixed
+- Tightened the shared list-table actions column so single-icon open actions consume less horizontal space.
+
+## [1.3.11] - 2026-03-16
+
+#### Changed
+- Removed direct archive actions from list rows and moved record archiving into the detail-screen actions menus with confirmation prompts.
+
+## [1.3.10] - 2026-03-16
+
+#### Changed
+- Simplified list-view column chooser triggers to an icon-only control instead of the `Columns` text button.
+
+## [1.3.9] - 2026-03-16
+
+#### Changed
+- Switched the job-order public-description AI enhance control to the shared sparkles icon pattern for consistency with other AI actions.
+
+## [1.3.8] - 2026-03-16
+
+#### Fixed
+- Matched the candidate AI Summary header button size to the adjacent actions button so header controls align cleanly.
+
+## [1.3.7] - 2026-03-16
+
+#### Fixed
+- Corrected the candidate AI Summary header trigger to use a true icon-only sparkles button so the control renders properly on mobile and no longer collapses into broken text layout.
+
+## [1.3.6] - 2026-03-16
+
+#### Changed
+- Candidate AI Summary now starts generating automatically when the summary modal opens and no stored summary exists yet.
+- Candidate AI Summary documentation now reflects the modal-based flow instead of the old workspace-tab wording.
+
+## [1.3.5] - 2026-03-16
+
+#### Changed
+- Moved the candidate AI Summary trigger out of the actions menu and into a dedicated header action.
+- Updated the AI Summary modal to use compact icon-based generate/refresh controls instead of a large text button.
+
+## [1.3.4] - 2026-03-16
+
+#### Changed
+- Moved candidate AI summaries out of the workspace tab strip and into `Actions > AI Summary`, opening the summary in a dedicated modal with in-place generate/refresh.
+
+## [1.3.3] - 2026-03-15
+
+#### Fixed
+- Hardened `/api/lookups/contacts` and `/api/job-orders/[id]/matches` so demo environments with optional schema drift degrade cleanly instead of returning `500` for missing optional fields like `divisionId` or `publicDescription`.
+
 ## [1.3.2] - 2026-03-15
 
 #### Changed

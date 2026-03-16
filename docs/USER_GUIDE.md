@@ -95,7 +95,7 @@ Common actions:
 2. Fill required identity fields.
 3. Add status, source, owner, and current employment details.
 4. Add notes, education, work history, and file attachments.
-5. Use the `AI Summary` workspace tab to generate a recruiter-facing summary of the candidate.
+5. Use the candidate detail sparkles `AI Summary` header button to open the summary modal. If no summary exists yet, it generates automatically.
 6. Use `Actions` for fast create:
 - Add submission
 - Add interview
@@ -109,13 +109,16 @@ Resume parsing:
 - Parsed resumes can auto-populate candidate data and attach source file.
 
 AI summary:
+- Opened from the candidate detail sparkles `AI Summary` header button.
 - Generated on demand from the candidate profile, resume text, skills, education, work history, and recent notes.
+- Opening the modal auto-generates the first summary when none exists.
 - Stored separately from the resume field.
 - Shows:
 	- overview
 	- strengths
 	- concerns
 	- suggested next step
+- Can be refreshed from the modal.
 - Matched job orders also support `Explain Match`, which stores a reusable explanation of fit, likely gaps, and what the recruiter should validate.
 
 Duplicate handling:

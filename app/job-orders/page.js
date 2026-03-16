@@ -8,10 +8,8 @@ import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import KanbanBoard from '@/app/components/kanban-board';
-import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
-import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { JOB_ORDER_STATUS_OPTIONS } from '@/lib/job-order-options';
@@ -35,8 +33,7 @@ function updateStatusDisplay(row, nextStatus, nextTimestamp) {
 
 export default function JobOrdersPage() {
 	const router = useRouter();
-	const toast = useToast();
-	const { requestConfirmWithOptions, requestConfirm } = useConfirmDialog();
+	const { requestConfirm } = useConfirmDialog();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
@@ -44,7 +41,7 @@ export default function JobOrdersPage() {
 	const [clientFilter, setClientFilter] = useState('all');
 	const [viewMode, setViewMode] = useState('list');
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
-	const { archivedIdSet, archiveEntity } = useArchivedEntities('JOB_ORDER');
+	const { archivedIdSet } = useArchivedEntities('JOB_ORDER');
 
 	const activeRows = useMemo(
 		() => rows.filter((row) => !archivedIdSet.has(row.id)),
@@ -133,31 +130,6 @@ export default function JobOrdersPage() {
 
 	function onOpen(row) {
 		router.push(`/job-orders/${row.id}`);
-	}
-
-	async function onArchive(row) {
-		const archiveOptions = getArchiveCascadeOptions('JOB_ORDER');
-		const decision = await requestConfirmWithOptions({
-			title: 'Archive Job Order',
-			message: `Archive ${row.title}? You can restore it from Archive later.`,
-			confirmLabel: 'Archive',
-			cancelLabel: 'Cancel',
-			isDanger: true,
-			options: archiveOptions
-		});
-		if (!decision?.confirmed) return;
-		const cascade = cascadeSelectionFromIds('JOB_ORDER', decision.selections);
-		const result = await archiveEntity(row.id, '', cascade);
-		if (!result.ok) {
-			toast.error(result.error || 'Failed to archive job order.');
-			return;
-		}
-		const relatedCount = Math.max(0, Number(result.archivedCount || 1) - 1);
-		toast.success(
-			relatedCount > 0
-				? `Job order archived with ${relatedCount} related record${relatedCount === 1 ? '' : 's'}.`
-				: 'Job order archived.'
-		);
 	}
 
 	async function onMoveJobOrder(rowId, nextStatus) {
@@ -324,10 +296,7 @@ export default function JobOrdersPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading job orders"
-						rowActions={[
-							{ label: 'Open', onClick: onOpen },
-							{ label: 'Archive', onClick: onArchive }
-						]}
+						rowActions={[{ label: 'Open', onClick: onOpen }]}
 					/>
 				) : (
 					<KanbanBoard

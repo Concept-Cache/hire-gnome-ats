@@ -7,21 +7,17 @@ import { Archive, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
-import { useToast } from '@/app/components/toast-provider';
-import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { normalizeInterviewType } from '@/app/constants/interview-type-options';
 
 export default function InterviewsPage() {
 	const router = useRouter();
-	const toast = useToast();
-	const { requestConfirm } = useConfirmDialog();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
 	const [typeFilter, setTypeFilter] = useState('all');
-	const { archivedIdSet, archiveEntity } = useArchivedEntities('INTERVIEW');
+	const { archivedIdSet } = useArchivedEntities('INTERVIEW');
 
 	const activeRows = useMemo(
 		() => rows.filter((row) => !archivedIdSet.has(row.id)),
@@ -83,23 +79,6 @@ export default function InterviewsPage() {
 
 	function onOpen(row) {
 		router.push(`/interviews/${row.id}`);
-	}
-
-	async function onArchive(row) {
-		const confirmed = await requestConfirm({
-			title: 'Archive Interview',
-			message: `Archive ${row.subject || row.recordId || `interview #${row.id}`}? You can restore it from Archive later.`,
-			confirmLabel: 'Archive',
-			cancelLabel: 'Cancel',
-			destructive: true
-		});
-		if (!confirmed) return;
-		const result = await archiveEntity(row.id);
-		if (!result.ok) {
-			toast.error(result.error || 'Failed to archive interview.');
-			return;
-		}
-		toast.success('Interview archived.');
 	}
 
 	const columns = [
@@ -181,10 +160,7 @@ export default function InterviewsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading interviews"
-					rowActions={[
-						{ label: 'Open', onClick: onOpen },
-						{ label: 'Archive', onClick: onArchive }
-					]}
+					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
 		</section>

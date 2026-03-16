@@ -14,6 +14,8 @@ import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
+import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import {
 	CONTACT_SOURCE_OPTIONS,
 	normalizeContactSourceValue
@@ -92,6 +94,8 @@ export default function ContactDetailsPage() {
 	const detailsPanelRef = useRef(null);
 	const actionsMenuRef = useRef(null);
 	const toast = useToast();
+	const { requestConfirm } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('CONTACT');
 	const hasValidLinkedinUrl = isValidOptionalHttpUrl(form.linkedinUrl);
 	const linkedinUrlError =
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
@@ -318,6 +322,26 @@ export default function ContactDetailsPage() {
 		router.push(`/job-orders/new?clientId=${contact.clientId}&contactId=${contact.id}`);
 	}
 
+	async function onArchiveContact() {
+		if (!contact?.id) return;
+		setActionsOpen(false);
+		const confirmed = await requestConfirm({
+			title: 'Archive Contact',
+			message: `Archive ${contact.firstName || ''} ${contact.lastName || ''}`.trim() + '? You can restore it from Archive later.',
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			destructive: true
+		});
+		if (!confirmed) return;
+		const result = await archiveEntity(contact.id);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive contact.');
+			return;
+		}
+		toast.success('Contact archived.');
+		router.push('/contacts');
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -383,6 +407,14 @@ export default function ContactDetailsPage() {
 								{!aiAvailable ? (
 									<p className="actions-menu-hint">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
 								) : null}
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onArchiveContact}
+								>
+									Archive Contact
+								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
 								</button>

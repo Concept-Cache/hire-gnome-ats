@@ -13,6 +13,7 @@ import LoadingIndicator from '@/app/components/loading-indicator';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { INTERVIEW_TYPE_OPTIONS, normalizeInterviewType } from '@/app/constants/interview-type-options';
 import { formatDateTimeAt } from '@/lib/date-format';
@@ -139,6 +140,7 @@ export default function InterviewDetailsPage() {
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('INTERVIEW');
 	const { markAsClean } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(interview)
 	});
@@ -418,6 +420,26 @@ export default function InterviewDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	async function onArchiveInterview() {
+		if (!interview?.id) return;
+		setActionsOpen(false);
+		const confirmed = await requestConfirm({
+			title: 'Archive Interview',
+			message: `Archive ${interview.subject || interview.recordId || `interview #${interview.id}`}? You can restore it from Archive later.`,
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			destructive: true
+		});
+		if (!confirmed) return;
+		const result = await archiveEntity(interview.id);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive interview.');
+			return;
+		}
+		toast.success('Interview archived.');
+		router.push('/interviews');
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -482,6 +504,15 @@ export default function InterviewDetailsPage() {
 									disabled={inviteState.downloading || saveState.saving || cancelState.canceling || isCancelled}
 								>
 									{cancelState.canceling ? 'Cancelling...' : isCancelled ? 'Interview Cancelled' : 'Cancel Interview'}
+								</button>
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onArchiveInterview}
+									disabled={inviteState.downloading || saveState.saving || cancelState.canceling}
+								>
+									Archive Interview
 								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
