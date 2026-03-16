@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Bold, Italic, Link2, List, ListOrdered, Underline } from 'lucide-react';
+import { Bold, Italic, Link2, List, ListOrdered, LoaderCircle, Underline } from 'lucide-react';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 
 const toolbarItems = [
@@ -94,10 +94,15 @@ export default function RichTextEditor({
 					const label = isLoading
 						? action?.loadingLabel || action?.label || 'Working...'
 						: action?.label || 'Action';
-					const className =
-						index === 0
-							? 'rich-text-tool rich-text-tool-text rich-text-tool-action-anchor'
-							: 'rich-text-tool rich-text-tool-text';
+					const isIconOnly = Boolean(action?.iconOnly);
+					const Icon = action?.icon;
+					const className = [
+						'rich-text-tool',
+						isIconOnly ? 'rich-text-tool-icon-action' : 'rich-text-tool-text',
+						index === 0 ? 'rich-text-tool-action-anchor' : ''
+					]
+						.filter(Boolean)
+						.join(' ');
 
 					return (
 						<button
@@ -109,7 +114,17 @@ export default function RichTextEditor({
 							disabled={disabled || Boolean(action?.disabled) || typeof action?.onClick !== 'function'}
 							onClick={action?.onClick}
 						>
-							{label}
+							{isIconOnly ? (
+								isLoading ? (
+									<LoaderCircle size={15} strokeWidth={2.1} aria-hidden="true" className="row-action-icon-spinner" />
+								) : Icon ? (
+									<Icon size={15} strokeWidth={2.1} aria-hidden="true" />
+								) : (
+									label
+								)
+							) : (
+								label
+							)}
 						</button>
 					);
 				})}

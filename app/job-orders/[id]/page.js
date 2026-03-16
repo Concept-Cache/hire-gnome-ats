@@ -15,7 +15,9 @@ import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import MatchExplanationModal from '@/app/components/match-explanation-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
+import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { formatDateTimeAt } from '@/lib/date-format';
 import {
 	JOB_ORDER_EMPLOYMENT_TYPES,
@@ -177,7 +179,8 @@ export default function JobOrderDetailsPage() {
 	});
 	const detailsPanelRef = useRef(null);
 	const actionsMenuRef = useRef(null);
-	const { requestConfirm } = useConfirmDialog();
+	const { requestConfirm, requestConfirmWithOptions } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('JOB_ORDER');
 	const toast = useToast();
 	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
 	const { markAsClean } = useUnsavedChangesGuard(form, {
@@ -861,6 +864,34 @@ export default function JobOrderDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	async function onArchiveJobOrder() {
+		if (!jobOrder?.id) return;
+		setActionsOpen(false);
+		const archiveOptions = getArchiveCascadeOptions('JOB_ORDER');
+		const decision = await requestConfirmWithOptions({
+			title: 'Archive Job Order',
+			message: `Archive ${jobOrder.title}? You can restore it from Archive later.`,
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			isDanger: true,
+			options: archiveOptions
+		});
+		if (!decision?.confirmed) return;
+		const cascade = cascadeSelectionFromIds('JOB_ORDER', decision.selections);
+		const result = await archiveEntity(jobOrder.id, '', cascade);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive job order.');
+			return;
+		}
+		const relatedCount = Math.max(0, Number(result.archivedCount || 1) - 1);
+		toast.success(
+			relatedCount > 0
+				? `Job order archived with ${relatedCount} related record${relatedCount === 1 ? '' : 's'}.`
+				: 'Job order archived.'
+		);
+		router.push('/job-orders');
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -964,6 +995,15 @@ export default function JobOrderDetailsPage() {
 									disabled={closeState.closing || saveState.saving || jobOrder.status === 'closed'}
 								>
 									{closeState.closing ? 'Closing...' : 'Close Job Order'}
+								</button>
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onArchiveJobOrder}
+									disabled={closeState.closing || saveState.saving}
+								>
+									Archive Job Order
 								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
@@ -1282,8 +1322,10 @@ export default function JobOrderDetailsPage() {
 										toolbarActions={[
 											{
 												key: 'enhance-public-posting',
-												label: 'Enhance with AI',
+												label: 'Enhance public posting with AI',
 												loadingLabel: 'Enhancing...',
+												icon: Sparkles,
+												iconOnly: true,
 												title: aiAvailable
 													? 'Enhance with AI'
 													: 'Enable OpenAI in Admin Area > System Settings to use this.',

@@ -11,6 +11,7 @@ import LoadingIndicator from '@/app/components/loading-indicator';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
@@ -233,6 +234,7 @@ export default function PlacementDetailsPage() {
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('PLACEMENT');
 	const relationshipsLocked = Boolean(placement?.id);
 	const acceptedReadOnly = String(placement?.status || '').toLowerCase() === 'accepted';
 	const currentStatus = String(placement?.status || '').toLowerCase();
@@ -591,6 +593,26 @@ export default function PlacementDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	async function onArchivePlacement() {
+		if (!placement?.id) return;
+		setActionsOpen(false);
+		const confirmed = await requestConfirm({
+			title: 'Archive Placement',
+			message: `Archive ${placement.recordId || `placement #${placement.id}`}? You can restore it from Archive later.`,
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			destructive: true
+		});
+		if (!confirmed) return;
+		const result = await archiveEntity(placement.id);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive placement.');
+			return;
+		}
+		toast.success('Placement archived.');
+		router.push('/placements');
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -670,6 +692,15 @@ export default function PlacementDetailsPage() {
 										</button>
 									</>
 									)}
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onArchivePlacement}
+									disabled={saveState.saving}
+								>
+									Archive Placement
+								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
 								</button>

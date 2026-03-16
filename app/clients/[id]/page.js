@@ -13,8 +13,11 @@ import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/comp
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
+import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { INDUSTRY_OPTIONS, normalizeIndustryValue } from '@/app/constants/industry-options';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
+import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { sortByConfig } from '@/lib/list-sort';
@@ -90,6 +93,8 @@ export default function ClientDetailsPage() {
 	const [jobsSort, setJobsSort] = useState({ field: 'title', direction: 'asc' });
 	const detailsPanelRef = useRef(null);
 	const toast = useToast();
+	const { requestConfirmWithOptions } = useConfirmDialog();
+	const { archiveEntity } = useArchivedEntities('CLIENT');
 	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
 	const hasValidWebsite = isValidOptionalHttpUrl(form.website);
 	const customFieldsComplete = areRequiredCustomFieldsComplete(
@@ -316,6 +321,34 @@ export default function ClientDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	async function onArchiveClient() {
+		if (!client?.id) return;
+		setActionsOpen(false);
+		const archiveOptions = getArchiveCascadeOptions('CLIENT');
+		const decision = await requestConfirmWithOptions({
+			title: 'Archive Client',
+			message: `Archive ${client.name}? You can restore it from Archive later.`,
+			confirmLabel: 'Archive',
+			cancelLabel: 'Cancel',
+			isDanger: true,
+			options: archiveOptions
+		});
+		if (!decision?.confirmed) return;
+		const cascade = cascadeSelectionFromIds('CLIENT', decision.selections);
+		const result = await archiveEntity(client.id, '', cascade);
+		if (!result.ok) {
+			toast.error(result.error || 'Failed to archive client.');
+			return;
+		}
+		const relatedCount = Math.max(0, Number(result.archivedCount || 1) - 1);
+		toast.success(
+			relatedCount > 0
+				? `Client archived with ${relatedCount} related record${relatedCount === 1 ? '' : 's'}.`
+				: 'Client archived.'
+		);
+		router.push('/clients');
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -368,6 +401,14 @@ export default function ClientDetailsPage() {
 								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onAddJobOrder}>
 									Add Job Order
+								</button>
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item actions-menu-item-danger"
+									onClick={onArchiveClient}
+								>
+									Archive Client
 								</button>
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
 									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}

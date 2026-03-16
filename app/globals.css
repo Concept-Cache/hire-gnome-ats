@@ -2959,6 +2959,11 @@ p {
 	max-width: 44rem;
 }
 
+.candidate-ai-summary-modal {
+	width: min(46rem, calc(100vw - 2rem));
+	max-width: 46rem;
+}
+
 .email-draft-body {
 	display: flex;
 	flex-direction: column;
@@ -4423,6 +4428,12 @@ button:disabled {
 	border-top: 1px solid var(--line);
 }
 
+.side-tab-content form > button,
+.side-tab-content form > .btn-secondary,
+.side-tab-content form > .btn-danger {
+	justify-self: flex-start;
+}
+
 .submission-list-stack {
 	margin-top: 0.7rem;
 }
@@ -4469,6 +4480,9 @@ button:disabled {
 }
 
 .ai-summary-toolbar {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
 	margin-bottom: 0.35rem;
 }
 
@@ -4753,6 +4767,12 @@ button:disabled {
 	white-space: nowrap;
 }
 
+.rich-text-tool-icon-action {
+	width: 1.9rem;
+	min-width: 1.9rem;
+	padding: 0;
+}
+
 .rich-text-tool-action-anchor {
 	margin-left: auto;
 }
@@ -4815,6 +4835,12 @@ button:disabled {
 	height: 2.05rem;
 	padding: 0;
 	border-radius: 999px;
+}
+
+.candidate-ai-summary-trigger {
+	min-width: 2.3rem;
+	width: 2.3rem;
+	height: 2.3rem;
 }
 
 .btn-link-icon span {
@@ -6020,7 +6046,7 @@ th {
 
 .row-actions {
 	display: flex;
-	gap: 0.55rem;
+	gap: 0.22rem;
 }
 
 .row-actions-right {
@@ -6031,9 +6057,9 @@ th {
 .table-actions-cell {
 	text-align: right;
 	width: 1%;
-	min-width: 2.6rem;
-	padding-left: 0.2rem;
-	padding-right: 0.35rem;
+	min-width: 2.15rem;
+	padding-left: 0.08rem;
+	padding-right: 0.16rem;
 	white-space: nowrap;
 }
 
@@ -6059,7 +6085,7 @@ th {
 	width: auto;
 	height: auto;
 	min-height: 0;
-	padding: 0.14rem 0.34rem;
+	padding: 0.08rem 0.18rem;
 	border-radius: 0;
 	color: var(--ui-secondary-ink);
 	font-size: 1.26rem;

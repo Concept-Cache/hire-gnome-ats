@@ -37,6 +37,12 @@ function setCachedMatchResponse(key, payload) {
 	}
 }
 
+function isMissingJobMatchFieldError(error, fieldName) {
+	if (!error || error.code !== 'P2022') return false;
+	const message = `${error.message || ''}`;
+	return fieldName ? message.includes(fieldName) : true;
+}
+
 function toBoolean(value, fallback = false) {
 	if (value == null) return fallback;
 	const normalized = String(value).trim().toLowerCase();
@@ -319,44 +325,68 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 			return NextResponse.json(cached);
 		}
 
-		const jobOrder = await prisma.jobOrder.findFirst({
-			where: addScopeToWhere({ id }, scope),
-			select: {
-				id: true,
-				title: true,
-				status: true,
-				openings: true,
-				description: true,
-				publicDescription: true,
-				location: true,
-				employmentType: true,
-				divisionId: true,
-				_count: {
-					select: {
-						submissions: true
+		let jobOrder;
+		let includeDivisionFilter = true;
+		try {
+			jobOrder = await prisma.jobOrder.findFirst({
+				where: addScopeToWhere({ id }, scope),
+				select: {
+					id: true,
+					title: true,
+					status: true,
+					openings: true,
+					description: true,
+					publicDescription: true,
+					location: true,
+					employmentType: true,
+					divisionId: true,
+					_count: {
+						select: {
+							submissions: true
+						}
 					}
 				}
+			});
+		} catch (error) {
+			if (
+				!isMissingJobMatchFieldError(error, 'divisionId') &&
+				!isMissingJobMatchFieldError(error, 'publicDescription')
+			) {
+				throw error;
 			}
-		});
+			includeDivisionFilter = false;
+			jobOrder = await prisma.jobOrder.findFirst({
+				where: addScopeToWhere({ id }, scope),
+				select: {
+					id: true,
+					title: true,
+					status: true,
+					openings: true,
+					description: true,
+					location: true,
+					employmentType: true,
+					_count: {
+						select: {
+							submissions: true
+						}
+					}
+				}
+			});
+		}
 
 		if (!jobOrder) {
 			return NextResponse.json({ error: 'Job order not found.' }, { status: 404 });
 		}
 
-		const openings = Number(jobOrder.openings || 0);
-		const submissionCount = Number(jobOrder?._count?.submissions || 0);
-		const activeHiring = openings <= 0 || submissionCount < openings;
-		if (jobOrder.status !== 'open' || !activeHiring) {
+		if (jobOrder.status !== 'open') {
 			const payload = {
 				jobOrderId: id,
 				computedAt: new Date().toISOString(),
 				requiredSkillNames: [],
 				totalCandidatesEvaluated: 0,
-				activeHiring,
+				activeHiring: false,
 				matchEligibility:
-					jobOrder.status !== 'open'
-						? `Matches are unavailable while this job order is ${String(jobOrder.status).replaceAll('_', ' ')}.`
-						: 'Matches are unavailable because this job order has no open capacity remaining.',
+					`Matches are unavailable while this job order is ${String(jobOrder.status).replaceAll('_', ' ')}.`,
 				matches: []
 			};
 			setCachedMatchResponse(cacheKey, payload);
@@ -371,7 +401,7 @@ async function getJob_orders_id_matchesHandler(req, { params }) {
 			prisma.candidate.findMany({
 				where: addScopeToWhere(
 					{
-						divisionId: jobOrder.divisionId || undefined,
+						divisionId: includeDivisionFilter ? jobOrder.divisionId || undefined : undefined,
 						...(includeSubmitted
 							? {}
 							: {

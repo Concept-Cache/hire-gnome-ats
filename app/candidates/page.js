@@ -7,11 +7,9 @@ import { Archive, LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import KanbanBoard from '@/app/components/kanban-board';
-import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
-import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { CANDIDATE_STATUS_OPTIONS } from '@/lib/candidate-status';
 
@@ -34,8 +32,7 @@ function updateStatusDisplay(row, nextStatus, nextTimestamp) {
 
 export default function CandidatesPage() {
 	const router = useRouter();
-	const toast = useToast();
-	const { requestConfirmWithOptions, requestPrompt } = useConfirmDialog();
+	const { requestPrompt } = useConfirmDialog();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
@@ -43,7 +40,7 @@ export default function CandidatesPage() {
 	const [ownerFilter, setOwnerFilter] = useState('all');
 	const [viewMode, setViewMode] = useState('list');
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
-	const { archivedIdSet, archiveEntity } = useArchivedEntities('CANDIDATE');
+	const { archivedIdSet } = useArchivedEntities('CANDIDATE');
 
 	const activeRows = useMemo(
 		() => rows.filter((row) => !archivedIdSet.has(row.id)),
@@ -131,31 +128,6 @@ export default function CandidatesPage() {
 
 	function onOpen(row) {
 		router.push(`/candidates/${row.id}`);
-	}
-
-	async function onArchive(row) {
-		const archiveOptions = getArchiveCascadeOptions('CANDIDATE');
-		const decision = await requestConfirmWithOptions({
-			title: 'Archive Candidate',
-			message: `Archive ${row.fullName}? You can restore it from Archive later.`,
-			confirmLabel: 'Archive',
-			cancelLabel: 'Cancel',
-			isDanger: true,
-			options: archiveOptions
-		});
-		if (!decision?.confirmed) return;
-		const cascade = cascadeSelectionFromIds('CANDIDATE', decision.selections);
-		const result = await archiveEntity(row.id, '', cascade);
-		if (!result.ok) {
-			toast.error(result.error || 'Failed to archive candidate.');
-			return;
-		}
-		const relatedCount = Math.max(0, Number(result.archivedCount || 1) - 1);
-		toast.success(
-			relatedCount > 0
-				? `Candidate archived with ${relatedCount} related record${relatedCount === 1 ? '' : 's'}.`
-				: 'Candidate archived.'
-		);
 	}
 
 	async function onMoveCandidate(rowId, nextStatus) {
@@ -313,10 +285,7 @@ export default function CandidatesPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading candidates"
-						rowActions={[
-							{ label: 'Open', onClick: onOpen },
-							{ label: 'Archive', onClick: onArchive }
-						]}
+						rowActions={[{ label: 'Open', onClick: onOpen }]}
 					/>
 				) : (
 					<KanbanBoard

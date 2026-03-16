@@ -96,9 +96,9 @@ export default function TableColumnPicker({ tableKey = '', columns = [] }) {
 				onClick={() => setMenuOpen((current) => !current)}
 				aria-expanded={menuOpen}
 				aria-label="Customize visible columns"
+				title="Columns"
 			>
 				<Columns3 aria-hidden="true" />
-				<span>Columns</span>
 			</button>
 			{menuOpen ? (
 				<div className="table-columns-menu">

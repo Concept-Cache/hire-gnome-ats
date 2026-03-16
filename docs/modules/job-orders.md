@@ -31,7 +31,7 @@ If career site is enabled in system settings:
 ## Public Description Editor
 Rich text formatting is available for readability and candidate conversion quality.
 
-When OpenAI is configured, the editor also supports `Enhance with AI`.
+When OpenAI is configured, the editor also supports a sparkles AI enhance action in the public-description toolbar.
 If OpenAI is not configured, that control remains visible but disabled with a hint.
 
 ## Job Workspace

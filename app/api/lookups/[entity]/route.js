@@ -99,6 +99,12 @@ function applyWindow(rows, limit) {
 	};
 }
 
+function isMissingLookupFieldError(error, fieldName) {
+	if (!error || error.code !== 'P2022') return false;
+	const message = `${error.message || ''}`;
+	return fieldName ? message.includes(fieldName) : true;
+}
+
 async function lookupUsers({ actingUser, query, limit, skip = 0, selectedId, searchParams }) {
 	const divisionId = parsePositiveInt(searchParams.get('divisionId'));
 	const includeInactive = parseBoolean(searchParams.get('includeInactive'));
@@ -330,26 +336,16 @@ async function lookupContacts({ actingUser, query, limit, skip = 0, selectedId, 
 	const baseWhere =
 		filters.length === 0 ? undefined : filters.length === 1 ? filters[0] : { AND: filters };
 	const where = addScopeToWhere(baseWhere, scopeWhere);
-	const rowsRaw = await prisma.contact.findMany({
-		where,
-		orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-		skip,
-		take: limit + 1,
-		select: {
-			id: true,
-			firstName: true,
-			lastName: true,
-			email: true,
-			clientId: true,
-			divisionId: true
-		}
-	});
-	const { rows, hasMore } = applyWindow(rowsRaw, limit);
-
+	let rowsRaw;
 	let selectedRow = null;
-	if (selectedId) {
-		selectedRow = await prisma.contact.findFirst({
-			where: addScopeToWhere({ id: selectedId }, scopeWhere),
+	let includeDivisionId = true;
+
+	try {
+		rowsRaw = await prisma.contact.findMany({
+			where,
+			orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+			skip,
+			take: limit + 1,
 			select: {
 				id: true,
 				firstName: true,
@@ -359,6 +355,59 @@ async function lookupContacts({ actingUser, query, limit, skip = 0, selectedId, 
 				divisionId: true
 			}
 		});
+	} catch (error) {
+		if (!isMissingLookupFieldError(error, 'divisionId')) throw error;
+		includeDivisionId = false;
+		const fallbackFilters = filters.filter((filter) => !Object.prototype.hasOwnProperty.call(filter || {}, 'divisionId'));
+		const fallbackBaseWhere =
+			fallbackFilters.length === 0
+				? undefined
+				: fallbackFilters.length === 1
+					? fallbackFilters[0]
+					: { AND: fallbackFilters };
+		rowsRaw = await prisma.contact.findMany({
+			where: addScopeToWhere(fallbackBaseWhere, scopeWhere),
+			orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+			skip,
+			take: limit + 1,
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				email: true,
+				clientId: true
+			}
+		});
+	}
+	const { rows, hasMore } = applyWindow(rowsRaw, limit);
+
+	if (selectedId) {
+		try {
+			selectedRow = await prisma.contact.findFirst({
+				where: addScopeToWhere({ id: selectedId }, scopeWhere),
+				select: {
+					id: true,
+					firstName: true,
+					lastName: true,
+					email: true,
+					clientId: true,
+					divisionId: true
+				}
+			});
+		} catch (error) {
+			if (!isMissingLookupFieldError(error, 'divisionId')) throw error;
+			includeDivisionId = false;
+			selectedRow = await prisma.contact.findFirst({
+				where: addScopeToWhere({ id: selectedId }, scopeWhere),
+				select: {
+					id: true,
+					firstName: true,
+					lastName: true,
+					email: true,
+					clientId: true
+				}
+			});
+		}
 	}
 
 	return {
@@ -369,7 +418,7 @@ async function lookupContacts({ actingUser, query, limit, skip = 0, selectedId, 
 					label: `${selectedRow.firstName} ${selectedRow.lastName}`,
 					email: selectedRow.email,
 					clientId: selectedRow.clientId,
-					divisionId: selectedRow.divisionId
+					divisionId: includeDivisionId ? selectedRow.divisionId : null
 				}
 			: null,
 		...rows.map((row) => ({
@@ -377,7 +426,7 @@ async function lookupContacts({ actingUser, query, limit, skip = 0, selectedId, 
 			label: `${row.firstName} ${row.lastName}`,
 			email: row.email,
 			clientId: row.clientId,
-			divisionId: row.divisionId
+			divisionId: includeDivisionId ? row.divisionId : null
 		}))
 		]),
 		hasMore

@@ -42,11 +42,12 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - List + Kanban pipeline views for Candidates and Job Orders with drag-and-drop status updates
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
-- AI candidate summaries generated on demand from candidate profile, resume, history, skills, and recent notes
+- AI candidate summaries opened from a dedicated sparkles button on candidate detail, with first-run auto-generation from profile, resume, history, skills, and recent notes
 - AI-generated submission write-ups for polished client-facing candidate introductions
 - AI-generated interview question sets stored on the interview record and refreshable on demand
-- AI match explanations on candidate/job-order match lists with cached, refreshable fit analysis
+- AI match explanations on candidate/job-order match lists with cached, refreshable fit analysis that auto-generates on first open
 - AI email drafting from candidate and contact actions menus with purpose/tone controls and copy-to-clipboard
+- AI editor actions use the shared sparkles icon pattern for consistency across candidate and job-order detail views
 - AI-specific controls stay visible but are disabled with an inline hint when no OpenAI key is configured in system settings
 - Candidate file attachments with object storage (`s3`) and local fallback
 - Public career site (toggleable in Admin settings) with quick apply + resume upload

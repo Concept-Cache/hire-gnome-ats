@@ -32,6 +32,12 @@ export default function MatchExplanationModal({
 	const [state, setState] = useState(buildEmptyState());
 
 	useEffect(() => {
+		if (!open) {
+			setState(buildEmptyState());
+		}
+	}, [open]);
+
+	useEffect(() => {
 		if (!open || !candidateId || !jobOrderId) return;
 
 		let cancelled = false;
@@ -56,6 +62,10 @@ export default function MatchExplanationModal({
 					generating: false,
 					error: ''
 				});
+
+				if (!data.explanation) {
+					void onGenerate(false);
+				}
 			})
 			.catch(() => {
 				if (cancelled) return;
@@ -71,7 +81,7 @@ export default function MatchExplanationModal({
 		};
 	}, [open, candidateId, jobOrderId]);
 
-	async function onGenerate() {
+	async function onGenerate(showSuccessToast = true) {
 		setState((current) => ({ ...current, generating: true, error: '' }));
 		try {
 			const response = await fetch('/api/match-explanations', {
@@ -102,7 +112,9 @@ export default function MatchExplanationModal({
 				generating: false,
 				error: ''
 			});
-			toast.success(state.explanation ? 'Match explanation refreshed.' : 'Match explanation generated.');
+			if (showSuccessToast) {
+				toast.success(state.explanation ? 'Match explanation refreshed.' : 'Match explanation generated.');
+			}
 		} catch {
 			setState((current) => ({
 				...current,
@@ -231,6 +243,8 @@ export default function MatchExplanationModal({
 									@ {formatDateTimeAt(explanation.updatedAt)}
 								</p>
 							</div>
+						) : state.generating ? (
+							<p className="panel-subtext">Generating match explanation...</p>
 						) : (
 							<p className="panel-subtext">No explanation generated yet. Use the sparkle icon to create one.</p>
 						)}

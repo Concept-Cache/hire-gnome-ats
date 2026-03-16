@@ -7,8 +7,6 @@ import { Archive, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
-import { useToast } from '@/app/components/toast-provider';
-import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
@@ -20,14 +18,12 @@ function formatDate(value) {
 
 export default function SubmissionsPage() {
 	const router = useRouter();
-	const toast = useToast();
-	const { requestConfirm } = useConfirmDialog();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
 	const [submitterFilter, setSubmitterFilter] = useState('all');
-	const { archivedIdSet, archiveEntity } = useArchivedEntities('SUBMISSION');
+	const { archivedIdSet } = useArchivedEntities('SUBMISSION');
 
 	const activeRows = useMemo(
 		() => rows.filter((row) => !archivedIdSet.has(row.id)),
@@ -97,23 +93,6 @@ export default function SubmissionsPage() {
 
 	function onOpen(row) {
 		router.push(`/submissions/${row.id}`);
-	}
-
-	async function onArchive(row) {
-		const confirmed = await requestConfirm({
-			title: 'Archive Submission',
-			message: `Archive ${row.recordId || `submission #${row.id}`}? You can restore it from Archive later.`,
-			confirmLabel: 'Archive',
-			cancelLabel: 'Cancel',
-			destructive: true
-		});
-		if (!confirmed) return;
-		const result = await archiveEntity(row.id);
-		if (!result.ok) {
-			toast.error(result.error || 'Failed to archive submission.');
-			return;
-		}
-		toast.success('Submission archived.');
 	}
 
 	const columns = [
@@ -205,10 +184,7 @@ export default function SubmissionsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading submissions"
-					rowActions={[
-						{ label: 'Open', onClick: onOpen },
-						{ label: 'Archive', onClick: onArchive }
-					]}
+					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
 		</section>
