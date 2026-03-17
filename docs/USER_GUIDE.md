@@ -181,6 +181,8 @@ Common actions:
 
 Submission workflow:
 - Add submissions directly from job order detail workspace.
+- Use `Priority Order` in the submissions workspace to rank submissions by recruiter preference.
+- Drag and drop submissions while in `Priority Order` sort to persist the ranking.
 - Duplicate submissions for same candidate + job are blocked.
 - Candidate suggestions use qualification scoring and typeahead safeguards.
 - Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.

@@ -2,6 +2,46 @@
 
 This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
 
+## [1.4.6] - 2026-03-17
+
+#### Fixed
+- Cleaned up the job-order submission drag preview so the priority handle drags without the awkward opaque rectangle around it.
+
+## [1.4.5] - 2026-03-17
+
+#### Changed
+- Finalized the job-order submission reordering interaction so the priority handle is the sole drag/drop control.
+
+## [1.4.4] - 2026-03-17
+
+#### Changed
+- Finalized the submission row layout on job-order detail with ranking on the left and status on the right.
+
+## [1.4.3] - 2026-03-17
+
+#### Fixed
+- Updated both demo seed paths to assign explicit submission priority values so job-order ranking works correctly with seeded data.
+
+## [1.4.2] - 2026-03-17
+
+#### Changed
+- Continued refining the job-order submission ranking badge styling and spacing.
+
+## [1.4.1] - 2026-03-17
+
+#### Changed
+- Introduced the first visual refinement pass for the new job-order submission ranking indicator.
+
+## [1.4.0] - 2026-03-17
+
+#### Added
+- Added persisted drag-and-drop submission ranking on job-order detail so recruiters can keep submissions ordered by preference/importance.
+
+## [1.3.17] - 2026-03-17
+
+#### Changed
+- Upgraded Next.js to `16.1.7`, refreshed several direct dependencies, and removed the unused `xlsx` package to clear npm audit warnings.
+
 ## [1.3.16] - 2026-03-16
 
 #### Added

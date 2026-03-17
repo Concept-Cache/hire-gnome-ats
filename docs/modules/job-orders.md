@@ -44,6 +44,8 @@ Use workspace tabs for:
 
 ## Submission Rules
 - New submission from job detail is supported.
+- Job-order submissions can be ranked in recruiter preference order from the workspace using persisted drag-and-drop ordering.
+- Drag-and-drop reorder is available when the submissions workspace is sorted by `Priority Order`.
 - Duplicate candidate+job submissions are blocked.
 - Candidate typeahead is optimized for larger datasets and qualification filtering.
 - Candidate match rows support `Explain Match`, which opens a saved AI explanation of fit, gaps, and recruiter validation points for that candidate/job pair.
