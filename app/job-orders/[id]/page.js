@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, MoreVertical, RefreshCcw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, GripVertical, MoreVertical, RefreshCcw, Sparkles } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
@@ -64,6 +64,32 @@ const initialSubmissionForm = {
 	status: 'submitted',
 	notes: ''
 };
+
+function reorderSubmissionCollection(submissions, orderedIds) {
+	if (!Array.isArray(submissions) || submissions.length === 0) return [];
+	const orderMap = new Map(orderedIds.map((submissionId, index) => [Number(submissionId), index + 1]));
+	return [...submissions]
+		.map((submission) => ({
+			...submission,
+			submissionPriority: orderMap.get(Number(submission.id)) ?? Number(submission.submissionPriority || 0)
+		}))
+		.sort((a, b) => {
+			const aPriority = Number(a.submissionPriority || 0);
+			const bPriority = Number(b.submissionPriority || 0);
+			if (aPriority !== bPriority) return aPriority - bPriority;
+			return Number(a.id) - Number(b.id);
+		});
+}
+
+function moveSubmissionId(orderedIds, draggedId, targetId) {
+	const fromIndex = orderedIds.indexOf(Number(draggedId));
+	const toIndex = orderedIds.indexOf(Number(targetId));
+	if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return orderedIds;
+	const next = [...orderedIds];
+	const [moved] = next.splice(fromIndex, 1);
+	next.splice(toIndex, 0, moved);
+	return next;
+}
 
 const submissionStatuses = [
 	{ value: 'submitted', label: 'Submitted' },
@@ -163,10 +189,15 @@ export default function JobOrderDetailsPage() {
 	const [workspaceTab, setWorkspaceTab] = useState('submissions');
 	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
-	const [submissionSort, setSubmissionSort] = useState({ field: 'createdAt', direction: 'desc' });
+	const [submissionSort, setSubmissionSort] = useState({ field: 'submissionPriority', direction: 'asc' });
 	const [interviewSort, setInterviewSort] = useState({ field: 'startsAt', direction: 'desc' });
 	const [placementSort, setPlacementSort] = useState({ field: 'createdAt', direction: 'desc' });
 	const [matchesSort, setMatchesSort] = useState({ field: 'scorePercent', direction: 'desc' });
+	const [submissionOrderState, setSubmissionOrderState] = useState({
+		saving: false,
+		draggingId: '',
+		overId: ''
+	});
 	const [matchState, setMatchState] = useState({
 		loading: false,
 		error: '',
@@ -237,6 +268,7 @@ export default function JobOrderDetailsPage() {
 	const sortedSubmissions = useMemo(
 		() =>
 			sortByConfig(jobOrder?.submissions || [], submissionSort, (submission, field) => {
+				if (field === 'submissionPriority') return Number(submission.submissionPriority || 0);
 				if (field === 'createdAt') return submission.createdAt || '';
 				if (field === 'candidate') {
 					return `${submission.candidate?.firstName || ''} ${submission.candidate?.lastName || ''}`;
@@ -247,6 +279,12 @@ export default function JobOrderDetailsPage() {
 			}),
 		[jobOrder?.submissions, submissionSort]
 	);
+
+	const canReorderSubmissions =
+		submissionSort.field === 'submissionPriority' &&
+		submissionSort.direction === 'asc' &&
+		!submissionState.saving &&
+		!submissionOrderState.saving;
 
 	const sortedInterviews = useMemo(
 		() =>
@@ -314,6 +352,7 @@ export default function JobOrderDetailsPage() {
 		markAsClean(nextForm);
 		setSubmissionForm(initialSubmissionForm);
 		setSubmissionState({ saving: false, error: '', success: '' });
+		setSubmissionOrderState({ saving: false, draggingId: '', overId: '' });
 		setLoading(false);
 	}
 
@@ -679,7 +718,7 @@ export default function JobOrderDetailsPage() {
 			);
 			const nextSubmissions = alreadyExists
 				? current.submissions
-				: [createdSubmission, ...current.submissions];
+				: [...current.submissions, createdSubmission];
 			const currentCount = current._count?.submissions ?? current.submissions.length;
 			return {
 				...current,
@@ -741,7 +780,7 @@ export default function JobOrderDetailsPage() {
 			);
 			const nextSubmissions = alreadyExists
 				? current.submissions
-				: [createdSubmission, ...current.submissions];
+				: [...current.submissions, createdSubmission];
 			const currentCount = current._count?.submissions ?? current.submissions.length;
 			return {
 				...current,
@@ -755,6 +794,94 @@ export default function JobOrderDetailsPage() {
 		setSubmissionState({ saving: false, error: '', success: 'Submission added from match.' });
 		setMatchState((current) => ({ ...current, submittingCandidateId: '' }));
 		await loadMatches();
+	}
+
+	async function persistSubmissionOrder(nextOrderedIds) {
+		if (!jobOrder) return;
+		const previousSubmissions = jobOrder.submissions;
+		setSubmissionOrderState({ saving: true, draggingId: '', overId: '' });
+		setJobOrder((current) =>
+			current
+				? {
+						...current,
+						submissions: reorderSubmissionCollection(current.submissions, nextOrderedIds)
+					}
+				: current
+		);
+
+		try {
+			const res = await fetch(`/api/job-orders/${id}/submissions/order`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ submissionIds: nextOrderedIds })
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				throw new Error(data.error || 'Failed to save submission order.');
+			}
+			setSubmissionOrderState({ saving: false, draggingId: '', overId: '' });
+			toast.success('Submission order updated.');
+		} catch (reorderError) {
+			setJobOrder((current) =>
+				current
+					? {
+							...current,
+							submissions: previousSubmissions
+						}
+					: current
+			);
+			setSubmissionOrderState({ saving: false, draggingId: '', overId: '' });
+			toast.error(reorderError.message || 'Failed to save submission order.');
+		}
+	}
+
+	function onSubmissionDragStart(event, submissionId) {
+		if (!canReorderSubmissions) return;
+		const handle = event.currentTarget;
+		if (typeof event.dataTransfer?.setDragImage === 'function' && handle instanceof HTMLElement) {
+			const dragPreview = handle.cloneNode(true);
+			dragPreview.style.position = 'fixed';
+			dragPreview.style.top = '-9999px';
+			dragPreview.style.left = '-9999px';
+			dragPreview.style.margin = '0';
+			dragPreview.style.pointerEvents = 'none';
+			document.body.appendChild(dragPreview);
+			event.dataTransfer.setDragImage(dragPreview, dragPreview.offsetWidth / 2, dragPreview.offsetHeight / 2);
+			requestAnimationFrame(() => {
+				dragPreview.remove();
+			});
+		}
+		setSubmissionOrderState({
+			saving: false,
+			draggingId: String(submissionId),
+			overId: String(submissionId)
+		});
+	}
+
+	function onSubmissionDragOver(event, submissionId) {
+		if (!canReorderSubmissions) return;
+		event.preventDefault();
+		if (!submissionOrderState.draggingId || submissionOrderState.draggingId === String(submissionId)) return;
+		setSubmissionOrderState((current) => ({ ...current, overId: String(submissionId) }));
+	}
+
+	async function onSubmissionDrop(submissionId) {
+		if (!canReorderSubmissions || !submissionOrderState.draggingId) return;
+		const currentOrder = sortedSubmissions.map((submission) => Number(submission.id));
+		const nextOrderedIds = moveSubmissionId(
+			currentOrder,
+			submissionOrderState.draggingId,
+			submissionId
+		);
+		if (nextOrderedIds.join(',') === currentOrder.join(',')) {
+			setSubmissionOrderState({ saving: false, draggingId: '', overId: '' });
+			return;
+		}
+		await persistSubmissionOrder(nextOrderedIds);
+	}
+
+	function onSubmissionDragEnd() {
+		setSubmissionOrderState((current) => ({ ...current, draggingId: '', overId: '' }));
 	}
 
 	async function onCloseJobOrder() {
@@ -1474,38 +1601,86 @@ export default function JobOrderDetailsPage() {
 									label="Sort Submissions"
 									value={submissionSort.field}
 									direction={submissionSort.direction}
-									onValueChange={(field) => setSubmissionSort((current) => ({ ...current, field }))}
-									onDirectionToggle={() =>
+									onValueChange={(field) =>
+										setSubmissionSort((current) => ({
+											field,
+											direction: field === 'submissionPriority' ? 'asc' : current.direction
+										}))
+									}
+									onDirectionToggle={() => {
+										if (submissionSort.field === 'submissionPriority') return;
 										setSubmissionSort((current) => ({
 											...current,
 											direction: current.direction === 'asc' ? 'desc' : 'asc'
-										}))
-									}
+										}));
+									}}
 									options={[
+										{ value: 'submissionPriority', label: 'Priority Order' },
 										{ value: 'createdAt', label: 'Submitted Date' },
 										{ value: 'candidate', label: 'Candidate' },
 										{ value: 'status', label: 'Status' },
 										{ value: 'submittedBy', label: 'Submitted By' }
 									]}
 									disabled={sortedSubmissions.length < 2}
+									disableDirectionToggle={submissionSort.field === 'submissionPriority'}
 								/>
+								{sortedSubmissions.length > 1 ? (
+									<p className="panel-subtext">
+										{canReorderSubmissions
+											? 'Drag and drop submissions to set preference order.'
+											: 'Switch sort to Priority Order to drag and reorder submissions.'}
+									</p>
+								) : null}
 								{jobOrder.submissions.length === 0 ? (
 									<p className="panel-subtext">No submissions yet.</p>
 								) : (
-									<ul className="simple-list">
+									<ul className="simple-list simple-list-reorderable">
 										{sortedSubmissions.map((submission) => (
-											<li key={submission.id}>
-												<div>
-													<strong>
-														<Link href={`/submissions/${submission.id}`}>
-															{submission.candidate.firstName} {submission.candidate.lastName}
-														</Link>
-													</strong>
-													<p className="simple-list-meta">
-														By{' '}
-														{submissionCreatedByLabel(submission)}{' '}
-														@ {formatDate(submission.createdAt)}
-													</p>
+											<li
+												key={submission.id}
+												className={
+													canReorderSubmissions && submissionOrderState.overId === String(submission.id)
+														? 'is-drop-target'
+														: canReorderSubmissions && submissionOrderState.draggingId === String(submission.id)
+															? 'is-dragging'
+															: ''
+												}
+												onDragOver={(event) => onSubmissionDragOver(event, submission.id)}
+												onDrop={() => onSubmissionDrop(submission.id)}
+												onDragEnd={onSubmissionDragEnd}
+											>
+												<div className="submission-list-entry">
+													<span
+														className={
+															canReorderSubmissions
+																? 'submission-priority-handle submission-priority-handle-active'
+																: 'submission-priority-handle'
+														}
+														aria-label={`Priority ${submission.submissionPriority || 0}`}
+														title={
+															canReorderSubmissions
+																? `Priority ${submission.submissionPriority || 0}. Drag to reorder.`
+																: `Priority ${submission.submissionPriority || 0}`
+														}
+														draggable={canReorderSubmissions}
+														onDragStart={(event) => onSubmissionDragStart(event, submission.id)}
+														onDragEnd={onSubmissionDragEnd}
+													>
+														{canReorderSubmissions ? <GripVertical aria-hidden="true" /> : null}
+														<strong>#{submission.submissionPriority || 0}</strong>
+													</span>
+													<div className="submission-list-entry-body">
+														<strong>
+															<Link href={`/submissions/${submission.id}`}>
+																{submission.candidate.firstName} {submission.candidate.lastName}
+															</Link>
+														</strong>
+														<p className="simple-list-meta">
+															By{' '}
+															{submissionCreatedByLabel(submission)}{' '}
+															@ {formatDate(submission.createdAt)}
+														</p>
+													</div>
 												</div>
 												<div className="simple-list-actions simple-list-indicators">
 													<span className="chip">{formatSelectValueLabel(submission.status)}</span>

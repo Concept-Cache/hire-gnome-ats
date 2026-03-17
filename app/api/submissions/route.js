@@ -100,16 +100,24 @@ async function postSubmissionsHandler(req) {
 			);
 		}
 
-		const submission = await prisma.submission.create({
-			data: {
-				candidateId: parsed.data.candidateId,
-				jobOrderId: parsed.data.jobOrderId,
-				status: parsed.data.status,
-				notes: parsed.data.notes || null,
-				customFields: customFieldValidation.customFields,
-				createdByUserId: actingUser.id
-			},
-			include: submissionInclude
+		const submission = await prisma.$transaction(async (tx) => {
+			const aggregate = await tx.submission.aggregate({
+				where: { jobOrderId: parsed.data.jobOrderId },
+				_max: { submissionPriority: true }
+			});
+			const nextPriority = Number(aggregate._max.submissionPriority || 0) + 1;
+			return tx.submission.create({
+				data: {
+					candidateId: parsed.data.candidateId,
+					jobOrderId: parsed.data.jobOrderId,
+					status: parsed.data.status,
+					submissionPriority: nextPriority,
+					notes: parsed.data.notes || null,
+					customFields: customFieldValidation.customFields,
+					createdByUserId: actingUser.id
+				},
+				include: submissionInclude
+			});
 		});
 		await logCreate({
 			actorUserId: actingUser?.id,

@@ -632,6 +632,7 @@ model Submission {
 	id         Int      @id @default(autoincrement())
 	recordId   String   @unique
 	status     String   @default("submitted")
+	submissionPriority Int @default(0)
 	notes      String?   @db.Text
 	aiWriteUp  String?   @db.Text
 	aiWriteUpGeneratedAt DateTime?
@@ -654,6 +655,7 @@ model Submission {
 	@@unique([candidateId, jobOrderId])
 	@@index([candidateId, status])
 	@@index([jobOrderId, status])
+	@@index([jobOrderId, submissionPriority])
 	@@index([createdByUserId])
 	@@index([aiWriteUpGeneratedByUserId])
 }

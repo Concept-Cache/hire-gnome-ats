@@ -5125,6 +5125,74 @@ button:disabled {
 	color: #5a6f93;
 }
 
+.simple-list-reorderable li[draggable='true'] {
+	cursor: grab;
+	transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.simple-list-reorderable li[draggable='true']:active {
+	cursor: grabbing;
+}
+
+.simple-list-reorderable li.is-dragging {
+	opacity: 0.68;
+}
+
+.simple-list-reorderable li.is-drop-target {
+	border-color: #9fc0ef;
+	background: #f3f8ff;
+	box-shadow: inset 0 0 0 1px rgba(31, 79, 155, 0.12);
+}
+
+.submission-list-entry {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.submission-list-entry-body {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.submission-priority-handle {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	gap: 0.22rem;
+	padding: 0.18rem 0.5rem;
+	border: 1px solid #c99c2d;
+	border-radius: 999px;
+	background: linear-gradient(180deg, #fff4c8 0%, #ffe59b 100%);
+	color: #8c5b00;
+	font-size: 0.7rem;
+	font-weight: 700;
+	font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+	font-variant-ligatures: none;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+	flex: 0 0 auto;
+}
+
+.submission-priority-handle-active {
+	cursor: grab;
+	border-color: #b8840e;
+	background: linear-gradient(180deg, #ffe07a 0%, #ffc83d 100%);
+	color: #6f4200;
+	box-shadow: 0 4px 12px rgba(204, 139, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.52);
+}
+
+.submission-priority-handle-active:active {
+	cursor: grabbing;
+}
+
+.submission-priority-handle svg {
+	width: 0.76rem;
+	height: 0.76rem;
+	stroke-width: 2.1;
+}
+
 .simple-list-meta,
 .simple-list-meta *,
 .form-actions-meta,

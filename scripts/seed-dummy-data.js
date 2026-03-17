@@ -1028,6 +1028,7 @@ async function main() {
 				data: {
 					candidateId: candidate.id,
 					jobOrderId: jobOrder.id,
+					submissionPriority: j + 1,
 					status: pick(SUBMISSION_STATUSES, i + j),
 					notes: 'Submitted with updated resume, compensation targets, and interview availability.',
 					createdByUserId: createdByUser?.id ?? null,

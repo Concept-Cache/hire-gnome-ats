@@ -476,9 +476,9 @@ async function main() {
 				const candidate = picks[j];
 				const [submissionResult] = await connection.query(
 					`INSERT INTO \`Submission\`
-					(\`status\`, \`notes\`, \`createdByUserId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
-					VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-					[pick(SUBMISSION_STATUSES, i + j), 'Demo submission.', creator.id, candidate.id, job.id]
+					(\`submissionPriority\`, \`status\`, \`notes\`, \`createdByUserId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
+					VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+					[j + 1, pick(SUBMISSION_STATUSES, i + j), 'Demo submission.', creator.id, candidate.id, job.id]
 				);
 				const submissionId = submissionResult.insertId;
 				submissionCount += 1;

@@ -49,6 +49,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - AI email drafting from candidate and contact actions menus with purpose/tone controls and copy-to-clipboard
 - AI editor actions use the shared sparkles icon pattern for consistency across candidate and job-order detail views
 - AI-specific controls stay visible but are disabled with an inline hint when no OpenAI key is configured in system settings
+- Job-order submission workspaces support recruiter priority ordering with persisted drag-and-drop ranking
 - Candidate file attachments with object storage (`s3`) and local fallback
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
 - Candidate and job-order match workspaces (top matches, sortable/paged)
