@@ -25,8 +25,9 @@ After creation:
 ## Actions Menu
 Key actions:
 - Schedule interview
+- Promote to / hide from client portal
 - Convert to placement (with confirmation)
-- View audit trail
+- View audit trail (administrators only)
 - Archive
 
 ## Client Write-Up
@@ -40,6 +41,21 @@ Behavior:
 - Uses the OpenAI API key from `Admin Area > System Settings`
 - If the submission is converted to a placement, the write-up remains visible but is locked
 - If OpenAI is not configured, the generate control remains visible but disabled with an inline hint
+
+## Client Feedback
+Submission detail includes a `Client Feedback` section for portal-driven client responses.
+
+Behavior:
+- Submission detail shows both submission `Origin` and `Client Portal` visibility so recruiters can differentiate career-site responses from recruiter-curated submissions.
+- Career-site `Web` responses start hidden from the client portal until a recruiter explicitly promotes them.
+- Recruiters can later hide a submission from the client portal again from the same actions menu.
+- Shows comments and action history submitted through the client review portal
+- Includes the client name/email snapshot and timestamp for each entry
+- Captures actions like `Request Interview`, `Comment`, and `Pass`
+- `Pass` is confirmed in the portal and locks the submission against any further client actions
+- When a client uses `Pass`, the submission is also moved to the bottom of the job order's priority order
+- The portal only exposes the candidate's labeled primary resume; other candidate attachments stay internal
+- Feedback is read-only internally and serves as the client-side activity trail on the submission
 
 ## Snapshot Usage
 Snapshot emphasizes immutable context and links back to source records.

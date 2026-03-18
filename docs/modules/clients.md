@@ -27,7 +27,7 @@ Use workspace tabs to manage related records without leaving the client context:
 From client detail, common actions include:
 - Add new contact (client pre-linked and locked)
 - Add new job order (client pre-linked and locked)
-- View audit trail
+- View audit trail (administrators only)
 - Archive
 
 ## Lifecycle Guidance

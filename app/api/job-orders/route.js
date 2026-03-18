@@ -65,6 +65,11 @@ const jobOrderListInclude = {
 	contact: true,
 	ownerUser: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true } },
 	division: { select: { id: true, name: true, accessMode: true } },
+	_count: {
+		select: {
+			submissions: true
+		}
+	},
 	submissions: {
 		select: { createdAt: true, updatedAt: true },
 		orderBy: { updatedAt: 'desc' },
@@ -128,9 +133,10 @@ async function getJob_ordersHandler(req) {
 			orderBy: { createdAt: 'desc' }
 		});
 		const jobOrderRows = jobOrders.map((jobOrder) => {
-			const { submissions, interviews, offers, ...jobOrderRest } = jobOrder;
+			const { submissions, interviews, offers, _count, ...jobOrderRest } = jobOrder;
 			return {
 				...jobOrderRest,
+				submissionCount: _count?.submissions || 0,
 				lastActivityAt: resolveJobOrderLastActivityAt(jobOrder)
 			};
 		});

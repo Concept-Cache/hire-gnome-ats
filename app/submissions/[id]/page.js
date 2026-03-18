@@ -12,7 +12,9 @@ import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { submissionOriginLabel } from '@/lib/submission-origin';
 
 const initialForm = {
 	candidateId: '',
@@ -54,6 +56,19 @@ function formatDate(value) {
 	return formatDateTimeAt(value);
 }
 
+function formatClientFeedbackLabel(value) {
+	const normalized = String(value || '').trim().toLowerCase();
+	if (normalized === 'request_interview') return 'Requested Interview';
+	if (normalized === 'need_more_info') return 'Needs More Info';
+	if (normalized === 'pass') return 'Passed';
+	if (normalized === 'comment') return 'Comment';
+	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : 'Client Update';
+}
+
+function formatClientPortalVisibilityLabel(value) {
+	return value ? 'Visible' : 'Hidden';
+}
+
 export default function SubmissionDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
@@ -72,6 +87,7 @@ export default function SubmissionDetailsPage() {
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('SUBMISSION');
+	const isAdmin = useIsAdministrator();
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(submission)
 	});
@@ -333,6 +349,63 @@ export default function SubmissionDetailsPage() {
 		router.push('/submissions');
 	}
 
+	async function onToggleClientPortalVisibility() {
+		if (!submission || saveState.saving || convertState.converting || writeUpState.generating) return;
+		setActionsOpen(false);
+
+		const nextVisible = !submission.isClientVisible;
+		const confirmed = await requestConfirm({
+			title: nextVisible ? 'Promote to Client Portal' : 'Hide from Client Portal',
+			message: nextVisible
+				? 'Make this submission visible in the client review portal?'
+				: 'Hide this submission from the client review portal?',
+			confirmLabel: nextVisible ? 'Promote' : 'Hide',
+			cancelLabel: 'Cancel',
+			destructive: !nextVisible
+		});
+		if (!confirmed) return;
+
+		setSaveState({ saving: true, error: '', success: '' });
+
+		const res = await fetch(`/api/submissions/${id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				candidateId: submission.candidateId,
+				jobOrderId: submission.jobOrderId,
+				status: submission.status,
+				notes: submission.notes || '',
+				aiWriteUp: submission.aiWriteUp || '',
+				customFields:
+					submission.customFields && typeof submission.customFields === 'object' && !Array.isArray(submission.customFields)
+						? submission.customFields
+						: {},
+				isClientVisible: nextVisible
+			})
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			setSaveState({
+				saving: false,
+				error: data.error || 'Failed to update client portal visibility.',
+				success: ''
+			});
+			return;
+		}
+
+		const updated = await res.json();
+		const nextForm = toForm(updated);
+		setSubmission(updated);
+		setForm(nextForm);
+		markAsClean(nextForm);
+		setSaveState({
+			saving: false,
+			error: '',
+			success: nextVisible ? 'Submission promoted to client portal.' : 'Submission hidden from client portal.'
+		});
+	}
+
 	async function onCopyWriteUp() {
 		const value = String(form.aiWriteUp || '').trim();
 		if (!value) return;
@@ -416,6 +489,15 @@ export default function SubmissionDetailsPage() {
 								>
 									Schedule Interview
 								</button>
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item"
+									onClick={onToggleClientPortalVisibility}
+									disabled={convertState.converting || saveState.saving || writeUpState.generating || isConvertedToPlacement}
+								>
+									{submission.isClientVisible ? 'Hide from Client Portal' : 'Promote to Client Portal'}
+								</button>
 								{submission.offer?.id ? (
 									<Link
 										href={`/placements/${submission.offer.id}`}
@@ -444,9 +526,14 @@ export default function SubmissionDetailsPage() {
 								>
 									Archive Submission
 								</button>
-								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
-									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-								</button>
+								{isAdmin ? (
+									<>
+										<div className="actions-menu-divider" role="separator" />
+										<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+											{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+										</button>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>
@@ -489,6 +576,33 @@ export default function SubmissionDetailsPage() {
 				</div>
 			</article>
 
+			<article className="panel">
+				<h3>Client Feedback</h3>
+				<p className="panel-subtext">Responses submitted through the client review portal appear here.</p>
+				{Array.isArray(submission.clientFeedback) && submission.clientFeedback.length > 0 ? (
+					<ul className="simple-list">
+						{submission.clientFeedback.map((entry) => (
+							<li key={entry.id}>
+								<div>
+									<strong>{formatClientFeedbackLabel(entry.actionType)}</strong>
+									{entry.statusApplied ? (
+										<p>Status Applied: {formatSubmissionStatusLabel(entry.statusApplied)}</p>
+									) : null}
+									{entry.comment ? <p>{entry.comment}</p> : null}
+									<p className="simple-list-meta">
+										By {entry.clientNameSnapshot || 'Client Contact'}
+										{entry.clientEmailSnapshot ? ` <${entry.clientEmailSnapshot}>` : ''}
+										{' '}@ <span className="meta-emphasis-time">{formatDate(entry.createdAt)}</span>
+									</p>
+								</div>
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="panel-subtext">No client feedback yet.</p>
+				)}
+			</article>
+
 			<article className="panel panel-spacious">
 				<h3>Submission Details</h3>
 				<p className="panel-subtext">Edit submission details and save updates.</p>
@@ -498,7 +612,7 @@ export default function SubmissionDetailsPage() {
 				<form onSubmit={onSave} className="detail-form">
 					<section className="form-section">
 						<h4>Assignment</h4>
-						<div className="detail-form-grid-3">
+						<div className="detail-form-grid-5">
 							<FormField label="Candidate" required>
 								<div className="locked-field">
 									<input
@@ -514,6 +628,22 @@ export default function SubmissionDetailsPage() {
 							<FormField label="Job Order" required>
 								<div className="locked-field">
 									<input value={submission.jobOrder?.title || '-'} disabled readOnly />
+									<span className="locked-field-icon" aria-label="Locked field" title="Locked field">
+										<Lock aria-hidden="true" />
+									</span>
+								</div>
+							</FormField>
+							<FormField label="Origin">
+								<div className="locked-field">
+									<input value={submissionOriginLabel(submission)} disabled readOnly />
+									<span className="locked-field-icon" aria-label="Locked field" title="Locked field">
+										<Lock aria-hidden="true" />
+									</span>
+								</div>
+							</FormField>
+							<FormField label="Client Portal">
+								<div className="locked-field">
+									<input value={formatClientPortalVisibilityLabel(submission.isClientVisible)} disabled readOnly />
 									<span className="locked-field-icon" aria-label="Locked field" title="Locked field">
 										<Lock aria-hidden="true" />
 									</span>
@@ -614,7 +744,7 @@ export default function SubmissionDetailsPage() {
 								{submission.aiWriteUpGeneratedByUser
 									? `${submission.aiWriteUpGeneratedByUser.firstName} ${submission.aiWriteUpGeneratedByUser.lastName}`
 									: 'Unknown User'}{' '}
-								@ {formatDate(submission.aiWriteUpGeneratedAt)}
+								@ <span className="meta-emphasis-time">{formatDate(submission.aiWriteUpGeneratedAt)}</span>
 							</p>
 						) : null}
 						<CustomFieldsSection
@@ -645,7 +775,7 @@ export default function SubmissionDetailsPage() {
 					</div>
 				</form>
 			</article>
-			<AuditTrailPanel entityType="SUBMISSION" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="SUBMISSION" entityId={id} visible={showAuditTrail} /> : null}
 		</section>
 	);
 }

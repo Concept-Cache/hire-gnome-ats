@@ -8,6 +8,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import PhoneInput from '@/app/components/phone-input';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { INDUSTRY_OPTIONS } from '@/app/constants/industry-options';
@@ -178,6 +179,7 @@ function NewClientsPageContent() {
 				</div>
 			</header>
 
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<div className="method-content">
 					<h3>Add Client</h3>
@@ -332,6 +334,24 @@ function NewClientsPageContent() {
 					</form>
 				</div>
 			</article>
+			<NewRecordGuide
+				title="Client Setup"
+				intro="Use this record for the account itself. Hiring managers and portal reviewers should be created as contacts after the client exists."
+				checklist={[
+					'Set the owner and division correctly before adding contacts or job orders.',
+					'Use the real ZIP code and website so location and account context stay clean.',
+					'Add a short description when the client needs quick internal context.'
+				]}
+				outcomes={[
+					'The saved client record becomes the parent for contacts, job orders, and downstream reporting.',
+					'New contacts and job orders can inherit context from this account immediately.'
+				]}
+				tips={[
+					'If ownership is likely to change, fix it now instead of after contacts and jobs are attached.',
+					'Keep the client name canonical to reduce duplicate account creation.'
+				]}
+			/>
+			</div>
 		</section>
 	);
 }

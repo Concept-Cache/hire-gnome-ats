@@ -8,6 +8,7 @@ import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import EmailChipInput from '@/app/components/email-chip-input';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { INTERVIEW_TYPE_OPTIONS, normalizeInterviewType } from '@/app/constants/interview-type-options';
@@ -214,6 +215,7 @@ function NewInterviewsPageContent() {
 				</div>
 			</header>
 
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<h3>Schedule Interview</h3>
 				<form onSubmit={onSubmit}>
@@ -416,6 +418,24 @@ function NewInterviewsPageContent() {
 					</button>
 				</form>
 			</article>
+			<NewRecordGuide
+				title="Interview Setup"
+				intro="Use interviews for real candidate-job conversations. This record is where timing, interviewer data, and AI question generation live."
+				checklist={[
+					'Candidate and job order should already be a valid pairing before you schedule.',
+					'Use a valid interviewer email and real start time so downstream communication stays reliable.',
+					'Choose the right interview type and provide location or video details where relevant.'
+				]}
+				outcomes={[
+					'The interview detail opens after save for updates, notes, and AI-generated question sets.',
+					'Interview records feed reporting and candidate/job activity history immediately.'
+				]}
+				tips={[
+					'Optional participants are useful for panel visibility, but do not replace the main interviewer.',
+					'If this is only tentative, wait until the slot is real instead of cluttering the pipeline.'
+				]}
+			/>
+			</div>
 		</section>
 	);
 }

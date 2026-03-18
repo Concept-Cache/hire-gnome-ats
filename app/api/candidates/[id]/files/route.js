@@ -15,6 +15,13 @@ import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 
 import { withApiLogging } from '@/lib/api-logging';
+
+function parseBooleanFormValue(value) {
+	if (typeof value === 'boolean') return value;
+	const normalized = String(value || '').trim().toLowerCase();
+	return normalized === 'true' || normalized === '1' || normalized === 'on' || normalized === 'yes';
+}
+
 function handleError(error, fallbackMessage) {
 	if (error instanceof AccessControlError) {
 		return NextResponse.json({ error: error.message }, { status: error.status });
@@ -92,6 +99,7 @@ async function postCandidates_id_filesHandler(req, { params }) {
 
 		const formData = await req.formData();
 		const file = formData.get('file');
+		const isResume = parseBooleanFormValue(formData.get('isResume'));
 		const validationError = fileValidationError(file);
 		if (validationError) {
 			return NextResponse.json({ error: validationError }, { status: 400 });
@@ -105,23 +113,38 @@ async function postCandidates_id_filesHandler(req, { params }) {
 			contentType: file.type || 'application/octet-stream'
 		});
 
-			const attachment = await prisma.candidateAttachment.create({
-			data: {
-				candidateId,
-				fileName: file.name,
-				contentType: file.type || null,
-				sizeBytes: file.size,
-				storageProvider: uploaded.storageProvider,
-				storageBucket: uploaded.storageBucket,
-				storageKey: uploaded.storageKey,
-				uploadedByUserId: actingUser?.id || null
-			},
-			include: {
-				uploadedByUser: {
-					select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
-				}
+		const attachment = await prisma.$transaction(async (tx) => {
+			if (isResume) {
+				await tx.candidateAttachment.updateMany({
+					where: {
+						candidateId,
+						isResume: true
+					},
+					data: {
+						isResume: false
+					}
+				});
 			}
+
+			return tx.candidateAttachment.create({
+				data: {
+					candidateId,
+					fileName: file.name,
+					isResume,
+					contentType: file.type || null,
+					sizeBytes: file.size,
+					storageProvider: uploaded.storageProvider,
+					storageBucket: uploaded.storageBucket,
+					storageKey: uploaded.storageKey,
+					uploadedByUserId: actingUser?.id || null
+				},
+				include: {
+					uploadedByUser: {
+						select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
+					}
+				}
 			});
+		});
 			await logCreate({
 				actorUserId: actingUser?.id,
 				entityType: 'CANDIDATE_ATTACHMENT',

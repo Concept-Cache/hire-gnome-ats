@@ -32,7 +32,7 @@ Use workspace tabs for:
 Typical actions:
 - Add job order
 - Draft email
-- View audit trail
+- View audit trail (administrators only)
 
 ## Email Drafting
 Contact detail actions include `Draft Email`.

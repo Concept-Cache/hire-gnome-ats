@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import {
-	AccessControlError,
-	addScopeToWhere,
-	ensureScopedEntityAccess,
-	getActingUser
-} from '@/lib/access-control';
-import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
+import { AccessControlError, getActingUser } from '@/lib/access-control';
 
 import { withApiLogging } from '@/lib/api-logging';
+const SUPPORTED_ENTITY_TYPES = new Set([
+	'CANDIDATE',
+	'CLIENT',
+	'CONTACT',
+	'JOB_ORDER',
+	'SUBMISSION',
+	'INTERVIEW',
+	'PLACEMENT',
+	'USER',
+	'DIVISION',
+	'SKILL'
+]);
+
 const ENTITY_SCOPE_MODEL_MAP = {
 	CANDIDATE: 'candidate',
 	CLIENT: 'client',
@@ -18,8 +25,6 @@ const ENTITY_SCOPE_MODEL_MAP = {
 	INTERVIEW: 'interview',
 	PLACEMENT: 'offer'
 };
-
-const ADMIN_ONLY_ENTITY_TYPES = new Set(['USER', 'DIVISION', 'SKILL']);
 
 function parsePositiveInt(value) {
 	const parsed = Number(value);
@@ -61,24 +66,11 @@ async function getAudit_logsHandler(req) {
 			);
 		}
 
-		if (ADMIN_ONLY_ENTITY_TYPES.has(entityType) && actingUser.role !== 'ADMINISTRATOR') {
-			throw new AccessControlError('Only administrators can view this audit trail.', 403);
+		if (actingUser.role !== 'ADMINISTRATOR') {
+			throw new AccessControlError('Only administrators can view audit trails.', 403);
 		}
 
-		const scopedModel = ENTITY_SCOPE_MODEL_MAP[entityType];
-		if (scopedModel) {
-			if (scopedModel === 'submission' || scopedModel === 'interview' || scopedModel === 'offer') {
-				const record = await prisma[scopedModel].findFirst({
-					where: addScopeToWhere({ id: entityId }, getCandidateJobOrderScope(actingUser)),
-					select: { id: true }
-				});
-				if (!record) {
-					throw new AccessControlError('Record not found or unavailable for your role.', 404);
-				}
-			} else {
-				await ensureScopedEntityAccess(scopedModel, entityId, actingUser);
-			}
-		} else if (!ADMIN_ONLY_ENTITY_TYPES.has(entityType)) {
+		if (!SUPPORTED_ENTITY_TYPES.has(entityType)) {
 			throw new AccessControlError('Unsupported entity type for audit logs.', 400);
 		}
 

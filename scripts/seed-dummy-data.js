@@ -4,6 +4,8 @@ require('./load-env.cjs');
 
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('node:crypto');
+const path = require('node:path');
+const { mkdir, writeFile } = require('node:fs/promises');
 const { SKILLS_TO_SEED } = require('./seed-skills');
 const { buildPublicJobDescription } = require('./demo-job-description');
 
@@ -20,6 +22,8 @@ const RECORD_ID_PREFIX_BY_MODEL = Object.freeze({
 	CandidateEducation: 'CED',
 	CandidateWorkExperience: 'CWR',
 	CandidateAttachment: 'CAF',
+	ClientPortalAccess: 'CPA',
+	ClientSubmissionFeedback: 'CSF',
 	Client: 'CLI',
 	Contact: 'CON',
 	ClientNote: 'CLN',
@@ -430,6 +434,99 @@ function addMinutes(date, minutes) {
 	return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
+function cleanStorageSegment(value) {
+	return String(value || '')
+		.trim()
+		.replace(/[^a-zA-Z0-9._-]+/g, '-')
+		.replace(/-+/g, '-')
+		.replace(/^-|-$/g, '');
+}
+
+function normalizeResumeFileName(value) {
+	const raw = String(value || '').trim();
+	const parsed = path.parse(raw);
+	const baseName = cleanStorageSegment(parsed.name) || 'resume';
+	return `${baseName.slice(0, 80)}.pdf`;
+}
+
+function getLocalStorageRoot() {
+	return process.env.LOCAL_STORAGE_ROOT || path.join(process.cwd(), '.local-storage');
+}
+
+async function writeSeedAttachment({ storageKey, body }) {
+	const localRoot = path.resolve(getLocalStorageRoot());
+	const normalizedKey = String(storageKey || '').replace(/\\/g, '/').replace(/^\/+/, '');
+	const absolutePath = path.resolve(localRoot, normalizedKey);
+	await mkdir(path.dirname(absolutePath), { recursive: true });
+	await writeFile(absolutePath, body);
+}
+
+function buildSeedResumeStorageKey(candidateRecordId, fileName) {
+	const candidateSegment = cleanStorageSegment(candidateRecordId) || 'candidate';
+	const safeFileName = normalizeResumeFileName(fileName);
+	return `candidates/${candidateSegment}/seed/${safeFileName}`;
+}
+
+function escapePdfText(value) {
+	return String(value || '')
+		.replace(/\\/g, '\\\\')
+		.replace(/\(/g, '\\(')
+		.replace(/\)/g, '\\)');
+}
+
+function buildSimplePdfBuffer(lines) {
+	const objects = [];
+	function addObject(content) {
+		objects.push(content);
+		return objects.length;
+	}
+
+	const contentStream = `BT\n/F1 12 Tf\n72 740 Td\n${lines
+		.map((line, index) => `${index === 0 ? '' : '0 -18 Td\n'}(${escapePdfText(line)}) Tj\n`)
+		.join('')}ET`;
+	const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+	const contentsId = addObject(`<< /Length ${Buffer.byteLength(contentStream, 'utf8')} >>\nstream\n${contentStream}\nendstream`);
+	const pageId = addObject(`<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentsId} 0 R >>`);
+	const pagesId = addObject(`<< /Type /Pages /Kids [${pageId} 0 R] /Count 1 >>`);
+	const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+	let pdf = '%PDF-1.4\n';
+	const offsets = [0];
+	for (let i = 0; i < objects.length; i += 1) {
+		offsets.push(Buffer.byteLength(pdf, 'utf8'));
+		pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
+	}
+	const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+	pdf += `xref\n0 ${objects.length + 1}\n`;
+	pdf += '0000000000 65535 f \n';
+	for (let i = 1; i < offsets.length; i += 1) {
+		pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+	}
+	pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+	return Buffer.from(pdf, 'utf8');
+}
+
+function buildSeedResumePdfBuffer(candidate) {
+	const candidateName = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || 'Candidate';
+	const location = [candidate.city, candidate.state].filter(Boolean).join(', ') || 'Open to relocation';
+	return buildSimplePdfBuffer([
+		`${candidateName}`,
+		`${candidate.currentJobTitle || 'Professional'} | ${candidate.currentEmployer || 'Current Employer'}`,
+		`${location}`,
+		'',
+		'Profile Summary',
+		`${candidate.summary || 'Experienced professional with strong communication, delivery, and stakeholder partnership skills.'}`,
+		'',
+		'Core Strengths',
+		'- Cross-functional collaboration',
+		'- Client-facing communication',
+		'- Process improvement and execution',
+		'',
+		'Experience',
+		`${candidate.currentEmployer || 'Current Employer'} - ${candidate.currentJobTitle || 'Professional'}`
+	]);
+}
+
 function dateYearsAgo(years, month = 0) {
 	const d = new Date();
 	d.setMonth(month, 1);
@@ -505,6 +602,29 @@ async function cleanupSeedData() {
 	const seedDivisionIds = seedDivisions.map((division) => division.id);
 
 	const scopedJobOrderFilter = seedDivisionIds.length > 0 ? { divisionId: { in: seedDivisionIds } } : { id: -1 };
+
+	try {
+		await prisma.clientSubmissionFeedback.deleteMany({
+			where: {
+				OR: [
+					{ submission: { candidate: { email: { endsWith: `@${PERSON_EMAIL_DOMAIN}` } } } },
+					{ submission: { jobOrder: scopedJobOrderFilter } }
+				]
+			}
+		});
+		await prisma.clientPortalAccess.deleteMany({
+			where: {
+				OR: [
+					{ contact: { email: { endsWith: `@${PERSON_EMAIL_DOMAIN}` } } },
+					{ jobOrder: scopedJobOrderFilter }
+				]
+			}
+		});
+	} catch (error) {
+		if (error?.code !== 'P2021' && error?.code !== 'P2022') {
+			throw error;
+		}
+	}
 
 	await prisma.offer.deleteMany({
 		where: {
@@ -922,6 +1042,29 @@ async function main() {
 				status: 'open'
 			}
 		});
+
+		const resumeFileName = `${firstName}-${lastName}-resume.pdf`;
+		const resumeStorageKey = buildSeedResumeStorageKey(candidate.recordId, resumeFileName);
+		const resumeBuffer = buildSeedResumePdfBuffer(candidate);
+		await writeSeedAttachment({
+			storageKey: resumeStorageKey,
+			body: resumeBuffer
+		});
+		await prisma.candidateAttachment.create({
+			data: {
+				candidateId: candidate.id,
+				uploadedByUserId: owner?.id ?? null,
+				fileName: resumeFileName,
+				isResume: true,
+				contentType: 'application/pdf',
+				sizeBytes: resumeBuffer.length,
+				storageProvider: 'local',
+				storageBucket: 'local',
+				storageKey: resumeStorageKey,
+				createdAt: addMinutes(createdAt, 25),
+				updatedAt: addMinutes(createdAt, 25)
+			}
+		});
 	}
 
 	const jobOrders = [];
@@ -999,6 +1142,9 @@ async function main() {
 	let submissionCount = 0;
 	let interviewCount = 0;
 	let placementCount = 0;
+	let portalAccessCount = 0;
+	let portalFeedbackCount = 0;
+	const seededSubmissions = [];
 
 	for (let i = 0; i < jobOrders.length; i += 1) {
 		const jobOrder = jobOrders[i];
@@ -1024,19 +1170,28 @@ async function main() {
 				minuteStep: 5
 			});
 			const submissionUpdatedAt = addHours(submissionCreatedAt, 2 + ((i + j) % 30));
-			const submission = await prisma.submission.create({
-				data: {
-					candidateId: candidate.id,
-					jobOrderId: jobOrder.id,
-					submissionPriority: j + 1,
-					status: pick(SUBMISSION_STATUSES, i + j),
-					notes: 'Submitted with updated resume, compensation targets, and interview availability.',
-					createdByUserId: createdByUser?.id ?? null,
+				const submission = await prisma.submission.create({
+					data: {
+						candidateId: candidate.id,
+						jobOrderId: jobOrder.id,
+						submissionPriority: j + 1,
+						isClientVisible: true,
+						status: pick(SUBMISSION_STATUSES, i + j),
+						notes: 'Submitted with updated resume, compensation targets, and interview availability.',
+						createdByUserId: createdByUser?.id ?? null,
 					createdAt: submissionCreatedAt,
 					updatedAt: submissionUpdatedAt
 				}
 			});
 			submissionCount += 1;
+			seededSubmissions.push({
+				id: submission.id,
+				recordId: submission.recordId,
+				jobOrderId: jobOrder.id,
+				candidateId: candidate.id,
+				candidateName: `${candidate.firstName} ${candidate.lastName}`.trim(),
+				submissionPriority: j + 1
+			});
 
 			if ((i + j) % 2 === 0) {
 				const interviewCreatedAt = buildSeedTimestamp((i * 7) + (j * 13), {
@@ -1105,6 +1260,106 @@ async function main() {
 		}
 	}
 
+	const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
+	const submissionsByJobOrder = new Map();
+	for (const submission of seededSubmissions) {
+		const bucket = submissionsByJobOrder.get(submission.jobOrderId) || [];
+		bucket.push(submission);
+		submissionsByJobOrder.set(submission.jobOrderId, bucket);
+	}
+
+	for (let i = 0; i < jobOrders.length; i += 1) {
+		const jobOrder = jobOrders[i];
+		if (!jobOrder.contactId) continue;
+
+		const portalContact = contactsById.get(jobOrder.contactId);
+		const jobSubmissions = (submissionsByJobOrder.get(jobOrder.id) || []).sort(
+			(left, right) => left.submissionPriority - right.submissionPriority
+		);
+		if (!portalContact || jobSubmissions.length === 0) continue;
+
+		const accessCreatedAt = buildSeedTimestamp(240 + i, {
+			windowSize: 12,
+			salt: 59,
+			baseHour: 9,
+			hourSpan: 7,
+			minuteStep: 17
+		});
+		const portalAccess = await prisma.clientPortalAccess.create({
+			data: {
+				contactId: portalContact.id,
+				jobOrderId: jobOrder.id,
+				createdByUserId: jobOrder.ownerId ?? null,
+				lastViewedAt: addHours(accessCreatedAt, 3 + (i % 20)),
+				lastEmailedAt: addHours(accessCreatedAt, 1 + (i % 10)),
+				lastActionAt: i % 3 === 0 ? addHours(accessCreatedAt, 8 + (i % 12)) : null,
+				createdAt: accessCreatedAt,
+				updatedAt: accessCreatedAt
+			}
+		});
+		portalAccessCount += 1;
+
+		const latestPrimaryFeedbackAt = addHours(accessCreatedAt, 7 + (i % 12));
+		await prisma.clientSubmissionFeedback.create({
+			data: {
+				submissionId: jobSubmissions[0].id,
+				portalAccessId: portalAccess.id,
+				actionType: i % 2 === 0 ? 'request_interview' : 'comment',
+				comment:
+					i % 2 === 0
+						? 'Please coordinate the next interview round with the hiring team.'
+						: 'Strong profile. We would like to review this candidate with the broader team.',
+				clientNameSnapshot: `${portalContact.firstName || ''} ${portalContact.lastName || ''}`.trim(),
+				clientEmailSnapshot: portalContact.email || '',
+				ipAddress: '127.0.0.1',
+				userAgent: 'Demo Seed',
+				createdAt: latestPrimaryFeedbackAt,
+				updatedAt: latestPrimaryFeedbackAt
+			}
+		});
+		portalFeedbackCount += 1;
+		await prisma.clientPortalAccess.update({
+			where: { id: portalAccess.id },
+			data: {
+				lastActionAt: latestPrimaryFeedbackAt
+			}
+		});
+
+		if (jobSubmissions[1] && i % 4 === 0) {
+			const latestPassAt = addHours(accessCreatedAt, 10 + (i % 14));
+			const nextPriority = (jobSubmissions[jobSubmissions.length - 1]?.submissionPriority || jobSubmissions[1].submissionPriority) + 1;
+			await prisma.submission.update({
+				where: { id: jobSubmissions[1].id },
+				data: {
+					status: 'rejected',
+					submissionPriority: nextPriority
+				}
+			});
+			await prisma.clientSubmissionFeedback.create({
+				data: {
+					submissionId: jobSubmissions[1].id,
+					portalAccessId: portalAccess.id,
+					actionType: 'pass',
+					statusApplied: 'rejected',
+					comment: 'Thank you. We are passing on this candidate for now.',
+					clientNameSnapshot: `${portalContact.firstName || ''} ${portalContact.lastName || ''}`.trim(),
+					clientEmailSnapshot: portalContact.email || '',
+					ipAddress: '127.0.0.1',
+					userAgent: 'Demo Seed',
+					createdAt: latestPassAt,
+					updatedAt: latestPassAt
+				}
+			});
+			portalFeedbackCount += 1;
+			await prisma.clientPortalAccess.update({
+				where: { id: portalAccess.id },
+				data: {
+					lastActionAt: latestPassAt
+				}
+			});
+		}
+	}
+
 	console.log('Realistic seed completed.');
 	console.log(`Divisions: ${divisions.length}`);
 	console.log(`Users: ${users.length}`);
@@ -1115,6 +1370,8 @@ async function main() {
 	console.log(`Submissions: ${submissionCount}`);
 	console.log(`Interviews: ${interviewCount}`);
 	console.log(`Placements: ${placementCount}`);
+	console.log(`Portal Links: ${portalAccessCount}`);
+	console.log(`Portal Feedback Entries: ${portalFeedbackCount}`);
 
 	const adminUser = users.find((user) => user.role === 'ADMINISTRATOR');
 	const recruiterUser = users.find((user) => user.role === 'RECRUITER');

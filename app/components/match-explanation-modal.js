@@ -240,7 +240,7 @@ export default function MatchExplanationModal({
 									{explanation.generatedByUser
 										? `${explanation.generatedByUser.firstName} ${explanation.generatedByUser.lastName}`
 										: 'Unknown User'}{' '}
-									@ {formatDateTimeAt(explanation.updatedAt)}
+									@ <span className="meta-emphasis-time">{formatDateTimeAt(explanation.updatedAt)}</span>
 								</p>
 							</div>
 						) : state.generating ? (

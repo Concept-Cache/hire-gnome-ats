@@ -73,6 +73,7 @@ model User {
 	email            String      @unique
 	passwordHash     String?
 	notifyCareerSiteApplications Boolean @default(true)
+	notifyClientPortalFeedback Boolean @default(true)
 	failedLoginAttempts Int      @default(0)
 	lockoutUntil     DateTime?
 	sessionVersion   Int         @default(1)
@@ -95,6 +96,7 @@ model User {
 	uploadedCandidateAttachments CandidateAttachment[] @relation("CandidateAttachmentUploadedBy")
 	generatedCandidateSummaries CandidateAiSummary[]
 	generatedMatchExplanations MatchExplanation[]
+	createdClientPortalAccesses ClientPortalAccess[] @relation("ClientPortalAccessCreatedBy")
 	candidateStatusChanges CandidateStatusChange[] @relation("CandidateStatusChangedBy")
 	auditLogs       AuditLog[]  @relation("AuditLogActor")
 	passwordResetTokens PasswordResetToken[]
@@ -403,6 +405,7 @@ model CandidateAttachment {
 	id               Int       @id @default(autoincrement())
 	recordId         String    @unique
 	fileName         String
+	isResume         Boolean   @default(false)
 	contentType      String?
 	sizeBytes        Int
 	storageProvider  String    @default("s3")
@@ -416,6 +419,7 @@ model CandidateAttachment {
 	uploadedByUser   User?     @relation("CandidateAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
 	@@index([candidateId])
+	@@index([candidateId, isResume])
 	@@index([uploadedByUserId])
 }
 
@@ -535,6 +539,7 @@ model Contact {
 
 	notes     ContactNote[]
 	jobOrders JobOrder[]
+	clientPortalAccesses ClientPortalAccess[]
 
 	@@index([firstName, lastName])
 	@@index([email])
@@ -616,6 +621,7 @@ model JobOrder {
 	interviews  Interview[]
 	offers      Offer[]
 	matchExplanations MatchExplanation[]
+	clientPortalAccesses ClientPortalAccess[]
 
 	@@index([title])
 	@@index([status])
@@ -633,6 +639,7 @@ model Submission {
 	recordId   String   @unique
 	status     String   @default("submitted")
 	submissionPriority Int @default(0)
+	isClientVisible Boolean @default(true)
 	notes      String?   @db.Text
 	aiWriteUp  String?   @db.Text
 	aiWriteUpGeneratedAt DateTime?
@@ -651,11 +658,13 @@ model Submission {
 
 	jobOrderId Int
 	jobOrder   JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Restrict)
+	clientFeedback ClientSubmissionFeedback[]
 
 	@@unique([candidateId, jobOrderId])
 	@@index([candidateId, status])
 	@@index([jobOrderId, status])
 	@@index([jobOrderId, submissionPriority])
+	@@index([jobOrderId, isClientVisible])
 	@@index([createdByUserId])
 	@@index([aiWriteUpGeneratedByUserId])
 }
@@ -725,6 +734,53 @@ model MatchExplanation {
 	@@index([generatedByUserId])
 	@@index([candidateId])
 	@@index([jobOrderId])
+}
+
+model ClientPortalAccess {
+	id              Int      @id @default(autoincrement())
+	recordId        String   @unique
+	contactId       Int
+	jobOrderId      Int
+	createdByUserId Int?
+	isRevoked       Boolean  @default(false)
+	lastViewedAt    DateTime?
+	lastActionAt    DateTime?
+	lastEmailedAt   DateTime?
+	createdAt       DateTime @default(now())
+	updatedAt       DateTime @updatedAt
+
+	contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+	jobOrder        JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Cascade)
+	createdByUser   User?    @relation("ClientPortalAccessCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+	feedbackEntries ClientSubmissionFeedback[]
+
+	@@unique([contactId, jobOrderId])
+	@@index([jobOrderId])
+	@@index([createdByUserId])
+	@@index([isRevoked])
+}
+
+model ClientSubmissionFeedback {
+	id                  Int      @id @default(autoincrement())
+	recordId            String   @unique
+	submissionId        Int
+	portalAccessId      Int
+	actionType          String
+	comment             String?  @db.Text
+	statusApplied       String?
+	clientNameSnapshot  String?
+	clientEmailSnapshot String?
+	ipAddress           String?
+	userAgent           String?
+	createdAt           DateTime @default(now())
+	updatedAt           DateTime @updatedAt
+
+	submission   Submission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+	portalAccess ClientPortalAccess @relation(fields: [portalAccessId], references: [id], onDelete: Cascade)
+
+	@@index([submissionId, createdAt])
+	@@index([portalAccessId, createdAt])
+	@@index([actionType])
 }
 
 model Offer {

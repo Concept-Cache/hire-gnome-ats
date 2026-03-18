@@ -14,6 +14,7 @@ import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { INTERVIEW_TYPE_OPTIONS, normalizeInterviewType } from '@/app/constants/interview-type-options';
 import { formatDateTimeAt } from '@/lib/date-format';
@@ -141,6 +142,7 @@ export default function InterviewDetailsPage() {
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('INTERVIEW');
+	const isAdmin = useIsAdministrator();
 	const { markAsClean } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(interview)
 	});
@@ -514,9 +516,14 @@ export default function InterviewDetailsPage() {
 								>
 									Archive Interview
 								</button>
-								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
-									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-								</button>
+								{isAdmin ? (
+									<>
+										<div className="actions-menu-divider" role="separator" />
+										<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+											{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+										</button>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>
@@ -834,7 +841,7 @@ export default function InterviewDetailsPage() {
 								{interview.aiQuestionSetGeneratedByUser
 									? `${interview.aiQuestionSetGeneratedByUser.firstName} ${interview.aiQuestionSetGeneratedByUser.lastName}`
 									: 'Unknown User'}{' '}
-								@ {formatDate(interview.aiQuestionSetGeneratedAt)}
+								@ <span className="meta-emphasis-time">{formatDate(interview.aiQuestionSetGeneratedAt)}</span>
 							</p>
 						) : null}
 					</section>
@@ -850,7 +857,7 @@ export default function InterviewDetailsPage() {
 					</div>
 				</form>
 			</article>
-			<AuditTrailPanel entityType="INTERVIEW" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="INTERVIEW" entityId={id} visible={showAuditTrail} /> : null}
 		</section>
 	);
 }

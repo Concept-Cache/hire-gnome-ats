@@ -3,6 +3,8 @@
 require('./load-env.cjs');
 
 const mysql = require('mysql2/promise');
+const path = require('node:path');
+const { mkdir, writeFile } = require('node:fs/promises');
 const { SKILLS_TO_SEED } = require('./seed-skills');
 const { buildPublicJobDescription } = require('./demo-job-description');
 
@@ -84,6 +86,96 @@ function daysFromToday(offset, hour = 10) {
 	return d;
 }
 
+function cleanStorageSegment(value) {
+	return String(value || '')
+		.trim()
+		.replace(/[^a-zA-Z0-9._-]+/g, '-')
+		.replace(/-+/g, '-')
+		.replace(/^-|-$/g, '');
+}
+
+function getLocalStorageRoot() {
+	return process.env.LOCAL_STORAGE_ROOT || path.join(process.cwd(), '.local-storage');
+}
+
+async function writeSeedAttachment({ storageKey, body }) {
+	const localRoot = path.resolve(getLocalStorageRoot());
+	const normalizedKey = String(storageKey || '').replace(/\\/g, '/').replace(/^\/+/, '');
+	const absolutePath = path.resolve(localRoot, normalizedKey);
+	await mkdir(path.dirname(absolutePath), { recursive: true });
+	await writeFile(absolutePath, body);
+}
+
+function buildSeedResumeStorageKey(candidateId, fileName) {
+	const candidateSegment = cleanStorageSegment(candidateId) || 'candidate';
+	const safeFileName = cleanStorageSegment(path.parse(String(fileName || 'resume.pdf')).name) || 'resume';
+	return `candidates/${candidateSegment}/seed/${safeFileName}.pdf`;
+}
+
+function escapePdfText(value) {
+	return String(value || '')
+		.replace(/\\/g, '\\\\')
+		.replace(/\(/g, '\\(')
+		.replace(/\)/g, '\\)');
+}
+
+function buildSimplePdfBuffer(lines) {
+	const objects = [];
+	function addObject(content) {
+		objects.push(content);
+		return objects.length;
+	}
+
+	const contentStream = `BT\n/F1 12 Tf\n72 740 Td\n${lines
+		.map((line, index) => `${index === 0 ? '' : '0 -18 Td\n'}(${escapePdfText(line)}) Tj\n`)
+		.join('')}ET`;
+	const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+	const contentsId = addObject(`<< /Length ${Buffer.byteLength(contentStream, 'utf8')} >>\nstream\n${contentStream}\nendstream`);
+	const pageId = addObject(`<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentsId} 0 R >>`);
+	const pagesId = addObject(`<< /Type /Pages /Kids [${pageId} 0 R] /Count 1 >>`);
+	const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+	let pdf = '%PDF-1.4\n';
+	const offsets = [0];
+	for (let i = 0; i < objects.length; i += 1) {
+		offsets.push(Buffer.byteLength(pdf, 'utf8'));
+		pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
+	}
+	const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+	pdf += `xref\n0 ${objects.length + 1}\n`;
+	pdf += '0000000000 65535 f \n';
+	for (let i = 1; i < offsets.length; i += 1) {
+		pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+	}
+	pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+	return Buffer.from(pdf, 'utf8');
+}
+
+function buildSeedResumePdfBuffer(candidate) {
+	const candidateName = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || 'Candidate';
+	const location = [candidate.city, candidate.state].filter(Boolean).join(', ') || 'Open to relocation';
+	return buildSimplePdfBuffer([
+		candidateName,
+		`${candidate.currentJobTitle || 'Professional'} | ${candidate.currentEmployer || 'Current Employer'}`,
+		location,
+		'',
+		'Profile Summary',
+		`${candidate.summary || 'Experienced professional with strong communication and delivery skills.'}`
+	]);
+}
+
+async function tableExists(connection, tableName) {
+	const [rows] = await connection.query(
+		`SELECT 1
+		 FROM information_schema.tables
+		 WHERE table_schema = DATABASE()
+		 AND table_name = ?
+		 LIMIT 1`,
+		[tableName]
+	);
+	return Array.isArray(rows) && rows.length > 0;
+}
+
 function buildSeedUserEmail(userSeed, index, state) {
 	if (userSeed?.role === 'ADMINISTRATOR' && !state.adminAssigned) {
 		state.adminAssigned = true;
@@ -117,6 +209,31 @@ async function cleanup(connection) {
 	const emailLike = `%@${PERSON_EMAIL_DOMAIN}`;
 	const clientLike = `${CLIENT_PREFIX}%`;
 	const divisionLike = `${DIVISION_PREFIX}%`;
+	const hasClientSubmissionFeedback = await tableExists(connection, 'ClientSubmissionFeedback');
+	const hasClientPortalAccess = await tableExists(connection, 'ClientPortalAccess');
+
+	if (hasClientSubmissionFeedback) {
+		await connection.query(
+			`DELETE csf FROM \`ClientSubmissionFeedback\` csf
+			 LEFT JOIN \`Submission\` s ON s.id = csf.submissionId
+			 LEFT JOIN \`Candidate\` c ON c.id = s.candidateId
+			 LEFT JOIN \`JobOrder\` j ON j.id = s.jobOrderId
+			 LEFT JOIN \`Client\` cl ON cl.id = j.clientId
+			 WHERE c.email LIKE ? OR cl.name LIKE ?`,
+			[emailLike, clientLike]
+		);
+	}
+
+	if (hasClientPortalAccess) {
+		await connection.query(
+			`DELETE cpa FROM \`ClientPortalAccess\` cpa
+			 LEFT JOIN \`Contact\` ct ON ct.id = cpa.contactId
+			 LEFT JOIN \`JobOrder\` j ON j.id = cpa.jobOrderId
+			 LEFT JOIN \`Client\` cl ON cl.id = j.clientId
+			 WHERE ct.email LIKE ? OR cl.name LIKE ?`,
+			[emailLike, clientLike]
+		);
+	}
 
 	await connection.query(
 		`DELETE o FROM \`Offer\` o
@@ -340,7 +457,14 @@ async function main() {
 				);
 
 				const contactId = result.insertId;
-				contacts.push({ id: contactId, clientId: client.id, divisionId: client.divisionId });
+				contacts.push({
+					id: contactId,
+					clientId: client.id,
+					divisionId: client.divisionId,
+					firstName: `Contact${idx + 1}`,
+					lastName: `Demo${idx + 1}`,
+					email: `contact${idx + 1}@${PERSON_EMAIL_DOMAIN}`
+				});
 				await connection.query(
 					'INSERT INTO `ContactNote` (`content`, `contactId`, `createdByUserId`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, NOW(), NOW())',
 					['Initial outreach completed.', contactId, owner.id]
@@ -355,17 +479,27 @@ async function main() {
 		}
 
 		const candidates = [];
+		let candidateAttachmentCount = 0;
 		for (let i = 0; i < 28; i += 1) {
 			const division = divisions[i % divisions.length];
 			const divisionUsers = usersByDivision.get(division.id);
 			const owner = divisionUsers[(i + 1) % divisionUsers.length];
+			const candidateSeed = {
+				firstName: `Candidate${i + 1}`,
+				lastName: `Demo${i + 1}`,
+				currentJobTitle: i % 2 === 0 ? 'Software Engineer' : 'Project Manager',
+				currentEmployer: `Employer ${i + 1}`,
+				city: i % 2 === 0 ? 'Austin' : 'Denver',
+				state: i % 2 === 0 ? 'TX' : 'CO',
+				summary: 'Demo candidate profile.'
+			};
 			const [result] = await connection.query(
 				`INSERT INTO \`Candidate\`
 				(\`firstName\`, \`lastName\`, \`email\`, \`phone\`, \`mobile\`, \`status\`, \`source\`, \`ownerId\`, \`divisionId\`, \`currentJobTitle\`, \`currentEmployer\`, \`city\`, \`state\`, \`zipCode\`, \`website\`, \`linkedinUrl\`, \`summary\`, \`createdAt\`, \`updatedAt\`)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 				[
-					`Candidate${i + 1}`,
-					`Demo${i + 1}`,
+					candidateSeed.firstName,
+					candidateSeed.lastName,
 					`candidate${i + 1}@${PERSON_EMAIL_DOMAIN}`,
 					phoneFrom(200 + i),
 					phoneFrom(500 + i),
@@ -373,14 +507,14 @@ async function main() {
 					pick(SOURCE_OPTIONS, i + 1),
 					owner.id,
 					division.id,
-					i % 2 === 0 ? 'Software Engineer' : 'Project Manager',
-					`Employer ${i + 1}`,
-					i % 2 === 0 ? 'Austin' : 'Denver',
-					i % 2 === 0 ? 'TX' : 'CO',
+					candidateSeed.currentJobTitle,
+					candidateSeed.currentEmployer,
+					candidateSeed.city,
+					candidateSeed.state,
 					i % 2 === 0 ? '78701' : '80202',
 					`https://candidate${i + 1}.portfolio.example`,
 					`https://linkedin.com/in/candidate-demo-${i + 1}`,
-					'Demo candidate profile.'
+					candidateSeed.summary
 				]
 			);
 			const candidateId = result.insertId;
@@ -401,6 +535,21 @@ async function main() {
 				'INSERT INTO `CandidateActivity` (`type`, `subject`, `description`, `dueAt`, `status`, `candidateId`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
 				['call', 'Screening Call', 'Initial screening completed.', daysFromToday((i % 6) + 1), 'open', candidateId]
 			);
+
+			const resumeFileName = `${candidateSeed.firstName}-${candidateSeed.lastName}-resume.pdf`;
+			const resumeStorageKey = buildSeedResumeStorageKey(candidateId, resumeFileName);
+			const resumeBuffer = buildSeedResumePdfBuffer(candidateSeed);
+			await writeSeedAttachment({
+				storageKey: resumeStorageKey,
+				body: resumeBuffer
+			});
+			await connection.query(
+				`INSERT INTO \`CandidateAttachment\`
+				(\`fileName\`, \`isResume\`, \`contentType\`, \`sizeBytes\`, \`storageProvider\`, \`storageBucket\`, \`storageKey\`, \`candidateId\`, \`uploadedByUserId\`, \`createdAt\`, \`updatedAt\`)
+				VALUES (?, 1, 'application/pdf', ?, 'local', 'local', ?, ?, ?, NOW(), NOW())`,
+				[resumeFileName, resumeBuffer.length, resumeStorageKey, candidateId, owner.id]
+			);
+			candidateAttachmentCount += 1;
 		}
 
 		const jobOrders = [];
@@ -452,12 +601,20 @@ async function main() {
 					contact?.id || null
 				]
 			);
-			jobOrders.push({ id: result.insertId, divisionId: client.divisionId });
+			jobOrders.push({
+				id: result.insertId,
+				divisionId: client.divisionId,
+				ownerId: owner.id,
+				contactId: contact?.id || null
+			});
 		}
 
 		let submissionCount = 0;
 		let interviewCount = 0;
 		let placementCount = 0;
+		let portalAccessCount = 0;
+		let portalFeedbackCount = 0;
+		const seededSubmissions = [];
 
 		for (let i = 0; i < jobOrders.length; i += 1) {
 			const job = jobOrders[i];
@@ -476,12 +633,17 @@ async function main() {
 				const candidate = picks[j];
 				const [submissionResult] = await connection.query(
 					`INSERT INTO \`Submission\`
-					(\`submissionPriority\`, \`status\`, \`notes\`, \`createdByUserId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
-					VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-					[j + 1, pick(SUBMISSION_STATUSES, i + j), 'Demo submission.', creator.id, candidate.id, job.id]
+					(\`submissionPriority\`, \`status\`, \`isClientVisible\`, \`notes\`, \`createdByUserId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
+					VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+					[j + 1, pick(SUBMISSION_STATUSES, i + j), true, 'Demo submission.', creator.id, candidate.id, job.id]
 				);
 				const submissionId = submissionResult.insertId;
 				submissionCount += 1;
+				seededSubmissions.push({
+					id: submissionId,
+					jobOrderId: job.id,
+					submissionPriority: j + 1
+				});
 
 				if ((i + j) % 2 === 0) {
 					const startsAt = daysFromToday((i + j) % 8, 9);
@@ -534,6 +696,81 @@ async function main() {
 			}
 		}
 
+		const hasClientPortalAccess = await tableExists(connection, 'ClientPortalAccess');
+		const hasClientSubmissionFeedback = await tableExists(connection, 'ClientSubmissionFeedback');
+		if (hasClientPortalAccess && hasClientSubmissionFeedback) {
+			const submissionsByJob = new Map();
+			for (const submission of seededSubmissions) {
+				const bucket = submissionsByJob.get(submission.jobOrderId) || [];
+				bucket.push(submission);
+				submissionsByJob.set(submission.jobOrderId, bucket);
+			}
+
+			for (let i = 0; i < jobOrders.length; i += 1) {
+				const job = jobOrders[i];
+				const jobSubmissions = (submissionsByJob.get(job.id) || []).sort(
+					(left, right) => left.submissionPriority - right.submissionPriority
+				);
+				if (!job.contactId || jobSubmissions.length === 0) continue;
+				const portalContact = contacts.find((contact) => contact.id === job.contactId);
+				if (!portalContact) continue;
+
+				const [portalResult] = await connection.query(
+					`INSERT INTO \`ClientPortalAccess\`
+					(\`contactId\`, \`jobOrderId\`, \`createdByUserId\`, \`isRevoked\`, \`lastViewedAt\`, \`lastActionAt\`, \`lastEmailedAt\`, \`createdAt\`, \`updatedAt\`)
+					VALUES (?, ?, ?, 0, ?, ?, ?, NOW(), NOW())`,
+					[
+						job.contactId,
+						job.id,
+						job.ownerId,
+						daysFromToday(-(i % 5), 9),
+						daysFromToday(-(i % 4), 11),
+						daysFromToday(-(i % 6), 8)
+					]
+				);
+				const portalAccessId = portalResult.insertId;
+				portalAccessCount += 1;
+
+				await connection.query(
+					`INSERT INTO \`ClientSubmissionFeedback\`
+					(\`submissionId\`, \`portalAccessId\`, \`actionType\`, \`comment\`, \`statusApplied\`, \`clientNameSnapshot\`, \`clientEmailSnapshot\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
+					VALUES (?, ?, ?, ?, NULL, ?, ?, '127.0.0.1', 'Demo Seed', NOW(), NOW())`,
+					[
+						jobSubmissions[0].id,
+						portalAccessId,
+						i % 2 === 0 ? 'request_interview' : 'comment',
+						i % 2 === 0
+							? 'Please coordinate the next interview round with the hiring team.'
+							: 'Strong profile. We would like to review this candidate with the broader team.',
+						`${portalContact.firstName} ${portalContact.lastName}`,
+						portalContact.email
+					]
+				);
+				portalFeedbackCount += 1;
+
+				if (jobSubmissions[1] && i % 4 === 0) {
+					const nextPriority = (jobSubmissions[jobSubmissions.length - 1]?.submissionPriority || jobSubmissions[1].submissionPriority) + 1;
+					await connection.query(
+						'UPDATE `Submission` SET `status` = ?, `submissionPriority` = ?, `updatedAt` = NOW() WHERE id = ?',
+						['rejected', nextPriority, jobSubmissions[1].id]
+					);
+					await connection.query(
+						`INSERT INTO \`ClientSubmissionFeedback\`
+						(\`submissionId\`, \`portalAccessId\`, \`actionType\`, \`comment\`, \`statusApplied\`, \`clientNameSnapshot\`, \`clientEmailSnapshot\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
+						VALUES (?, ?, 'pass', ?, 'rejected', ?, ?, '127.0.0.1', 'Demo Seed', NOW(), NOW())`,
+						[
+							jobSubmissions[1].id,
+							portalAccessId,
+							'Thank you. We are passing on this candidate for now.',
+							`${portalContact.firstName} ${portalContact.lastName}`,
+							portalContact.email
+						]
+					);
+					portalFeedbackCount += 1;
+				}
+			}
+		}
+
 		await connection.commit();
 		console.log('Demo seed completed.');
 		console.log(`Divisions: ${divisions.length}`);
@@ -545,6 +782,9 @@ async function main() {
 		console.log(`Submissions: ${submissionCount}`);
 		console.log(`Interviews: ${interviewCount}`);
 		console.log(`Placements: ${placementCount}`);
+		console.log(`Primary Resumes: ${candidateAttachmentCount}`);
+		console.log(`Portal Links: ${portalAccessCount}`);
+		console.log(`Portal Feedback Entries: ${portalFeedbackCount}`);
 	} catch (error) {
 		await connection.rollback();
 		throw error;

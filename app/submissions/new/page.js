@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
@@ -129,6 +130,7 @@ function NewSubmissionsPageContent() {
 				</div>
 			</header>
 
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<h3>Add Submission</h3>
 				<form onSubmit={onSubmit}>
@@ -197,6 +199,24 @@ function NewSubmissionsPageContent() {
 					</button>
 				</form>
 			</article>
+			<NewRecordGuide
+				title="Submission Setup"
+				intro="Submissions connect a qualified candidate to a job order and start the client-facing workflow."
+				checklist={[
+					'Only qualified candidates should be submitted.',
+					'Confirm the candidate and job order pairing is the one you actually intend to present.',
+					'Use notes for recruiter context that should live on the submission itself.'
+				]}
+				outcomes={[
+					'The submission detail opens after save for client write-up, feedback, and status updates.',
+					'Submitted candidates appear on the job order submissions workspace and client portal when shared.'
+				]}
+				tips={[
+					'Submission priority is managed on the job-order detail after save.',
+					'If the candidate is not really in play yet, do not create the submission early just to hold a spot.'
+				]}
+			/>
+			</div>
 		</section>
 	);
 }

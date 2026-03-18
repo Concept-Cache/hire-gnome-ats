@@ -156,6 +156,13 @@ function isMissingCandidateAiSummaryTableError(error) {
 	return message.includes('CandidateAiSummary') || message.includes('aiSummary');
 }
 
+function isMissingAttachmentResumeColumnError(error) {
+	if (!error) return false;
+	if (error.code === 'P2022') return true;
+	const message = `${error.message || ''}`;
+	return message.includes('isResume');
+}
+
 async function getCandidates_idHandler(req, { params }) {
 	try {
 		const awaitedParams = await params;
@@ -176,6 +183,11 @@ async function getCandidates_idHandler(req, { params }) {
 					where: addScopeToWhere({ id }, entityScope),
 					include: buildCandidateDetailInclude(entityScope, true, false)
 				});
+			} else if (isMissingAttachmentResumeColumnError(error)) {
+				return NextResponse.json(
+					{ error: 'Candidate attachments schema is out of date. Run database migrations.' },
+					{ status: 503 }
+				);
 			} else if (!isMissingNoteAuthorColumnError(error)) {
 				throw error;
 			} else {

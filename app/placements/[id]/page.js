@@ -12,6 +12,7 @@ import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
@@ -235,6 +236,7 @@ export default function PlacementDetailsPage() {
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('PLACEMENT');
+	const isAdmin = useIsAdministrator();
 	const relationshipsLocked = Boolean(placement?.id);
 	const acceptedReadOnly = String(placement?.status || '').toLowerCase() === 'accepted';
 	const currentStatus = String(placement?.status || '').toLowerCase();
@@ -701,9 +703,14 @@ export default function PlacementDetailsPage() {
 								>
 									Archive Placement
 								</button>
-								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
-									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-								</button>
+								{isAdmin ? (
+									<>
+										<div className="actions-menu-divider" role="separator" />
+										<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+											{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+										</button>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>
@@ -1112,7 +1119,7 @@ export default function PlacementDetailsPage() {
 					</div>
 				</form>
 			</article>
-			<AuditTrailPanel entityType="PLACEMENT" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="PLACEMENT" entityId={id} visible={showAuditTrail} /> : null}
 		</section>
 	);
 }

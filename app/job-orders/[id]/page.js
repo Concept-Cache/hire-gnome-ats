@@ -13,9 +13,11 @@ import RichTextEditor from '@/app/components/rich-text-editor';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import MatchExplanationModal from '@/app/components/match-explanation-modal';
+import ClientPortalModal from '@/app/components/client-portal-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { formatDateTimeAt } from '@/lib/date-format';
@@ -27,7 +29,7 @@ import {
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { sortByConfig } from '@/lib/list-sort';
-import { submissionCreatedByLabel } from '@/lib/submission-origin';
+import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
 import { toBooleanFlag } from '@/lib/boolean-flag';
@@ -100,6 +102,15 @@ const submissionStatuses = [
 	{ value: 'hired', label: 'Hired' },
 	{ value: 'placed', label: 'Placed' }
 ];
+
+function formatClientFeedbackLabel(value) {
+	const normalized = String(value || '').trim().toLowerCase();
+	if (normalized === 'request_interview') return 'Requested Interview';
+	if (normalized === 'pass') return 'Passed';
+	if (normalized === 'comment') return 'Comment';
+	if (normalized === 'need_more_info') return 'Needs More Info';
+	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : 'Client Update';
+}
 
 function toForm(row) {
 	if (!row) return initialForm;
@@ -182,6 +193,7 @@ export default function JobOrderDetailsPage() {
 		success: ''
 	});
 	const [actionsOpen, setActionsOpen] = useState(false);
+	const [showClientPortalModal, setShowClientPortalModal] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [closeState, setCloseState] = useState({ closing: false, error: '' });
@@ -213,7 +225,7 @@ export default function JobOrderDetailsPage() {
 	const { requestConfirm, requestConfirmWithOptions } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('JOB_ORDER');
 	const toast = useToast();
-	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
+	const isAdmin = useIsAdministrator(actingUser);
 	const { markAsClean } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(jobOrder)
 	});
@@ -991,6 +1003,11 @@ export default function JobOrderDetailsPage() {
 		setShowAuditTrail((current) => !current);
 	}
 
+	function onOpenClientPortal() {
+		setActionsOpen(false);
+		setShowClientPortalModal(true);
+	}
+
 	async function onArchiveJobOrder() {
 		if (!jobOrder?.id) return;
 		setActionsOpen(false);
@@ -1058,7 +1075,8 @@ export default function JobOrderDetailsPage() {
 		!saveState.saving &&
 		!closeState.closing &&
 		hasMeaningfulRichTextContent(form.publicDescription);
-	const canViewPublicPosting = careerSiteEnabled && Boolean(jobOrder.publishToCareerSite);
+	const isPublicPostingConfigured = careerSiteEnabled && Boolean(jobOrder.publishToCareerSite);
+	const canViewPublicPosting = isPublicPostingConfigured && jobOrder.status === 'open';
 	const publicPostingHref = canViewPublicPosting ? `/careers/jobs/${jobOrder.id}` : '';
 	const statusOptions = JOB_ORDER_STATUS_OPTIONS.filter(
 		(option) => option.value !== 'closed' || form.status === 'closed'
@@ -1102,18 +1120,38 @@ export default function JobOrderDetailsPage() {
 							</button>
 						{actionsOpen ? (
 							<div className="actions-menu-list" role="menu" aria-label="Job order actions">
-								{canViewPublicPosting ? (
-									<a
-										href={publicPostingHref}
-										target="_blank"
-										rel="noreferrer"
-										role="menuitem"
-										className="actions-menu-item"
-										onClick={() => setActionsOpen(false)}
-									>
-										View Public Posting
-									</a>
+								{isPublicPostingConfigured ? (
+									canViewPublicPosting ? (
+										<a
+											href={publicPostingHref}
+											target="_blank"
+											rel="noreferrer"
+											role="menuitem"
+											className="actions-menu-item"
+											onClick={() => setActionsOpen(false)}
+										>
+											View Public Posting
+										</a>
+									) : (
+										<button
+											type="button"
+											role="menuitem"
+											className="actions-menu-item"
+											disabled
+											title="Only open job orders have a public posting."
+										>
+											View Public Posting
+										</button>
+									)
 								) : null}
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item"
+									onClick={onOpenClientPortal}
+								>
+									Client Review Portal
+								</button>
 								<button
 									type="button"
 									role="menuitem"
@@ -1132,14 +1170,26 @@ export default function JobOrderDetailsPage() {
 								>
 									Archive Job Order
 								</button>
-								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
-									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-								</button>
+								{isAdmin ? (
+									<>
+										<div className="actions-menu-divider" role="separator" />
+										<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+											{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+										</button>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>
 				</div>
 			</header>
+
+			<ClientPortalModal
+				open={showClientPortalModal}
+				onClose={() => setShowClientPortalModal(false)}
+				jobOrderId={jobOrder.id}
+				jobOrderTitle={jobOrder.title}
+			/>
 
 			<article className="panel">
 				<h3>Snapshot</h3>
@@ -1635,7 +1685,15 @@ export default function JobOrderDetailsPage() {
 									<p className="panel-subtext">No submissions yet.</p>
 								) : (
 									<ul className="simple-list simple-list-reorderable">
-										{sortedSubmissions.map((submission) => (
+										{sortedSubmissions.map((submission) => {
+											const latestClientFeedback =
+												Array.isArray(submission.clientFeedback) && submission.clientFeedback.length > 0
+													? submission.clientFeedback[0]
+													: null;
+											const feedbackCount = Array.isArray(submission.clientFeedback)
+												? submission.clientFeedback.length
+												: 0;
+											return (
 											<li
 												key={submission.id}
 												className={
@@ -1650,43 +1708,82 @@ export default function JobOrderDetailsPage() {
 												onDragEnd={onSubmissionDragEnd}
 											>
 												<div className="submission-list-entry">
-													<span
-														className={
-															canReorderSubmissions
-																? 'submission-priority-handle submission-priority-handle-active'
-																: 'submission-priority-handle'
-														}
-														aria-label={`Priority ${submission.submissionPriority || 0}`}
-														title={
-															canReorderSubmissions
-																? `Priority ${submission.submissionPriority || 0}. Drag to reorder.`
-																: `Priority ${submission.submissionPriority || 0}`
-														}
-														draggable={canReorderSubmissions}
-														onDragStart={(event) => onSubmissionDragStart(event, submission.id)}
-														onDragEnd={onSubmissionDragEnd}
-													>
-														{canReorderSubmissions ? <GripVertical aria-hidden="true" /> : null}
-														<strong>#{submission.submissionPriority || 0}</strong>
-													</span>
 													<div className="submission-list-entry-body">
-														<strong>
-															<Link href={`/submissions/${submission.id}`}>
-																{submission.candidate.firstName} {submission.candidate.lastName}
-															</Link>
-														</strong>
+														<div className="submission-list-entry-head">
+															<span
+																className={
+																	canReorderSubmissions
+																		? 'submission-priority-handle submission-priority-handle-active'
+																		: 'submission-priority-handle'
+																}
+																aria-label={`Priority ${submission.submissionPriority || 0}`}
+																title={
+																	canReorderSubmissions
+																		? `Priority ${submission.submissionPriority || 0}. Drag to reorder.`
+																		: `Priority ${submission.submissionPriority || 0}`
+																}
+																draggable={canReorderSubmissions}
+																onDragStart={(event) => onSubmissionDragStart(event, submission.id)}
+																onDragEnd={onSubmissionDragEnd}
+															>
+																{canReorderSubmissions ? <GripVertical aria-hidden="true" /> : null}
+																<strong>#{submission.submissionPriority || 0}</strong>
+															</span>
+															<strong>
+																<Link href={`/candidates/${submission.candidate.id}`}>
+																	{submission.candidate.firstName} {submission.candidate.lastName}
+																</Link>
+															</strong>
+														</div>
 														<p className="simple-list-meta">
 															By{' '}
 															{submissionCreatedByLabel(submission)}{' '}
-															@ {formatDate(submission.createdAt)}
+															@ <span className="meta-emphasis-time">{formatDate(submission.createdAt)}</span>
 														</p>
+														{latestClientFeedback ? (
+															<>
+																<div className="submission-feedback-block">
+																	<p className="submission-feedback-label">Client Update</p>
+																	<p className="submission-feedback-meta">
+																		{formatClientFeedbackLabel(latestClientFeedback.actionType)}
+																		{latestClientFeedback.clientNameSnapshot ? ` by ${latestClientFeedback.clientNameSnapshot}` : ''}
+																		{latestClientFeedback.createdAt ? (
+																			<>
+																				{' '}@ <span className="meta-emphasis-time">{formatDate(latestClientFeedback.createdAt)}</span>
+																			</>
+																		) : null}
+																		{feedbackCount > 1 ? ` (+${feedbackCount - 1} more)` : ''}
+																	</p>
+																</div>
+															</>
+														) : null}
 													</div>
 												</div>
-												<div className="simple-list-actions simple-list-indicators">
-													<span className="chip">{formatSelectValueLabel(submission.status)}</span>
+												<div className="simple-list-actions simple-list-indicators submission-list-entry-actions">
+													<Link
+														href={`/submissions/${submission.id}`}
+														className="row-action-icon submission-open-link"
+														title="Open submission detail"
+														aria-label={`Open submission detail for ${submission.candidate.firstName} ${submission.candidate.lastName}`}
+													>
+														<ArrowUpRight aria-hidden="true" />
+													</Link>
+													<div className="submission-chip-stack">
+														<span className="chip">{formatSelectValueLabel(submission.status)}</span>
+														<span
+															className={
+																submissionOriginLabel(submission) === 'Web'
+																	? 'chip submission-origin-chip submission-origin-chip-web'
+																	: 'chip submission-origin-chip submission-origin-chip-recruiter'
+															}
+														>
+															{submissionOriginLabel(submission)}
+														</span>
+													</div>
 												</div>
 											</li>
-										))}
+											);
+										})}
 									</ul>
 								)}
 							</div>
@@ -1730,7 +1827,7 @@ export default function JobOrderDetailsPage() {
 															? `${interview.candidate.firstName} ${interview.candidate.lastName}`
 															: 'Candidate unavailable'}
 													</p>
-													<p className="simple-list-meta">@ {formatDate(interview.startsAt || interview.createdAt)}</p>
+													<p className="simple-list-meta">@ <span className="meta-emphasis-time">{formatDate(interview.startsAt || interview.createdAt)}</span></p>
 												</div>
 												<div className="simple-list-actions simple-list-indicators">
 													<span className="chip">{formatSelectValueLabel(interview.status)}</span>
@@ -1779,7 +1876,7 @@ export default function JobOrderDetailsPage() {
 															? `${offer.candidate.firstName} ${offer.candidate.lastName}`
 															: 'Candidate unavailable'}
 													</p>
-													<p className="simple-list-meta">@ {formatDate(offer.createdAt)}</p>
+													<p className="simple-list-meta">@ <span className="meta-emphasis-time">{formatDate(offer.createdAt)}</span></p>
 												</div>
 												<div className="simple-list-actions simple-list-indicators">
 													<span className="chip">{formatSelectValueLabel(offer.status)}</span>
@@ -1922,7 +2019,7 @@ export default function JobOrderDetailsPage() {
 					) : null}
 				</article>
 			</div>
-			<AuditTrailPanel entityType="JOB_ORDER" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="JOB_ORDER" entityId={id} visible={showAuditTrail} /> : null}
 			<MatchExplanationModal
 				open={Boolean(matchExplanationTarget)}
 				onClose={() => setMatchExplanationTarget(null)}

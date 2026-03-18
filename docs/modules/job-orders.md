@@ -46,6 +46,10 @@ Use workspace tabs for:
 - New submission from job detail is supported.
 - Job-order submissions can be ranked in recruiter preference order from the workspace using persisted drag-and-drop ordering.
 - Drag-and-drop reorder is available when the submissions workspace is sorted by `Priority Order`.
+- If a client passes on a submission through the portal, that submission is automatically moved to the bottom of the priority order.
+- Each submission row links directly to the candidate record and also includes a separate submission-detail link.
+- The submissions workspace surfaces the latest client portal action/comment so recruiters can scan client response without opening each submission.
+- Career-site `Web` responses remain hidden from the client portal until a recruiter promotes them from submission detail.
 - Duplicate candidate+job submissions are blocked.
 - Candidate typeahead is optimized for larger datasets and qualification filtering.
 - Candidate match rows support `Explain Match`, which opens a saved AI explanation of fit, gaps, and recruiter validation points for that candidate/job pair.
@@ -53,10 +57,21 @@ Use workspace tabs for:
 
 ## Actions Menu
 Typical actions include:
+- Client Review Portal
 - Close job order (with confirmation)
 - View career posting
-- View audit trail
+- View audit trail (administrators only)
 - Archive
+
+## Client Review Portal
+Job order detail includes `Actions > Client Review Portal` for client-facing candidate review without a separate login.
+
+Behavior:
+- Creates or reuses a persistent magic link for the assigned hiring-contact record on the job order
+- Portal access is scoped to that job order only
+- Link remains valid for the life of the job unless revoked
+- Internal users can copy, email, open, revoke, or restore the portal link from the modal, and the modal tracks the latest view/send timestamps
+- The external portal shows submitted candidates, recruiter write-ups, the candidate's labeled primary resume when available, and response actions
 
 ## Best Practice
 1. Keep internal and public descriptions distinct.

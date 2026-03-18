@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
@@ -175,9 +175,6 @@ export default function PlacementsPage() {
 					<h2>Placements</h2>
 				</div>
 				<div className="module-header-actions">
-					<Link href="/archive" className="btn-secondary btn-link-icon" aria-label="Archive" title="Archive">
-						<Archive aria-hidden="true" className="btn-refresh-icon-svg" />
-					</Link>
 					<Link
 						href="/placements/new"
 						className="btn-link btn-link-icon"

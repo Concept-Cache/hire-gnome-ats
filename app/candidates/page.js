@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, LayoutGrid, LayoutList, Plus } from 'lucide-react';
+import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import KanbanBoard from '@/app/components/kanban-board';
@@ -214,9 +214,6 @@ export default function CandidatesPage() {
 					<h2>Candidates</h2>
 				</div>
 				<div className="module-header-actions">
-					<Link href="/archive" className="btn-secondary btn-link-icon" aria-label="Archive" title="Archive">
-						<Archive aria-hidden="true" className="btn-refresh-icon-svg" />
-					</Link>
 					<Link
 						href="/candidates/new"
 						className="btn-link btn-link-icon"

@@ -71,6 +71,7 @@ export default function AppShell({ children }) {
 	const pathname = usePathname();
 	const branding = useSystemBranding();
 	const isPublicCareersRoute = pathname?.startsWith('/careers');
+	const isPublicClientReviewRoute = pathname?.startsWith('/client-review/');
 	const isAuthRoute = AUTH_ROUTES.has(pathname);
 	const [activeCareerQuick, setActiveCareerQuick] = useState('');
 	const [users, setUsers] = useState([]);
@@ -101,7 +102,7 @@ export default function AppShell({ children }) {
 	}, [branding?.siteName]);
 
 	useEffect(() => {
-		if (isPublicCareersRoute || isAuthRoute) return;
+		if (isPublicCareersRoute || isPublicClientReviewRoute || isAuthRoute) return;
 		if (sessionState.loading) return;
 		if (!branding?.demoMode) return;
 		if (!sessionState.authenticatedUser?.id) return;
@@ -114,6 +115,7 @@ export default function AppShell({ children }) {
 	}, [
 		branding?.demoMode,
 		isAuthRoute,
+		isPublicClientReviewRoute,
 		isPublicCareersRoute,
 		sessionState.authenticatedUser?.id,
 		sessionState.loading
@@ -145,7 +147,7 @@ export default function AppShell({ children }) {
 	}, [users, systemAdminUser]);
 
 	useEffect(() => {
-		if (isPublicCareersRoute || isAuthRoute) return undefined;
+		if (isPublicCareersRoute || isPublicClientReviewRoute || isAuthRoute) return undefined;
 		let cancelled = false;
 
 		async function loadSessionState() {
@@ -199,7 +201,7 @@ export default function AppShell({ children }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [isAuthRoute, isPublicCareersRoute]);
+	}, [isAuthRoute, isPublicCareersRoute, isPublicClientReviewRoute]);
 
 	useEffect(() => {
 		if (!isPublicCareersRoute || typeof window === 'undefined') return undefined;
@@ -234,17 +236,19 @@ export default function AppShell({ children }) {
 	}, []);
 
 	useEffect(() => {
-		if (isPublicCareersRoute || isAuthRoute || typeof document === 'undefined') return undefined;
+		if (isPublicCareersRoute || isPublicClientReviewRoute || isAuthRoute || typeof document === 'undefined') {
+			return undefined;
+		}
 		if (!mobileNavOpen) return undefined;
 		const previousOverflow = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return () => {
 			document.body.style.overflow = previousOverflow;
 		};
-	}, [isAuthRoute, isPublicCareersRoute, mobileNavOpen]);
+	}, [isAuthRoute, isPublicCareersRoute, isPublicClientReviewRoute, mobileNavOpen]);
 
 	useEffect(() => {
-		if (isPublicCareersRoute || isAuthRoute) return undefined;
+		if (isPublicCareersRoute || isPublicClientReviewRoute || isAuthRoute) return undefined;
 
 		function onMouseDown(event) {
 			if (!impersonationMenuRef.current) return;
@@ -264,7 +268,7 @@ export default function AppShell({ children }) {
 			document.removeEventListener('mousedown', onMouseDown);
 			document.removeEventListener('keydown', onKeyDown);
 		};
-	}, [isAuthRoute, isPublicCareersRoute]);
+	}, [isAuthRoute, isPublicCareersRoute, isPublicClientReviewRoute]);
 
 	function onSwitchUser(nextUserId) {
 		if (!sessionState.canImpersonate) return;
@@ -319,6 +323,10 @@ export default function AppShell({ children }) {
 				</div>
 			</ToastProvider>
 		);
+	}
+
+	if (isPublicClientReviewRoute) {
+		return <ToastProvider>{children}</ToastProvider>;
 	}
 
 	if (sessionState.loading) {
@@ -471,7 +479,7 @@ export default function AppShell({ children }) {
 										) : null}
 										<div className="topbar-user-divider" />
 										<Link
-											href="/account/password"
+											href="/account/settings"
 											role="menuitem"
 											className="topbar-user-item"
 											onClick={() => setImpersonationOpen(false)}

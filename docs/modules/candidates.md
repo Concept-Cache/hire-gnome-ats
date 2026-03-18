@@ -32,6 +32,8 @@ What parsing can populate:
 - Resume summary text
 - Education rows
 - Work experience rows
+- Parsed resume files and career-site resume uploads are labeled as `Resume` automatically when attached to the candidate.
+- Files in the candidate workspace can also be manually marked or unmarked as the candidate's `Resume`.
 
 ## Skills Management
 - Skills are selected from admin-maintained options.
@@ -87,7 +89,7 @@ From candidate detail, actions can launch:
 - New interview
 - New placement
 - Draft email
-- Audit trail
+- Audit trail (administrators only)
 
 ## Email Drafting
 Candidate detail actions include `Draft Email`.
