@@ -113,8 +113,8 @@ export default function ClientReviewPortal({ initialData, token }) {
 						</div>
 					</div>
 					<div className="client-portal-hero-meta">
-						<p><strong>Portal Contact</strong>{portalData?.portal?.contact?.email ? ` ${portalData.portal.contact.email}` : ''}</p>
-						<p><strong>Last Viewed</strong> {portalData?.portal?.lastViewedAt ? formatDateTime(portalData.portal.lastViewedAt) : 'Now'}</p>
+						<p><strong>Portal Contact: </strong>{portalData?.portal?.contact?.email ? ` ${portalData.portal.contact.email}` : ''}</p>
+						<p><strong>Last Viewed: </strong> {portalData?.portal?.lastViewedAt ? formatDateTime(portalData.portal.lastViewedAt) : 'Now'}</p>
 					</div>
 				</header>
 

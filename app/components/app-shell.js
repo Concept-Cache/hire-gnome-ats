@@ -315,9 +315,6 @@ export default function AppShell({ children }) {
 								);
 							})}
 						</nav>
-						<Link href="/login" className="career-public-login-link">
-							Recruiter Login
-						</Link>
 					</header>
 					<main className="career-public-main">{children}</main>
 				</div>
