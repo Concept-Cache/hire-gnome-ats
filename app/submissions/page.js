@@ -98,21 +98,6 @@ export default function SubmissionsPage() {
 
 	const columns = [
 		{
-			key: 'originLabel',
-			label: 'Origin',
-			render: (row) => (
-				<span
-					className={
-						row.originLabel === 'Web'
-							? 'chip submission-origin-chip submission-origin-chip-web'
-							: 'chip submission-origin-chip submission-origin-chip-recruiter'
-					}
-				>
-					{row.originLabel}
-				</span>
-			)
-		},
-		{
 			key: 'candidate',
 			label: 'Candidate',
 			render: (row) =>
@@ -144,7 +129,22 @@ export default function SubmissionsPage() {
 		},
 		{ key: 'statusLabel', label: 'Status' },
 		{ key: 'submittedBy', label: 'Submitted By' },
-		{ key: 'submittedAt', label: 'Submitted At' }
+		{ key: 'submittedAt', label: 'Submitted At' },
+		{
+			key: 'originLabel',
+			label: 'Origin',
+			render: (row) => (
+				<span
+					className={
+						row.originLabel === 'Web'
+							? 'chip submission-origin-chip submission-origin-chip-web'
+							: 'chip submission-origin-chip submission-origin-chip-recruiter'
+					}
+				>
+					{row.originLabel}
+				</span>
+			)
+		}
 	];
 
 	return (
