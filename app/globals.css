@@ -5361,6 +5361,12 @@ button:disabled {
 	height: 2.3rem;
 }
 
+.submission-header-link {
+	min-width: 2.3rem;
+	width: 2.3rem;
+	height: 2.3rem;
+}
+
 .btn-link-icon span {
 	font-size: 1rem;
 	line-height: 1;

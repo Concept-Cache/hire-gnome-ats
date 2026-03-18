@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
+import { ArrowUpRight, BriefcaseBusiness, Copy, LoaderCircle, Lock, MoreVertical, Sparkles, UserRound } from 'lucide-react';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
@@ -450,19 +450,23 @@ export default function SubmissionDetailsPage() {
 				<div className="module-header-actions">
 					<button
 						type="button"
-						className="btn-secondary"
+						className="btn-secondary btn-link-icon submission-header-link"
 						onClick={onOpenCandidate}
 						disabled={!submission.candidateId || saveState.saving || convertState.converting}
+						aria-label="Open Candidate"
+						title="Open Candidate"
 					>
-						Candidate
+						<UserRound aria-hidden="true" className="btn-refresh-icon-svg" />
 					</button>
 					<button
 						type="button"
-						className="btn-secondary"
+						className="btn-secondary btn-link-icon submission-header-link"
 						onClick={onOpenJobOrder}
 						disabled={!submission.jobOrderId || saveState.saving || convertState.converting}
+						aria-label="Open Job Order"
+						title="Open Job Order"
 					>
-						Job Order
+						<BriefcaseBusiness aria-hidden="true" className="btn-refresh-icon-svg" />
 					</button>
 					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
