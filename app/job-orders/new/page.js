@@ -8,6 +8,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import RichTextEditor from '@/app/components/rich-text-editor';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { JOB_ORDER_EMPLOYMENT_TYPES } from '@/lib/job-order-options';
@@ -431,6 +432,7 @@ function NewJobOrdersPageContent() {
 				</div>
 			</header>
 
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<div className="method-content">
 					<h3>Add Job Order</h3>
@@ -710,6 +712,25 @@ function NewJobOrdersPageContent() {
 					</form>
 				</div>
 			</article>
+			<NewRecordGuide
+				title="Job Order Setup"
+				intro="This record drives matching, submissions, interviews, the client portal, and public job publishing when enabled."
+				checklist={[
+					'Set the correct owner, client, hiring manager, status, and employment type before saving.',
+					'Use a real ZIP code and location so search and matching stay credible.',
+					'If you plan to publish publicly, finish the public description before turning that on.'
+				]}
+				outcomes={[
+					'The job opens directly into matching, submissions, and client portal workflows.',
+					'Open job orders can be matched against candidates immediately after save.',
+					'The assigned contact can later receive a persistent client review portal link for this job.'
+				]}
+				tips={[
+					'Keep internal description for recruiter context and public description for candidate-facing copy.',
+					'Pick the right hiring manager now because the portal and downstream client workflow hang off that relationship.'
+				]}
+			/>
+			</div>
 
 		</section>
 	);

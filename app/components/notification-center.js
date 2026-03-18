@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, Check, CheckCheck, LoaderCircle, RotateCcw } from 'lucide-react';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { useToast } from '@/app/components/toast-provider';
 
@@ -133,9 +133,10 @@ export default function NotificationCenter() {
 							className="topbar-notification-mark-all"
 							onClick={onMarkAllRead}
 							disabled={markingAllRead || unreadCount <= 0}
+							aria-label="Mark all notifications read"
+							title={markingAllRead ? 'Updating notifications' : 'Mark all notifications read'}
 						>
-							<CheckCheck aria-hidden="true" />
-							<span>{markingAllRead ? 'Updating...' : 'Mark all read'}</span>
+							{markingAllRead ? <LoaderCircle aria-hidden="true" className="topbar-notification-spinner" /> : <CheckCheck aria-hidden="true" />}
 						</button>
 					</div>
 					{loading ? <p className="topbar-notification-empty">Loading...</p> : null}
@@ -155,14 +156,16 @@ export default function NotificationCenter() {
 												<strong>{row.title}</strong>
 											)}
 											{row.message ? <p>{row.message}</p> : null}
-											<small>{formatDateTimeAt(row.createdAt)}</small>
+											<small><span className="meta-emphasis-time">{formatDateTimeAt(row.createdAt)}</span></small>
 										</div>
 										<button
 											type="button"
 											className="topbar-notification-item-toggle"
 											onClick={() => onMarkNotificationRead(row.id, isUnread)}
+											aria-label={isUnread ? 'Mark notification read' : 'Mark notification unread'}
+											title={isUnread ? 'Mark notification read' : 'Mark notification unread'}
 										>
-											{isUnread ? 'Mark Read' : 'Mark Unread'}
+											{isUnread ? <Check aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
 										</button>
 									</li>
 								);

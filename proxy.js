@@ -89,6 +89,7 @@ function isPublicPagePath(pathname) {
 		pathname === '/setup' ||
 		pathname === '/forgot-password' ||
 		pathname === '/reset-password' ||
+		pathname.startsWith('/client-review/') ||
 		pathname.startsWith('/careers')
 	);
 }
@@ -99,6 +100,7 @@ function isPublicApiPath(pathname) {
 		pathname === '/api/onboarding/setup' ||
 		pathname === '/api/health' ||
 		pathname === '/api/inbound/postmark' ||
+		pathname.startsWith('/api/client-review/') ||
 		pathname === '/api/session/login' ||
 		pathname === '/api/session/logout' ||
 		pathname === '/api/session/acting-user' ||

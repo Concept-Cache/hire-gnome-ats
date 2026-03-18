@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Download, LoaderCircle, MoreVertical, RefreshCcw, Sparkles, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, BookmarkX, Download, FileText, LoaderCircle, MoreVertical, RefreshCcw, Sparkles, Trash2, X } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
@@ -18,6 +18,7 @@ import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import {
 	CANDIDATE_SOURCE_OPTIONS,
 	normalizeCandidateSourceValue
@@ -29,7 +30,7 @@ import { formatDateTimeAt } from '@/lib/date-format';
 import { isValidEmailAddress } from '@/lib/email-validation';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { sortByConfig } from '@/lib/list-sort';
-import { submissionCreatedByLabel } from '@/lib/submission-origin';
+import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { CANDIDATE_STATUS_OPTIONS, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 
@@ -229,10 +230,12 @@ export default function CandidateDetailsPage() {
 	const [attachmentState, setAttachmentState] = useState({
 		uploading: false,
 		deletingId: null,
+		updatingId: null,
 		error: '',
 		success: ''
 	});
 	const [attachmentFile, setAttachmentFile] = useState(null);
+	const [attachmentIsResume, setAttachmentIsResume] = useState(false);
 	const [attachmentInputKey, setAttachmentInputKey] = useState(0);
 	const [workspaceTab, setWorkspaceTab] = useState('notes');
 	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
@@ -280,7 +283,7 @@ export default function CandidateDetailsPage() {
 				})),
 		[skills]
 	);
-	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
+	const isAdmin = useIsAdministrator(actingUser);
 	const hasRequiredFields = Boolean(
 		editForm.firstName.trim() &&
 			editForm.lastName.trim() &&
@@ -1012,7 +1015,13 @@ export default function CandidateDetailsPage() {
 	async function onUploadAttachment(e) {
 		e.preventDefault();
 		if (!attachmentFile) {
-			setAttachmentState({ uploading: false, deletingId: null, error: 'Select a file to upload.', success: '' });
+			setAttachmentState({
+				uploading: false,
+				deletingId: null,
+				updatingId: null,
+				error: 'Select a file to upload.',
+				success: ''
+			});
 			return;
 		}
 
@@ -1021,6 +1030,7 @@ export default function CandidateDetailsPage() {
 		try {
 			const formData = new FormData();
 			formData.append('file', attachmentFile);
+			formData.append('isResume', attachmentIsResume ? 'true' : 'false');
 
 			const res = await fetch(`/api/candidates/${id}/files`, {
 				method: 'POST',
@@ -1028,21 +1038,67 @@ export default function CandidateDetailsPage() {
 			});
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
-				setAttachmentState({
-					uploading: false,
-					deletingId: null,
-					error: data.error || 'Failed to upload file.',
-					success: ''
-				});
+			setAttachmentState({
+				uploading: false,
+				deletingId: null,
+				updatingId: null,
+				error: data.error || 'Failed to upload file.',
+				success: ''
+			});
 				return;
 			}
 
 			setAttachmentFile(null);
+			setAttachmentIsResume(false);
 			setAttachmentInputKey((value) => value + 1);
 			await load();
-			setAttachmentState({ uploading: false, deletingId: null, error: '', success: 'File uploaded.' });
+			setAttachmentState({ uploading: false, deletingId: null, updatingId: null, error: '', success: 'File uploaded.' });
 		} catch {
-			setAttachmentState({ uploading: false, deletingId: null, error: 'Failed to upload file.', success: '' });
+			setAttachmentState({ uploading: false, deletingId: null, updatingId: null, error: 'Failed to upload file.', success: '' });
+		}
+	}
+
+	async function onToggleAttachmentResume(attachment) {
+		if (!attachment) return;
+
+		setAttachmentState((current) => ({
+			...current,
+			updatingId: attachment.id,
+			error: '',
+			success: ''
+		}));
+
+		try {
+			const res = await fetch(`/api/candidates/${id}/files/${attachment.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ isResume: !attachment.isResume })
+			});
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				setAttachmentState((current) => ({
+					...current,
+					updatingId: null,
+					error: data.error || 'Failed to update file.',
+					success: ''
+				}));
+				return;
+			}
+
+			await load();
+			setAttachmentState((current) => ({
+					...current,
+					updatingId: null,
+					error: '',
+					success: attachment.isResume ? 'Resume label removed.' : 'File marked as resume.'
+				}));
+		} catch {
+			setAttachmentState((current) => ({
+				...current,
+				updatingId: null,
+				error: 'Failed to update file.',
+				success: ''
+			}));
 		}
 	}
 
@@ -1208,14 +1264,19 @@ export default function CandidateDetailsPage() {
 									>
 										Archive Candidate
 									</button>
-									<button
-										type="button"
-										role="menuitem"
-										className="actions-menu-item"
-										onClick={onToggleAuditTrail}
-									>
-										{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-									</button>
+									{isAdmin ? (
+										<>
+											<div className="actions-menu-divider" role="separator" />
+											<button
+												type="button"
+												role="menuitem"
+												className="actions-menu-item"
+												onClick={onToggleAuditTrail}
+											>
+												{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+											</button>
+										</>
+									) : null}
 								</div>
 							) : null}
 						</div>
@@ -1650,7 +1711,7 @@ export default function CandidateDetailsPage() {
 														{note.createdByUser
 															? `${note.createdByUser.firstName} ${note.createdByUser.lastName}`
 															: 'Unknown User'}{' '}
-														@ {formatDate(note.createdAt)}
+														@ <span className="meta-emphasis-time">{formatDate(note.createdAt)}</span>
 													</p>
 												</div>
 											</li>
@@ -1744,7 +1805,7 @@ export default function CandidateDetailsPage() {
 													<p>
 														{activity.type} | {formatSelectValueLabel(activity.status)}
 													</p>
-													<p className="simple-list-meta">@ {formatDate(activity.dueAt || activity.createdAt)}</p>
+													<p className="simple-list-meta">@ <span className="meta-emphasis-time">{formatDate(activity.dueAt || activity.createdAt)}</span></p>
 												</div>
 											</li>
 										))}
@@ -1787,10 +1848,21 @@ export default function CandidateDetailsPage() {
 														<Link href={`/submissions/${submission.id}`}>{submission.jobOrder}</Link>
 													</strong>
 													<p>{submission.client}</p>
-													<p className="simple-list-meta">By {submission.createdBy} @ {submission.createdAt}</p>
+													<p className="simple-list-meta">By {submission.createdBy} @ <span className="meta-emphasis-time">{submission.createdAt}</span></p>
 												</div>
 												<div className="simple-list-actions simple-list-indicators">
-													<span className="chip">{submission.status}</span>
+													<div className="submission-chip-stack">
+														<span className="chip">{submission.status}</span>
+														<span
+															className={
+																submissionOriginLabel(submission) === 'Web'
+																	? 'chip submission-origin-chip submission-origin-chip-web'
+																	: 'chip submission-origin-chip submission-origin-chip-recruiter'
+															}
+														>
+															{submissionOriginLabel(submission)}
+														</span>
+													</div>
 												</div>
 											</li>
 										))}
@@ -1803,18 +1875,32 @@ export default function CandidateDetailsPage() {
 						{workspaceTab === 'files' ? (
 							<div className="side-tab-content side-tab-content-with-scroll">
 							<form onSubmit={onUploadAttachment}>
-								<FormField label="Attachment File" required>
-									<input
-										key={attachmentInputKey}
-										type="file"
-										accept={candidateAttachmentAcceptString()}
-										onChange={(e) => {
-											const file = e.target.files?.[0] || null;
-											setAttachmentFile(file);
-										}}
-										required
-									/>
-								</FormField>
+								<div className="form-field">
+									<label className="form-label">
+										Attachment File <span className="required-indicator">*</span>
+									</label>
+									<div className="candidate-attachment-upload-row">
+										<input
+											key={attachmentInputKey}
+											className="candidate-attachment-file-input"
+											type="file"
+											accept={candidateAttachmentAcceptString()}
+											onChange={(e) => {
+												const file = e.target.files?.[0] || null;
+												setAttachmentFile(file);
+											}}
+											required
+										/>
+										<label className="candidate-attachment-resume-option">
+											<input
+												type="checkbox"
+												checked={attachmentIsResume}
+												onChange={(event) => setAttachmentIsResume(event.target.checked)}
+											/>
+											<span>Primary Resume?</span>
+										</label>
+									</div>
+								</div>
 								{attachmentFile ? (
 									<p className="panel-subtext">Selected: {attachmentFile.name}</p>
 								) : null}
@@ -1850,18 +1936,46 @@ export default function CandidateDetailsPage() {
 										{sortedAttachments.map((attachment) => (
 											<li key={attachment.id}>
 												<div>
-													<strong>{attachment.fileName}</strong>
+													<div className="simple-list-title-row">
+														<strong>{attachment.fileName}</strong>
+														{attachment.isResume ? <span className="chip chip-resume">Resume</span> : null}
+													</div>
 													<p>{formatFileSize(attachment.sizeBytes)}</p>
 													<p className="simple-list-meta">
 														By{' '}
 														{attachment.uploadedByUser
 															? `${attachment.uploadedByUser.firstName} ${attachment.uploadedByUser.lastName}`
 															: 'Unknown User'}{' '}
-														@ {formatDate(attachment.createdAt)}
+														@ <span className="meta-emphasis-time">{formatDate(attachment.createdAt)}</span>
 													</p>
 												</div>
 												<div className="simple-list-actions">
 													<div className="row-actions row-actions-right">
+														<button
+															type="button"
+															className={`row-action-icon${attachment.isResume ? ' row-action-icon-resume-active' : ''}`}
+															aria-label={attachment.isResume ? 'Remove resume label' : 'Mark as resume'}
+															title={attachment.isResume ? 'Remove resume label' : 'Mark as resume'}
+															disabled={
+																attachmentState.uploading ||
+																attachmentState.updatingId === attachment.id ||
+																attachmentState.deletingId === attachment.id
+															}
+															onClick={() => onToggleAttachmentResume(attachment)}
+														>
+															{attachmentState.updatingId === attachment.id ? (
+																<LoaderCircle
+																	aria-hidden="true"
+																	className="row-action-lucide row-action-icon-spinner"
+																/>
+															) : (
+																attachment.isResume ? (
+																	<BookmarkX aria-hidden="true" className="row-action-lucide" />
+																) : (
+																	<BookmarkPlus aria-hidden="true" className="row-action-lucide" />
+																)
+															)}
+														</button>
 														<a
 															href={`/api/candidates/${id}/files/${attachment.id}/download`}
 															className="row-action-icon"
@@ -1877,6 +1991,7 @@ export default function CandidateDetailsPage() {
 															title="Delete file"
 															disabled={
 																attachmentState.uploading ||
+																attachmentState.updatingId === attachment.id ||
 																attachmentState.deletingId === attachment.id
 															}
 															onClick={() => onDeleteAttachment(attachment)}
@@ -2338,7 +2453,7 @@ export default function CandidateDetailsPage() {
 															{statusChange.changedByUser
 																? `${statusChange.changedByUser.firstName} ${statusChange.changedByUser.lastName}`
 																: 'Unknown User'}{' '}
-															@ {formatDate(statusChange.createdAt)}
+															@ <span className="meta-emphasis-time">{formatDate(statusChange.createdAt)}</span>
 														</p>
 													</div>
 												</li>
@@ -2350,7 +2465,7 @@ export default function CandidateDetailsPage() {
 						) : null}
 					</article>
 			</div>
-			<AuditTrailPanel entityType="CANDIDATE" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="CANDIDATE" entityId={id} visible={showAuditTrail} /> : null}
 			{aiSummaryOpen ? (
 				<div className="confirm-overlay" onClick={() => setAiSummaryOpen(false)}>
 					<div
@@ -2444,7 +2559,7 @@ export default function CandidateDetailsPage() {
 										{candidate.aiSummary.generatedByUser
 											? `${candidate.aiSummary.generatedByUser.firstName} ${candidate.aiSummary.generatedByUser.lastName}`
 											: 'Unknown User'}{' '}
-										@ {formatDate(candidate.aiSummary.updatedAt)}
+										@ <span className="meta-emphasis-time">{formatDate(candidate.aiSummary.updatedAt)}</span>
 									</p>
 								</div>
 							) : summaryState.generating ? (

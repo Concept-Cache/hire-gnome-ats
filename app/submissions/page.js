@@ -3,14 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
-import { submissionCreatedByLabel } from '@/lib/submission-origin';
+import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 
 function formatDate(value) {
 	return formatDateTimeAt(value);
@@ -50,7 +50,7 @@ export default function SubmissionsPage() {
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.candidate} ${row.jobOrder} ${row.client} ${row.status} ${row.statusLabel} ${row.submittedBy ?? ''}`
+				`${row.candidate} ${row.jobOrder} ${row.client} ${row.status} ${row.statusLabel} ${row.originLabel ?? ''} ${row.submittedBy ?? ''}`
 					.toLowerCase()
 					.includes(q);
 			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
@@ -78,6 +78,7 @@ export default function SubmissionsPage() {
 					client: submission.jobOrder?.client?.name || '-',
 					clientId: submission.jobOrder?.client?.id || null,
 					statusLabel: formatSelectValueLabel(submission.status),
+					originLabel: submissionOriginLabel(submission),
 					submittedBy: submissionCreatedByLabel(submission),
 					submittedAt: formatDate(submission.createdAt)
 				}))
@@ -96,6 +97,21 @@ export default function SubmissionsPage() {
 	}
 
 	const columns = [
+		{
+			key: 'originLabel',
+			label: 'Origin',
+			render: (row) => (
+				<span
+					className={
+						row.originLabel === 'Web'
+							? 'chip submission-origin-chip submission-origin-chip-web'
+							: 'chip submission-origin-chip submission-origin-chip-recruiter'
+					}
+				>
+					{row.originLabel}
+				</span>
+			)
+		},
 		{
 			key: 'candidate',
 			label: 'Candidate',
@@ -138,9 +154,6 @@ export default function SubmissionsPage() {
 					<h2>Submissions</h2>
 				</div>
 				<div className="module-header-actions">
-					<Link href="/archive" className="btn-secondary btn-link-icon" aria-label="Archive" title="Archive">
-						<Archive aria-hidden="true" className="btn-refresh-icon-svg" />
-					</Link>
 					<Link
 						href="/submissions/new"
 						className="btn-link btn-link-icon"
@@ -156,7 +169,7 @@ export default function SubmissionsPage() {
 				<h3>Submission List</h3>
 					<div className="list-controls list-controls-three list-controls-with-columns">
 					<input
-						placeholder="Search candidate, job order, client, status, submitter"
+						placeholder="Search candidate, job order, client, status, origin, submitter"
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 					/>

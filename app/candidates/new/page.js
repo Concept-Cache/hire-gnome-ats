@@ -9,6 +9,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import SkillChipSelect from '@/app/components/skill-chip-select';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import {
@@ -609,7 +610,7 @@ function NewCandidatePageContent() {
 				</div>
 			</header>
 
-
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<div className="method-tabs" role="tablist" aria-label="Candidate creation methods">
 					<button
@@ -1043,6 +1044,25 @@ function NewCandidatePageContent() {
 				) : null}
 
 			</article>
+			<NewRecordGuide
+				title="Candidate Setup"
+				intro="Use manual entry for direct sourcing and resume parse when you want a faster first draft."
+				checklist={[
+					'Make sure email, mobile, source, owner, and current role details are real before saving.',
+					'Pick the correct stage up front so matching, submissions, and interviews behave correctly.',
+					'Review parsed resume data before saving if you used the resume workflow.'
+				]}
+				outcomes={[
+					'The candidate record opens immediately after save for notes, files, AI summary, and matching.',
+					'Qualified candidates can be submitted and scheduled for interviews right away.',
+					'Primary resume labeling controls what can be exposed later in the client portal.'
+				]}
+				tips={[
+					'Use Resume Parse when you want structure quickly, then tighten the record before saving.',
+					'Keep the owner accurate because reporting, notifications, and downstream workflows depend on it.'
+				]}
+			/>
+			</div>
 
 		</section>
 	);

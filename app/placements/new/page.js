@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
@@ -209,6 +210,7 @@ function NewPlacementPageContent() {
 				</div>
 			</header>
 
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<h3>Create Placement</h3>
 				<form onSubmit={onSubmit}>
@@ -458,6 +460,24 @@ function NewPlacementPageContent() {
 					</button>
 				</form>
 			</article>
+			<NewRecordGuide
+				title="Placement Setup"
+				intro="Placements are high-impact records. Compensation, dates, and status changes flow into reporting and downstream lock behavior."
+				checklist={[
+					'Use the correct candidate and job order pairing before you save.',
+					'Offered On and Start Date should reflect the real commercial timeline.',
+					'Compensation values should be complete for the selected placement and compensation type.'
+				]}
+				outcomes={[
+					'The placement detail becomes the source of truth for acceptance, revisions, and reporting.',
+					'Related submissions and job-order reporting use this record immediately after save.'
+				]}
+				tips={[
+					'Do not overuse placement creation for tentative deals; wait until the commercial process is real.',
+					'Get compensation structure right now because later cleanup is expensive and noisy in reports.'
+				]}
+			/>
+			</div>
 		</section>
 	);
 }

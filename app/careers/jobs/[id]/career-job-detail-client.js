@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BriefcaseBusiness, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/app/components/toast-provider';
 import { formatPhoneInput } from '@/lib/phone';
@@ -23,6 +23,39 @@ const initialForm = {
 	linkedinUrl: '',
 	faxNumber: ''
 };
+
+const CAREER_APPLY_SESSION_KEY = 'careerQuickApplyForm';
+
+function toStoredFormValue(value) {
+	return {
+		firstName: String(value?.firstName || ''),
+		lastName: String(value?.lastName || ''),
+		email: String(value?.email || ''),
+		mobile: String(value?.mobile || ''),
+		zipCode: String(value?.zipCode || ''),
+		currentJobTitle: String(value?.currentJobTitle || ''),
+		currentEmployer: String(value?.currentEmployer || ''),
+		linkedinUrl: String(value?.linkedinUrl || ''),
+		faxNumber: ''
+	};
+}
+
+function loadStoredApplyForm() {
+	if (typeof window === 'undefined') {
+		return initialForm;
+	}
+
+	try {
+		const raw = window.sessionStorage.getItem(CAREER_APPLY_SESSION_KEY);
+		if (!raw) return initialForm;
+		return {
+			...initialForm,
+			...toStoredFormValue(JSON.parse(raw))
+		};
+	} catch {
+		return initialForm;
+	}
+}
 
 function formatCurrencyRange(min, max, currency = 'USD') {
 	const hasMin = Number.isFinite(Number(min));
@@ -55,7 +88,7 @@ function formatDate(value) {
 
 export default function CareerJobDetailClient({ job }) {
 	const toast = useToast();
-	const [form, setForm] = useState(initialForm);
+	const [form, setForm] = useState(loadStoredApplyForm);
 	const [startedAtMs, setStartedAtMs] = useState(() => String(Date.now()));
 	const [resumeFile, setResumeFile] = useState(null);
 	const [resumeInputKey, setResumeInputKey] = useState(0);
@@ -76,6 +109,27 @@ export default function CareerJobDetailClient({ job }) {
 			),
 		[form, resumeFile]
 	);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		try {
+			window.sessionStorage.setItem(
+				CAREER_APPLY_SESSION_KEY,
+				JSON.stringify(toStoredFormValue(form))
+			);
+		} catch {
+			// Ignore sessionStorage failures and keep the form usable.
+		}
+	}, [
+		form.currentEmployer,
+		form.currentJobTitle,
+		form.email,
+		form.firstName,
+		form.lastName,
+		form.linkedinUrl,
+		form.mobile,
+		form.zipCode
+	]);
 
 	async function onSubmit(event) {
 		event.preventDefault();
@@ -127,10 +181,10 @@ export default function CareerJobDetailClient({ job }) {
 
 			toast.success(data.message || 'Application submitted successfully.');
 			setSubmitState({ submitting: false });
-			setForm(initialForm);
 			setStartedAtMs(String(Date.now()));
 			setResumeFile(null);
 			setResumeInputKey((current) => current + 1);
+			setForm((current) => ({ ...current, faxNumber: '' }));
 		} catch {
 			toast.error('Application could not be submitted. Please try again.');
 			setSubmitState({ submitting: false });
@@ -191,6 +245,9 @@ export default function CareerJobDetailClient({ job }) {
 					<h2>Quick Apply</h2>
 					<p>Submit your profile and we will connect with you if your background aligns.</p>
 					<form onSubmit={onSubmit} className="career-apply-form">
+						<p className="career-apply-helper">
+							Your contact details stay in this browser session so you can apply to multiple roles faster.
+						</p>
 						<div className="career-apply-grid-2">
 							<label>
 								<span>First Name *</span>

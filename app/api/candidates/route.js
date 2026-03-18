@@ -323,6 +323,7 @@ async function postCandidatesHandler(req) {
 					data: {
 						candidateId: createdCandidate.id,
 						fileName: attachmentFileName,
+						isResume: true,
 						contentType: parsedResumeAttachmentFile.type || null,
 						sizeBytes: parsedResumeAttachmentFile.size,
 						storageProvider: uploaded.storageProvider,

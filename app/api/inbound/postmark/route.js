@@ -227,6 +227,7 @@ async function maybeSaveCandidateAttachment(candidateId, messageId, attachment, 
 		data: {
 			candidateId,
 			fileName,
+			isResume: false,
 			contentType: contentType || null,
 			sizeBytes: buffer.length,
 			storageProvider: uploaded.storageProvider,

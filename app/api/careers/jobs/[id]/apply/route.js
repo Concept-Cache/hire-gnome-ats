@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getArchivedEntityIdSet } from '@/lib/archive-entities';
 import { logCreate, logUpdate } from '@/lib/audit-log';
 import { isValidEmailAddress } from '@/lib/email-validation';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
@@ -19,6 +20,7 @@ import {
 import { withInferredCityStateFromZip } from '@/lib/zip-code-lookup';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { createNotification } from '@/lib/notifications';
+import { getPublicAppBaseUrl } from '@/lib/site-url';
 import {
 	CAREERS_APPLY_RATE_LIMIT_MAX_REQUESTS,
 	CAREERS_APPLY_RATE_LIMIT_WINDOW_SECONDS,
@@ -85,6 +87,7 @@ function asTrimmedString(value) {
 }
 
 function buildCareerSiteApplicationOwnerEmail({
+	baseUrl,
 	jobOrder,
 	application,
 	normalizedEmail,
@@ -100,6 +103,13 @@ function buildCareerSiteApplicationOwnerEmail({
 	const safeJobOrderTitle = asTrimmedString(jobOrder?.title) || '-';
 	const appliedAtDisplay = formatDateTimeAt(new Date());
 	const subject = `New Career Site Application: ${safeApplicantName} for ${safeJobOrderTitle}`;
+	const normalizedBaseUrl = String(baseUrl || '').trim().replace(/\/$/, '');
+	const jobOrderLink =
+		normalizedBaseUrl && jobOrder?.id ? `${normalizedBaseUrl}/job-orders/${jobOrder.id}` : '';
+	const candidateLink =
+		normalizedBaseUrl && candidate?.id ? `${normalizedBaseUrl}/candidates/${candidate.id}` : '';
+	const submissionLink =
+		normalizedBaseUrl && submission?.id ? `${normalizedBaseUrl}/submissions/${submission.id}` : '';
 
 	const text = [
 		`Hi ${ownerName || 'there'},`,
@@ -118,16 +128,29 @@ function buildCareerSiteApplicationOwnerEmail({
 		`Candidate Record ID: ${asTrimmedString(candidate?.recordId) || '-'}`,
 		`Submission Record ID: ${asTrimmedString(submission?.recordId) || '-'}`,
 		`Resume File: ${asTrimmedString(resumeFileName) || '-'}`,
-		`Applied At: ${appliedAtDisplay}`
-	].join('\n');
+		`Applied At: ${appliedAtDisplay}`,
+		jobOrderLink ? `Open Job Order: ${jobOrderLink}` : '',
+		candidateLink ? `Open Candidate: ${candidateLink}` : '',
+		submissionLink ? `Open Submission: ${submissionLink}` : ''
+	]
+		.filter(Boolean)
+		.join('\n');
 
 	const html = `
 		<p>Hi ${escapeHtml(ownerName || 'there')},</p>
 		<p>A new application was submitted through the career site.</p>
 		<ul>
-			<li><strong>Job Order:</strong> ${escapeHtml(safeJobOrderTitle)}</li>
+			<li><strong>Job Order:</strong> ${
+				jobOrderLink
+					? `<a href="${escapeHtml(jobOrderLink)}">${escapeHtml(safeJobOrderTitle)}</a>`
+					: escapeHtml(safeJobOrderTitle)
+			}</li>
 			<li><strong>Client:</strong> ${escapeHtml(clientName)}</li>
-			<li><strong>Candidate:</strong> ${escapeHtml(safeApplicantName)}</li>
+			<li><strong>Candidate:</strong> ${
+				candidateLink
+					? `<a href="${escapeHtml(candidateLink)}">${escapeHtml(safeApplicantName)}</a>`
+					: escapeHtml(safeApplicantName)
+			}</li>
 			<li><strong>Email:</strong> ${escapeHtml(asTrimmedString(normalizedEmail) || '-')}</li>
 			<li><strong>Mobile:</strong> ${escapeHtml(asTrimmedString(application.mobile) || '-')}</li>
 			<li><strong>Zip Code:</strong> ${escapeHtml(asTrimmedString(application.zipCode) || '-')}</li>
@@ -135,10 +158,25 @@ function buildCareerSiteApplicationOwnerEmail({
 			<li><strong>Current Employer:</strong> ${escapeHtml(asTrimmedString(application.currentEmployer) || '-')}</li>
 			<li><strong>LinkedIn:</strong> ${escapeHtml(offeredLinkedin)}</li>
 			<li><strong>Candidate Record ID:</strong> ${escapeHtml(asTrimmedString(candidate?.recordId) || '-')}</li>
-			<li><strong>Submission Record ID:</strong> ${escapeHtml(asTrimmedString(submission?.recordId) || '-')}</li>
+			<li><strong>Submission Record ID:</strong> ${
+				submissionLink
+					? `<a href="${escapeHtml(submissionLink)}">${escapeHtml(asTrimmedString(submission?.recordId) || '-')}</a>`
+					: escapeHtml(asTrimmedString(submission?.recordId) || '-')
+			}</li>
 			<li><strong>Resume File:</strong> ${escapeHtml(asTrimmedString(resumeFileName) || '-')}</li>
 			<li><strong>Applied At:</strong> ${escapeHtml(appliedAtDisplay)}</li>
 		</ul>
+		${
+			jobOrderLink || candidateLink || submissionLink
+				? `<p>
+					${jobOrderLink ? `<a href="${escapeHtml(jobOrderLink)}">Open Job Order</a>` : ''}
+					${jobOrderLink && (candidateLink || submissionLink) ? ' &nbsp;|&nbsp; ' : ''}
+					${candidateLink ? `<a href="${escapeHtml(candidateLink)}">Open Candidate</a>` : ''}
+					${candidateLink && submissionLink ? ' &nbsp;|&nbsp; ' : ''}
+					${submissionLink ? `<a href="${escapeHtml(submissionLink)}">Open Submission</a>` : ''}
+				</p>`
+				: ''
+		}
 	`.trim();
 
 	return { subject, text, html };
@@ -326,11 +364,13 @@ async function postCareerSiteApplication(req, { params }) {
 			resumeBuffer = Buffer.from(await resumeFile.arrayBuffer());
 		}
 
+		const archivedJobOrderIds = await getArchivedEntityIdSet('JOB_ORDER');
 		const jobOrder = await prisma.jobOrder.findFirst({
 			where: {
 				id,
 				publishToCareerSite: true,
-				status: { in: ['open', 'active'] }
+				status: 'open',
+				...(archivedJobOrderIds.size > 0 ? { id: { notIn: [...archivedJobOrderIds] } } : {})
 			},
 			select: {
 				id: true,
@@ -437,11 +477,19 @@ async function postCareerSiteApplication(req, { params }) {
 				resumeFileName: resumeFile?.name || ''
 			});
 
+			const aggregate = await tx.submission.aggregate({
+				where: { jobOrderId: jobOrder.id },
+				_max: { submissionPriority: true }
+			});
+			const nextPriority = Number(aggregate._max.submissionPriority || 0) + 1;
+
 			const createdSubmission = await tx.submission.create({
 				data: {
 					candidateId: candidate.id,
 					jobOrderId: jobOrder.id,
 					status: 'submitted',
+					submissionPriority: nextPriority,
+					isClientVisible: false,
 					notes,
 					createdByUserId: null
 				},
@@ -515,6 +563,7 @@ async function postCareerSiteApplication(req, { params }) {
 				data: {
 					candidateId: candidate.id,
 					fileName: resumeFile.name,
+					isResume: true,
 					contentType: resumeFile.type || null,
 					sizeBytes: resumeFile.size,
 					storageProvider: uploaded.storageProvider,
@@ -564,6 +613,7 @@ async function postCareerSiteApplication(req, { params }) {
 			);
 		} else if (ownerEmail && isValidEmailAddress(ownerEmail)) {
 			const ownerNotification = buildCareerSiteApplicationOwnerEmail({
+				baseUrl: getPublicAppBaseUrl(),
 				jobOrder,
 				application,
 				normalizedEmail,

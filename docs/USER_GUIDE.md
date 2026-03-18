@@ -11,9 +11,10 @@ Use this sequence as your default process:
 3. Create a `Job Order` linked to the client and hiring manager contact.
 4. Add or import a `Candidate`.
 5. Create a `Submission` for candidate + job order.
-6. Schedule one or more `Interviews`.
-7. Convert successful submissions to `Placements`.
-8. Use notes, activities, and audit trail for accountability.
+6. Share the `Client Review Portal` from the job order when you want external client feedback without requiring client login.
+7. Schedule one or more `Interviews`.
+8. Convert successful submissions to `Placements`.
+9. Use notes, activities, and administrator audit trail access for accountability where applicable.
 
 ## 2) Roles And Access
 
@@ -40,7 +41,7 @@ Use this sequence as your default process:
 - User menu (`top-right`): account settings, Help, and sign out.
 - List pages: search, filters, sorting, paging, and column chooser.
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
-- Actions menu (`...`): context actions like archive, close, cancel, convert, view audit.
+- Actions menu (`...`): context actions like archive, close, cancel, convert, and administrator-only audit access where supported.
 
 ## Demo Environment Note
 
@@ -107,6 +108,7 @@ Resume parsing:
 - System attempts AI parsing first if key is configured.
 - Falls back to built-in parser if AI is unavailable.
 - Parsed resumes can auto-populate candidate data and attach source file.
+- In the candidate `Files` workspace, uploaded files can be labeled as the candidate's `Resume` for clearer internal review and to control which resume is exposed in the client portal.
 
 AI summary:
 - Opened from the candidate detail sparkles `AI Summary` header button.
@@ -183,9 +185,13 @@ Submission workflow:
 - Add submissions directly from job order detail workspace.
 - Use `Priority Order` in the submissions workspace to rank submissions by recruiter preference.
 - Drag and drop submissions while in `Priority Order` sort to persist the ranking.
+- Candidate names in the submissions workspace open the candidate record; use the separate launch icon to open the submission record.
+- The submissions workspace shows the latest client portal action/comment on each submission row for quick review.
+- Career-site responses stay marked as `Web` and start hidden from the client portal until a recruiter promotes them from submission detail.
 - Duplicate submissions for same candidate + job are blocked.
 - Candidate suggestions use qualification scoring and typeahead safeguards.
 - Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.
+- Use `Actions > Client Review Portal` to create, copy, email, open, revoke, or restore the persistent client-facing magic link for the assigned hiring contact, with last-viewed and last-emailed tracking in the modal.
 
 ## Submissions
 
@@ -205,6 +211,11 @@ Behavior notes:
 - If converted to placement, submission becomes non-editable.
 - `Client Write-Up` can be AI-generated from the candidate and job order, then edited before saving.
 - The write-up toolbar sits above the field and supports regenerate + copy to clipboard.
+- `Client Feedback` on submission detail shows comments and actions received through the client review portal, including interview requests and passes.
+- If the client uses `Pass`, the portal confirms the action first and then locks that submission against any further client responses.
+- Client `Pass` actions also move that submission to the bottom of the job order's `Priority Order` ranking.
+- The client portal only exposes the candidate's labeled primary resume. If no primary resume is set, the portal does not offer a file download.
+- Submission detail includes a `Client Portal` visibility field plus actions to `Promote to Client Portal` or `Hide from Client Portal`.
 
 ## Interviews
 
@@ -305,11 +316,16 @@ If enabled by admin:
 Owner notifications:
 - Job owner can receive quick-apply emails if notification settings allow.
 
+Account notification settings:
+- `Account Settings` lets each user control whether they receive:
+- Career site application emails
+- Client feedback notifications from the client review portal, including email alerts when enabled
+
 ## 8) Audit Trail And Accountability
 
 - Updates are logged with actor, timestamp, and field-level changes.
-- Audit panel is opened from actions menu on detail pages.
-- Payload view is available for technical/admin review.
+- Audit panel is opened from actions menu on detail pages by administrators only.
+- Payload view is available for administrator review.
 
 ## 9) Common Troubleshooting
 

@@ -15,6 +15,7 @@ import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import { INDUSTRY_OPTIONS, normalizeIndustryValue } from '@/app/constants/industry-options';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
@@ -95,7 +96,7 @@ export default function ClientDetailsPage() {
 	const toast = useToast();
 	const { requestConfirmWithOptions } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('CLIENT');
-	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
+	const isAdmin = useIsAdministrator(actingUser);
 	const hasValidWebsite = isValidOptionalHttpUrl(form.website);
 	const customFieldsComplete = areRequiredCustomFieldsComplete(
 		customFieldDefinitions,
@@ -410,9 +411,14 @@ export default function ClientDetailsPage() {
 								>
 									Archive Client
 								</button>
-								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
-									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-								</button>
+								{isAdmin ? (
+									<>
+										<div className="actions-menu-divider" role="separator" />
+										<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+											{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+										</button>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>
@@ -693,7 +699,7 @@ export default function ClientDetailsPage() {
 														{note.createdByUser
 															? `${note.createdByUser.firstName} ${note.createdByUser.lastName}`
 															: 'Unknown User'}{' '}
-														@ {formatDate(note.createdAt)}
+														@ <span className="meta-emphasis-time">{formatDate(note.createdAt)}</span>
 													</p>
 												</div>
 											</li>
@@ -795,7 +801,7 @@ export default function ClientDetailsPage() {
 					) : null}
 				</article>
 			</div>
-			<AuditTrailPanel entityType="CLIENT" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="CLIENT" entityId={id} visible={showAuditTrail} /> : null}
 		</section>
 	);
 }

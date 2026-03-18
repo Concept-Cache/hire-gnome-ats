@@ -50,10 +50,13 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - AI editor actions use the shared sparkles icon pattern for consistency across candidate and job-order detail views
 - AI-specific controls stay visible but are disabled with an inline hint when no OpenAI key is configured in system settings
 - Job-order submission workspaces support recruiter priority ordering with persisted drag-and-drop ranking
+- Client review portal with persistent magic links per job-order contact, allowing external review of submitted candidates without a login
+- Career-site web responses stay differentiated from recruiter-curated submissions and remain hidden from the client portal until a recruiter promotes them
 - Candidate file attachments with object storage (`s3`) and local fallback
+- Candidate file workspace supports explicit resume labeling so internal users and the client portal can identify the primary resume document
 - Public career site (toggleable in Admin settings) with quick apply + resume upload
 - Candidate and job-order match workspaces (top matches, sortable/paged)
-- Audit trails on records and admin diagnostics
+- Administrator-only audit trails on records plus admin diagnostics
 - Admin diagnostics includes recent inbound email webhook visibility
 - Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering (includes `customFieldDefinitions`)
 - Admin data import module:
@@ -225,6 +228,7 @@ Use `.env` for:
 | `AUTH_FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` | `900` | Forgot-password rate-limit window size. |
 | `AUTH_RESET_PASSWORD_RATE_LIMIT_MAX_REQUESTS` | `10` | Reset-password submission attempts allowed in window. |
 | `AUTH_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS` | `900` | Reset-password rate-limit window size. |
+| `CLIENT_PORTAL_SECRET` | falls back to `AUTH_SESSION_SECRET` | Optional dedicated secret for client-review portal magic links. |
 
 #### Rate Limit And Abuse Controls
 | Variable | Default | Purpose |
@@ -370,6 +374,7 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 - Admin diagnostics: `Admin Area > System Settings > System Diagnostics`
 - Data export: `Admin Area > Data Export` (or `GET /api/admin/data-export`)
 - Data import: `Admin Area > Data Import` (or `POST /api/admin/data-import`)
+- Client review portal management: `Job Order Detail > Actions > Client Review Portal`
 
 Data export query options:
 - `format`: `json` | `ndjson` | `zip`
@@ -418,6 +423,14 @@ Inbound email webhook:
 - Matching is based on any email addresses found in the inbound JSON payload, including common reply/forward content.
 - Candidate attachments are saved only when the inbound payload includes attachment bytes, not just metadata.
 - Recent inbound events and attachment skip reasons are visible in `Admin Area > System Settings > System Diagnostics`.
+
+Client review portal:
+- Internal users can issue a persistent magic link from `Job Order Detail > Actions > Client Review Portal`.
+- Portal access is scoped to the job order's assigned client contact and remains valid for the life of the job unless revoked.
+- Internal users can copy, open, email, revoke, or restore the portal link from the job-order modal.
+- Portal management shows the latest view and email-send timestamps so recruiters can track whether the link was already sent or opened.
+- Clients can review submitted candidates, read the recruiter write-up, download only the candidate's labeled primary resume, leave comments, request interviews, or pass.
+- Client responses are written back to `Submission Detail > Client Feedback` and generate in-app plus email notifications for users who keep `Client Feedback Notifications` enabled in `Account Settings`.
 - If `POSTMARK_INBOUND_WEBHOOK_SECRET` is set, include it either as `?secret=...` on the webhook URL or as the `x-webhook-secret` header.
 
 ## Production Checklist

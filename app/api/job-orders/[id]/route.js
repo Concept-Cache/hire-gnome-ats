@@ -89,7 +89,17 @@ function buildJobOrderDetailInclude(entityScope) {
 				orderBy: [{ submissionPriority: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
 				include: {
 					candidate: true,
-					createdByUser: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true } }
+					createdByUser: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true } },
+					clientFeedback: {
+						orderBy: { createdAt: 'desc' },
+						select: {
+							id: true,
+							actionType: true,
+							comment: true,
+							clientNameSnapshot: true,
+							createdAt: true
+						}
+					}
 				}
 			},
 		interviews: {

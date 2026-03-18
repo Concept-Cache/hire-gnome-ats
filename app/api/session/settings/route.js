@@ -7,7 +7,8 @@ import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 
 import { withApiLogging } from '@/lib/api-logging';
 const settingsSchema = z.object({
-	notifyCareerSiteApplications: z.coerce.boolean()
+	notifyCareerSiteApplications: z.coerce.boolean(),
+	notifyClientPortalFeedback: z.coerce.boolean()
 });
 
 const settingsSelect = {
@@ -16,7 +17,8 @@ const settingsSelect = {
 	lastName: true,
 	email: true,
 	isActive: true,
-	notifyCareerSiteApplications: true
+	notifyCareerSiteApplications: true,
+	notifyClientPortalFeedback: true
 };
 
 function serializeSettings(user) {
@@ -24,7 +26,8 @@ function serializeSettings(user) {
 		firstName: user.firstName,
 		lastName: user.lastName,
 		email: user.email,
-		notifyCareerSiteApplications: Boolean(user.notifyCareerSiteApplications)
+		notifyCareerSiteApplications: Boolean(user.notifyCareerSiteApplications),
+		notifyClientPortalFeedback: Boolean(user.notifyClientPortalFeedback)
 	};
 }
 
@@ -73,7 +76,8 @@ async function patchSession_settingsHandler(req) {
 	const updatedUser = await prisma.user.update({
 		where: { id: existingUser.id },
 		data: {
-			notifyCareerSiteApplications: parsed.data.notifyCareerSiteApplications
+			notifyCareerSiteApplications: parsed.data.notifyCareerSiteApplications,
+			notifyClientPortalFeedback: parsed.data.notifyClientPortalFeedback
 		},
 		select: settingsSelect
 	});
@@ -85,11 +89,13 @@ async function patchSession_settingsHandler(req) {
 		entityId: existingUser.id,
 		before: {
 			id: existingUser.id,
-			notifyCareerSiteApplications: existingUser.notifyCareerSiteApplications
+			notifyCareerSiteApplications: existingUser.notifyCareerSiteApplications,
+			notifyClientPortalFeedback: existingUser.notifyClientPortalFeedback
 		},
 		after: {
 			id: updatedUser.id,
-			notifyCareerSiteApplications: updatedUser.notifyCareerSiteApplications
+			notifyCareerSiteApplications: updatedUser.notifyCareerSiteApplications,
+			notifyClientPortalFeedback: updatedUser.notifyClientPortalFeedback
 		},
 		summary: 'Updated own notification settings.',
 		metadata: { source: 'account_settings' }

@@ -7,6 +7,7 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { CONTACT_SOURCE_OPTIONS } from '@/app/constants/contact-source-options';
@@ -283,6 +284,7 @@ function NewContactsPageContent() {
 				</div>
 			</header>
 
+			<div className="new-record-layout">
 			<article className="panel panel-narrow">
 				<div className="method-content">
 					<h3>Add Contact</h3>
@@ -429,6 +431,24 @@ function NewContactsPageContent() {
 					</form>
 				</div>
 			</article>
+			<NewRecordGuide
+				title="Contact Setup"
+				intro="Use contacts for hiring managers, approvers, and anyone who should receive client portal links or recruiting communication."
+				checklist={[
+					'Email, phone, source, owner, and client are required because the contact needs to be actionable immediately.',
+					'Attach the contact to the correct client so job-order lookups and portal workflows stay scoped properly.',
+					'Use a real title or department when it helps recruiters understand the person’s role.'
+				]}
+				outcomes={[
+					'The contact can be selected as a hiring manager on job orders right after save.',
+					'Client portal links and future communication workflows rely on the contact email being accurate.'
+				]}
+				tips={[
+					'If this person should review candidates externally later, verify the email now.',
+					'Use one clean contact record per real person to avoid portal and notification confusion.'
+				]}
+			/>
+			</div>
 		</section>
 	);
 }

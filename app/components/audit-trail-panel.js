@@ -192,7 +192,6 @@ export default function AuditTrailPanel({ entityType, entityId, visible, limit =
 	const [logs, setLogs] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
-	const [isAdmin, setIsAdmin] = useState(false);
 
 	const normalizedType = useMemo(() => String(entityType || '').trim().toUpperCase(), [entityType]);
 	const normalizedId = useMemo(() => {
@@ -247,23 +246,6 @@ export default function AuditTrailPanel({ entityType, entityId, visible, limit =
 		return () => window.clearTimeout(timer);
 	}, [visible]);
 
-	useEffect(() => {
-		if (!visible) return;
-		let ignore = false;
-
-		async function loadUserRole() {
-			const res = await fetch('/api/session/acting-user');
-			const data = await res.json().catch(() => ({}));
-			if (ignore) return;
-			setIsAdmin(data?.user?.role === 'ADMINISTRATOR');
-		}
-
-		loadUserRole();
-		return () => {
-			ignore = true;
-		};
-	}, [visible]);
-
 	if (!visible) return null;
 
 	return (
@@ -305,7 +287,7 @@ export default function AuditTrailPanel({ entityType, entityId, visible, limit =
 									<div>
 										<strong>{log.summary || `${formatActionLabel(log.action)} ${normalizedType}`}</strong>
 										<p className="simple-list-meta">
-											By {actorName(log)} @ {formatDateTime(log.createdAt)}
+											By {actorName(log)} @ <span className="meta-emphasis-time">{formatDateTime(log.createdAt)}</span>
 										</p>
 										{rows.length > 0 ? (
 											<div className="audit-change-list" role="table" aria-label="Audit field changes">
@@ -323,9 +305,9 @@ export default function AuditTrailPanel({ entityType, entityId, visible, limit =
 												))}
 											</div>
 										) : null}
-										{isAdmin && (log.beforeData || log.afterData) ? (
+										{log.beforeData || log.afterData ? (
 											<details className="audit-entry-details">
-												<summary>View raw payload (Admin)</summary>
+												<summary>View raw payload</summary>
 												<div className="audit-entry-grid">
 													{log.beforeData ? (
 														<div>

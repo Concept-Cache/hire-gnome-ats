@@ -2,6 +2,30 @@
 
 This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
 
+## [1.5.1] - 2026-03-17
+
+#### Changed
+- Added a submissions-count column to the job order list so recruiters can see pipeline volume from the main list view.
+- Added explicit candidate resume labeling on file attachments, including automatic labeling for known resume upload flows and clearer portal resume presentation.
+- Improved the demo seed so recent portal and resume workflows open with more representative data, including seeded primary resumes and client-review activity.
+- Refined client portal feedback so `Pass` is confirmed, locks the submission against further client actions, and only the clicked action shows a saving spinner.
+- Client portal `Pass` actions now also push the submission to the bottom of the job order's priority ranking, the job-order submissions workspace surfaces the latest client response more clearly, and the portal itself is now limited to the candidate's labeled primary resume.
+- Added a user-level `Client Feedback Notifications` setting so portal responses only notify users who have opted in through Account Settings.
+- Added an in-app portal email workflow so recruiters can send the persistent client-review link directly to the assigned contact from the job-order portal modal.
+- Client feedback notification opt-ins now trigger actual email alerts in addition to in-app notifications.
+- Portal management now tracks and displays the latest email-send timestamp alongside the existing view activity.
+- Audit trail viewing is now restricted to administrators in both the detail-screen UI and the audit-log API.
+- Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
+
+## [1.5.0] - 2026-03-17
+
+#### Added
+- Added a client review portal with persistent magic links tied to the job order's assigned client contact, allowing external users to review submitted candidates, download resume/files, leave comments, request interviews, and pass without creating a login.
+- Added internal portal management on job-order detail plus submission-level client feedback visibility so recruiters can issue, revoke, and track portal activity from existing workflow screens.
+
+#### Changed
+- Refined the portal management modal controls and button presentation so the client-link actions read cleanly as part of the same portal release.
+
 ## [1.4.6] - 2026-03-17
 
 #### Fixed

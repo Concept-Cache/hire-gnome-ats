@@ -39,6 +39,19 @@ const submissionInclude = {
 	},
 	offer: {
 		select: { id: true, status: true, updatedAt: true }
+	},
+	clientFeedback: {
+		orderBy: { createdAt: 'desc' },
+		select: {
+			id: true,
+			recordId: true,
+			actionType: true,
+			comment: true,
+			statusApplied: true,
+			clientNameSnapshot: true,
+			clientEmailSnapshot: true,
+			createdAt: true
+		}
 	}
 };
 
@@ -112,6 +125,7 @@ async function patchSubmissions_idHandler(req, { params }) {
 			select: {
 				id: true,
 				status: true,
+				isClientVisible: true,
 				notes: true,
 				aiWriteUp: true,
 				aiWriteUpGeneratedAt: true,
@@ -194,6 +208,10 @@ async function patchSubmissions_idHandler(req, { params }) {
 				candidateId: existing.candidateId,
 				jobOrderId: existing.jobOrderId,
 				status: parsed.data.status,
+				isClientVisible:
+					typeof parsed.data.isClientVisible === 'boolean'
+						? parsed.data.isClientVisible
+						: existing.isClientVisible,
 				notes: parsed.data.notes || null,
 				aiWriteUp: parsed.data.aiWriteUp || null,
 				customFields: customFieldValidation.customFields

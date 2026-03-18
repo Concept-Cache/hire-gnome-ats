@@ -16,6 +16,7 @@ import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import {
 	CONTACT_SOURCE_OPTIONS,
 	normalizeContactSourceValue
@@ -96,6 +97,7 @@ export default function ContactDetailsPage() {
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('CONTACT');
+	const isAdmin = useIsAdministrator();
 	const hasValidLinkedinUrl = isValidOptionalHttpUrl(form.linkedinUrl);
 	const linkedinUrlError =
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
@@ -415,9 +417,14 @@ export default function ContactDetailsPage() {
 								>
 									Archive Contact
 								</button>
-								<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
-									{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
-								</button>
+								{isAdmin ? (
+									<>
+										<div className="actions-menu-divider" role="separator" />
+										<button type="button" role="menuitem" className="actions-menu-item" onClick={onToggleAuditTrail}>
+											{showAuditTrail ? 'Hide Audit Trail' : 'View Audit Trail'}
+										</button>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>
@@ -685,7 +692,7 @@ export default function ContactDetailsPage() {
 														{note.createdByUser
 															? `${note.createdByUser.firstName} ${note.createdByUser.lastName}`
 															: 'Unknown User'}{' '}
-														@ {formatDate(note.createdAt)}
+														@ <span className="meta-emphasis-time">{formatDate(note.createdAt)}</span>
 													</p>
 												</div>
 											</li>
@@ -737,7 +744,7 @@ export default function ContactDetailsPage() {
 					) : null}
 				</article>
 			</div>
-			<AuditTrailPanel entityType="CONTACT" entityId={id} visible={showAuditTrail} />
+			{isAdmin ? <AuditTrailPanel entityType="CONTACT" entityId={id} visible={showAuditTrail} /> : null}
 			<EmailDraftModal
 				open={emailDraftOpen}
 				onClose={() => setEmailDraftOpen(false)}

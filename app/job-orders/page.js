@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, LayoutGrid, LayoutList, Plus } from 'lucide-react';
+import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import KanbanBoard from '@/app/components/kanban-board';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import { useToast } from '@/app/components/toast-provider';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
@@ -34,6 +35,7 @@ function updateStatusDisplay(row, nextStatus, nextTimestamp) {
 export default function JobOrdersPage() {
 	const router = useRouter();
 	const { requestConfirm } = useConfirmDialog();
+	const toast = useToast();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
@@ -210,6 +212,10 @@ export default function JobOrdersPage() {
 			label: 'Status',
 			getSortValue: (row) => row.status || ''
 		},
+		{
+			key: 'submissionCount',
+			label: 'Submissions'
+		},
 		{ key: 'owner', label: 'Owner' },
 		{
 			key: 'lastActivityAtLabel',
@@ -225,9 +231,6 @@ export default function JobOrdersPage() {
 					<h2>Job Orders</h2>
 				</div>
 				<div className="module-header-actions">
-					<Link href="/archive" className="btn-secondary btn-link-icon" aria-label="Archive" title="Archive">
-						<Archive aria-hidden="true" className="btn-refresh-icon-svg" />
-					</Link>
 					<Link
 						href="/job-orders/new"
 						className="btn-link btn-link-icon"
