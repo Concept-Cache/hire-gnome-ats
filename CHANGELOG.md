@@ -17,6 +17,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Audit trail viewing is now restricted to administrators in both the detail-screen UI and the audit-log API.
 - Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
 - In demo mode, system settings now allow theme changes while keeping all other admin settings read-only.
+- Added a print-friendly submission packet from submission detail that compiles the write-up, primary resume, candidate snapshot, match explanation, and interview prep for internal review or PDF export.
 
 ## [1.5.0] - 2026-03-17
 

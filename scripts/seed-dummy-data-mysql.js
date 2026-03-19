@@ -691,6 +691,10 @@ async function main() {
 							job.id
 						]
 					);
+					await connection.query(
+						'UPDATE `Submission` SET `status` = ?, `updatedAt` = NOW() WHERE `id` = ?',
+						['placed', submissionId]
+					);
 					placementCount += 1;
 				}
 			}

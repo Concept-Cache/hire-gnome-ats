@@ -216,6 +216,7 @@ Behavior notes:
 - Client `Pass` actions also move that submission to the bottom of the job order's `Priority Order` ranking.
 - The client portal only exposes the candidate's labeled primary resume. If no primary resume is set, the portal does not offer a file download.
 - Submission detail includes a `Client Portal` visibility field plus actions to `Promote to Client Portal` or `Hide from Client Portal`.
+- Submission detail also includes a `Submission Packet` action that opens a print-friendly internal packet for browser PDF export.
 
 ## Interviews
 

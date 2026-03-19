@@ -74,6 +74,9 @@ function buildCandidateDetailInclude(entityScope, includeNoteAuthor = true, incl
 			where: relatedJobOrderScope,
 			orderBy: { createdAt: 'desc' },
 			include: {
+				offer: {
+					select: { id: true, status: true, updatedAt: true }
+				},
 				createdByUser: {
 					select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
 				},

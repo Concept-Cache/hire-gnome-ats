@@ -1255,6 +1255,13 @@ async function main() {
 						updatedAt: placementUpdatedAt
 					}
 				});
+				await prisma.submission.update({
+					where: { id: submission.id },
+					data: {
+						status: 'placed',
+						updatedAt: placementUpdatedAt
+					}
+				});
 				placementCount += 1;
 			}
 		}

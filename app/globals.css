@@ -5367,6 +5367,137 @@ button:disabled {
 	height: 2.3rem;
 }
 
+.actions-menu-item-icon {
+	width: 0.9rem;
+	height: 0.9rem;
+	stroke-width: 2.1;
+}
+
+.submission-packet-page {
+	max-width: 78rem;
+}
+
+.submission-packet-header {
+	align-items: flex-start;
+}
+
+.submission-packet-toolbar {
+	gap: 0.6rem;
+}
+
+.submission-packet-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.submission-packet-kicker {
+	margin: 0 0 0.45rem;
+	font-size: 0.78rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.submission-packet-cover {
+	padding: 1.5rem;
+}
+
+.submission-packet-cover-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+
+.submission-packet-cover-head h3 {
+	margin: 0;
+}
+
+.submission-packet-statuses {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.45rem;
+}
+
+.submission-packet-cover-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.85rem 1.25rem;
+}
+
+.submission-packet-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+}
+
+.submission-packet-grid-tight {
+	gap: 1rem 1.25rem;
+}
+
+.submission-packet-span-all {
+	grid-column: 1 / -1;
+}
+
+.submission-packet-prose p,
+.submission-packet-text,
+.submission-packet-text-block p {
+	margin: 0 0 0.7rem;
+	line-height: 1.45;
+}
+
+.submission-packet-prose p:last-child,
+.submission-packet-text-block p:last-child {
+	margin-bottom: 0;
+}
+
+.submission-packet-chip-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.submission-packet-work-list {
+	margin-top: 1rem;
+}
+
+.submission-packet-work-list h4,
+.submission-packet-grid h4 {
+	margin-bottom: 0.7rem;
+}
+
+.submission-packet-empty-state {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.submission-packet-file-card {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 1rem 1.1rem;
+	border: 1px solid var(--line);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--surface) 92%, white 8%);
+}
+
+.submission-packet-footer {
+	margin-bottom: 2rem;
+}
+
+.submission-packet-page .submission-ai-meta {
+	margin-left: 0;
+}
+
+.submission-packet-prose + .submission-ai-meta {
+	margin-top: 0.6rem;
+}
+
 .btn-link-icon span {
 	font-size: 1rem;
 	line-height: 1;
@@ -7430,6 +7561,24 @@ small {
 	.career-apply-grid-3 {
 		grid-template-columns: 1fr;
 	}
+
+	.submission-packet-cover-grid,
+	.submission-packet-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.submission-packet-cover-head {
+		flex-direction: column;
+	}
+
+	.submission-packet-statuses {
+		align-items: flex-start;
+	}
+
+	.submission-packet-file-card {
+		flex-direction: column;
+		align-items: flex-start;
+	}
 }
 
 @media (max-width: 480px) {
@@ -7439,5 +7588,33 @@ small {
 
 	.dashboard-quick-actions {
 		grid-template-columns: 1fr;
+	}
+}
+
+@media print {
+	body.submission-packet-print-mode .sidebar,
+	body.submission-packet-print-mode .topbar,
+	body.submission-packet-print-mode .module-back-link,
+	body.submission-packet-print-mode .submission-packet-toolbar {
+		display: none !important;
+	}
+
+	body.submission-packet-print-mode .workspace-shell,
+	body.submission-packet-print-mode .workspace-main,
+	body.submission-packet-print-mode .module-page,
+	body.submission-packet-print-mode .submission-packet-page {
+		padding: 0 !important;
+		margin: 0 !important;
+		max-width: none !important;
+	}
+
+	body.submission-packet-print-mode .panel {
+		break-inside: avoid;
+		box-shadow: none !important;
+	}
+
+	body.submission-packet-print-mode a {
+		color: inherit !important;
+		text-decoration: none !important;
 	}
 }
