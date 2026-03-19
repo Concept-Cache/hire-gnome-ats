@@ -162,6 +162,10 @@ Use `Admin Area > System Settings` for:
 - Object storage settings (`s3` or local mode)
 - API error log retention days
 
+When `DEMO_MODE` is enabled:
+- administrators can still change the theme preset for presentation purposes
+- all other system settings remain read-only
+
 Use `Admin Area > Custom Fields` for:
 - Module-scoped custom fields on Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - Field-level validation (`text`, `long text`, `number`, `date`, `yes/no`, `select`)

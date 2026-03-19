@@ -26,6 +26,10 @@ Configuration includes:
 - System diagnostics and test email tools
 - Recent inbound email event visibility inside diagnostics
 
+When demo mode is enabled:
+- only the theme preset remains editable
+- all other system settings stay read-only
+
 Inbound email diagnostics includes:
 - Postmark webhook activity for `/api/inbound/postmark`
 - Processing status (`Processed`, `No Match`, `Failed`)
