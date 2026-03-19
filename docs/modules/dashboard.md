@@ -9,6 +9,8 @@ The dashboard is your launchpad for daily execution. It surfaces what needs atte
 The top row shows quick operational counts with direct links into the related module:
 - Interviews Today
 - Awaiting Feedback
+- Web Responses
+- Interview Requests
 - Open Jobs Stalled 7d
 - Placements This Month
 
@@ -28,9 +30,12 @@ This is meant to show short-term direction, not replace formal reporting.
 Shows actionable items that need follow-up, based on lifecycle and date logic.
 
 Typical examples:
+- Client interview requests that have not been scheduled yet
+- Career-site web responses that still need recruiter review
+- Client portal links that were sent but not opened
+- Client portals that were viewed without a follow-up action
 - Active submissions that are aging without movement
-- Placements pending key date/status updates
-- Other workflow records flagged as overdue or stale
+- Open jobs with no new submissions in the last 7 days
 
 ### Upcoming Interviews
 Shows scheduled interviews you can access based on your role/division permissions.
