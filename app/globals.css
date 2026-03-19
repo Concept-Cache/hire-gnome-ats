@@ -5619,6 +5619,153 @@ button:disabled {
 	transform: translateY(0.08em);
 }
 
+.candidate-snapshot-head {
+	align-items: flex-start;
+	flex-wrap: wrap;
+	gap: 0.8rem;
+}
+
+.candidate-completeness-summary {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.18rem;
+	text-align: right;
+}
+
+.candidate-completeness-label {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+}
+
+.candidate-completeness-summary-main {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.candidate-completeness-score {
+	font-size: 1.15rem;
+	font-weight: 650;
+	color: var(--ink);
+}
+
+.chip.candidate-completeness-chip {
+	min-width: 4.35rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	padding: 0.28rem 0.72rem;
+	border-style: solid;
+	border-width: 1px;
+	border-color: color-mix(in srgb, #9fb8df 70%, var(--line) 30%);
+}
+
+.chip.candidate-completeness-chip-good {
+	background: color-mix(in srgb, #e9f8ef 84%, var(--panel) 16%);
+	border-color: color-mix(in srgb, #8fd0a6 74%, var(--line) 26%);
+	color: #216544;
+}
+
+.chip.candidate-completeness-chip-warn {
+	background: color-mix(in srgb, #fff7df 84%, var(--panel) 16%);
+	border-color: color-mix(in srgb, #e2bf63 76%, var(--line) 24%);
+	color: #8a6115;
+}
+
+.chip.candidate-completeness-chip-poor {
+	background: color-mix(in srgb, #fdeeed 84%, var(--panel) 16%);
+	border-color: color-mix(in srgb, #dca19a 76%, var(--line) 24%);
+	color: #8a3f35;
+}
+
+.candidate-completeness-card {
+	margin-top: 0.85rem;
+	padding-top: 0.8rem;
+	border-top: 1px solid var(--line);
+}
+
+.candidate-completeness-meter {
+	position: relative;
+	height: 0.56rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--line) 55%, #eef3fb 45%);
+	overflow: hidden;
+}
+
+.candidate-completeness-meter-fill {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #d7932f 0%, #f0c24f 38%, #78bc73 100%);
+}
+
+.candidate-completeness-copy {
+	margin-top: 0.5rem;
+}
+
+.candidate-completeness-gaps {
+	display: grid;
+	gap: 0.38rem;
+	margin-top: 0.52rem;
+}
+
+.candidate-completeness-gaps-label {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+}
+
+.candidate-completeness-gap-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.38rem;
+}
+
+.chip.candidate-completeness-gap-chip {
+	background: color-mix(in srgb, #fdeeed 84%, var(--panel) 16%);
+	border-style: solid;
+	border-width: 1px;
+	border-color: color-mix(in srgb, #dca19a 76%, var(--line) 24%);
+	color: #8a3f35;
+	padding: 0.24rem 0.62rem;
+}
+
+.chip.candidate-completeness-list-chip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 3.35rem;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+	padding: 0.24rem 0.62rem;
+	border-style: solid;
+	border-width: 1px;
+	border-color: color-mix(in srgb, #9fb8df 70%, var(--line) 30%);
+}
+
+.chip.candidate-completeness-list-chip-good {
+	background: color-mix(in srgb, #e9f8ef 84%, var(--panel) 16%);
+	border-color: color-mix(in srgb, #8fd0a6 74%, var(--line) 26%);
+	color: #216544;
+}
+
+.chip.candidate-completeness-list-chip-warn {
+	background: color-mix(in srgb, #fff7df 84%, var(--panel) 16%);
+	border-color: color-mix(in srgb, #e2bf63 76%, var(--line) 24%);
+	color: #8a6115;
+}
+
+.chip.candidate-completeness-list-chip-poor {
+	background: color-mix(in srgb, #fdeeed 84%, var(--panel) 16%);
+	border-color: color-mix(in srgb, #dca19a 76%, var(--line) 24%);
+	color: #8a3f35;
+}
+
 .summary-block {
 	margin-top: 0.75rem;
 	padding-top: 0.75rem;
@@ -6286,6 +6433,7 @@ button:disabled {
 	display: inline-block;
 	background: #e5efff;
 	color: #1f4f9b;
+	border: 1px solid #aac2e7;
 	border-radius: 8px;
 	padding: 0.2rem 0.45rem;
 	font-size: 0.74rem;
@@ -6295,6 +6443,7 @@ button:disabled {
 .inbound-email-note-chip {
 	margin-bottom: 0.45rem;
 	background: #fff3dc;
+	border-color: #e5bf73;
 	color: #9a5f00;
 }
 
@@ -6304,11 +6453,13 @@ button:disabled {
 
 .submission-origin-chip-web {
 	background: #fdf0e5;
+	border-color: #e5b18b;
 	color: #a14a11;
 }
 
 .submission-origin-chip-recruiter {
 	background: #eaf7ea;
+	border-color: #9fd1ac;
 	color: #1e6a3f;
 }
 
@@ -6339,6 +6490,7 @@ button:disabled {
 	gap: 0.35rem;
 	background: #e5efff;
 	color: #1f4f9b;
+	border: 1px solid #aac2e7;
 	border-radius: 8px;
 	padding: 0.2rem 0.5rem;
 	font-size: 0.76rem;

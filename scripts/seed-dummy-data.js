@@ -527,6 +527,110 @@ function buildSeedResumePdfBuffer(candidate) {
 	]);
 }
 
+function buildCandidateProfileVariant(index) {
+	switch (index % 8) {
+		case 0:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: true,
+				summaryStyle: 'long',
+				skillCount: 5,
+				workHistoryCount: 2,
+				includeEducation: true,
+				includeOtherSkillsNote: true
+			};
+		case 1:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'medium',
+				skillCount: 4,
+				workHistoryCount: 2,
+				includeEducation: true,
+				includeOtherSkillsNote: false
+			};
+		case 2:
+			return {
+				includeResume: true,
+				includeLinkedin: false,
+				includeWebsite: false,
+				summaryStyle: 'medium',
+				skillCount: 2,
+				workHistoryCount: 1,
+				includeEducation: false,
+				includeOtherSkillsNote: false
+			};
+		case 3:
+			return {
+				includeResume: false,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'short',
+				skillCount: 2,
+				workHistoryCount: 1,
+				includeEducation: true,
+				includeOtherSkillsNote: false
+			};
+		case 4:
+			return {
+				includeResume: false,
+				includeLinkedin: false,
+				includeWebsite: false,
+				summaryStyle: 'none',
+				skillCount: 1,
+				workHistoryCount: 0,
+				includeEducation: false,
+				includeOtherSkillsNote: false
+			};
+		case 5:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'long',
+				skillCount: 4,
+				workHistoryCount: 2,
+				includeEducation: false,
+				includeOtherSkillsNote: false
+			};
+		case 6:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'short',
+				skillCount: 2,
+				workHistoryCount: 0,
+				includeEducation: true,
+				includeOtherSkillsNote: false
+			};
+		default:
+			return {
+				includeResume: false,
+				includeLinkedin: false,
+				includeWebsite: true,
+				summaryStyle: 'medium',
+				skillCount: 3,
+				workHistoryCount: 1,
+				includeEducation: false,
+				includeOtherSkillsNote: true
+			};
+	}
+}
+
+function buildCandidateSeedSummary({ title, market, employer, variant }) {
+	if (variant.summaryStyle === 'none') return null;
+	if (variant.summaryStyle === 'short') {
+		return `${title} in ${market.city}. Open to new opportunities.`;
+	}
+	if (variant.summaryStyle === 'medium') {
+		return `${title} with delivery experience across cross-functional teams in ${market.city}. Open to hybrid and remote opportunities.`;
+	}
+	return `${title} with strong delivery history across cross-functional teams in ${market.city}. Currently driving results at ${employer} with a focus on stakeholder communication, execution quality, and measurable operational improvement. Open to hybrid and remote opportunities.`;
+}
+
 function dateYearsAgo(years, month = 0) {
 	const d = new Date();
 	d.setMonth(month, 1);
@@ -937,6 +1041,7 @@ async function main() {
 		const market = pick(MARKET_LOCATIONS, i);
 		const title = pick(CANDIDATE_TITLE_OPTIONS, i);
 		const employer = pick(EMPLOYER_OPTIONS, i + 1);
+		const profileVariant = buildCandidateProfileVariant(i);
 		const createdAt = buildSeedTimestamp(i, {
 			windowSize: 14,
 			salt: 3,
@@ -962,10 +1067,10 @@ async function main() {
 				city: market.city,
 				state: market.state,
 				zipCode: market.zipCode,
-				website: `https://portfolio.${slug(firstName)}${i + 1}.com`,
-				linkedinUrl: `https://linkedin.com/in/${slug(firstName)}-${slug(lastName)}-${i + 1}`,
-				skillSet: i % 9 === 0 ? 'Additional niche tooling available on request.' : null,
-				summary: `${title} with strong delivery history across cross-functional teams in ${market.city}. Open to hybrid and remote opportunities.`,
+				website: profileVariant.includeWebsite ? `https://portfolio.${slug(firstName)}${i + 1}.com` : null,
+				linkedinUrl: profileVariant.includeLinkedin ? `https://linkedin.com/in/${slug(firstName)}-${slug(lastName)}-${i + 1}` : null,
+				skillSet: profileVariant.includeOtherSkillsNote ? 'Additional niche tooling available on request.' : null,
+				summary: buildCandidateSeedSummary({ title, market, employer, variant: profileVariant }),
 				createdAt,
 				updatedAt
 			}
@@ -976,8 +1081,9 @@ async function main() {
 			allSkills[i % allSkills.length],
 			allSkills[(i + 2) % allSkills.length],
 			allSkills[(i + 6) % allSkills.length],
-			allSkills[(i + 11) % allSkills.length]
-		].filter(Boolean);
+			allSkills[(i + 11) % allSkills.length],
+			allSkills[(i + 14) % allSkills.length]
+		].filter(Boolean).slice(0, profileVariant.skillCount);
 
 		for (const skill of selectedSkills) {
 			await prisma.candidateSkill.create({
@@ -988,41 +1094,47 @@ async function main() {
 			});
 		}
 
-		await prisma.candidateEducation.create({
-			data: {
-				candidateId: candidate.id,
-				schoolName: i % 2 === 0 ? 'State University' : 'Metro College',
-				degree: i % 3 === 0 ? 'MBA' : 'Bachelor of Science',
-				fieldOfStudy: i % 2 === 0 ? 'Information Systems' : 'Business Administration',
-				startDate: dateYearsAgo(10 + (i % 5), 8),
-				endDate: dateYearsAgo(6 + (i % 4), 4),
-				description: 'Completed coursework with emphasis on analytics and stakeholder communication.'
-			}
-		});
+		if (profileVariant.includeEducation) {
+			await prisma.candidateEducation.create({
+				data: {
+					candidateId: candidate.id,
+					schoolName: i % 2 === 0 ? 'State University' : 'Metro College',
+					degree: i % 3 === 0 ? 'MBA' : 'Bachelor of Science',
+					fieldOfStudy: i % 2 === 0 ? 'Information Systems' : 'Business Administration',
+					startDate: dateYearsAgo(10 + (i % 5), 8),
+					endDate: dateYearsAgo(6 + (i % 4), 4),
+					description: 'Completed coursework with emphasis on analytics and stakeholder communication.'
+				}
+			});
+		}
 
-		await prisma.candidateWorkExperience.create({
-			data: {
-				candidateId: candidate.id,
-				companyName: pick(EMPLOYER_OPTIONS, i + 3),
-				title: pick(CANDIDATE_TITLE_OPTIONS, i + 4),
-				location: `${market.city}, ${market.state}`,
-				startDate: dateYearsAgo(7 + (i % 4), 1),
-				endDate: dateYearsAgo(3 + (i % 2), 11),
-				description: 'Led delivery initiatives, partnered with client stakeholders, and improved operational metrics.'
-			}
-		});
+		if (profileVariant.workHistoryCount >= 1) {
+			await prisma.candidateWorkExperience.create({
+				data: {
+					candidateId: candidate.id,
+					companyName: pick(EMPLOYER_OPTIONS, i + 3),
+					title: pick(CANDIDATE_TITLE_OPTIONS, i + 4),
+					location: `${market.city}, ${market.state}`,
+					startDate: dateYearsAgo(7 + (i % 4), 1),
+					endDate: dateYearsAgo(3 + (i % 2), 11),
+					description: 'Led delivery initiatives, partnered with client stakeholders, and improved operational metrics.'
+				}
+			});
+		}
 
-		await prisma.candidateWorkExperience.create({
-			data: {
-				candidateId: candidate.id,
-				companyName: employer,
-				title,
-				location: `${market.city}, ${market.state}`,
-				startDate: dateYearsAgo(3 + (i % 2), 0),
-				isCurrent: true,
-				description: 'Currently leading projects with direct ownership of quality, timelines, and cross-functional communication.'
-			}
-		});
+		if (profileVariant.workHistoryCount >= 2) {
+			await prisma.candidateWorkExperience.create({
+				data: {
+					candidateId: candidate.id,
+					companyName: employer,
+					title,
+					location: `${market.city}, ${market.state}`,
+					startDate: dateYearsAgo(3 + (i % 2), 0),
+					isCurrent: true,
+					description: 'Currently leading projects with direct ownership of quality, timelines, and cross-functional communication.'
+				}
+			});
+		}
 
 		await prisma.candidateNote.create({
 			data: {
@@ -1043,28 +1155,30 @@ async function main() {
 			}
 		});
 
-		const resumeFileName = `${firstName}-${lastName}-resume.pdf`;
-		const resumeStorageKey = buildSeedResumeStorageKey(candidate.recordId, resumeFileName);
-		const resumeBuffer = buildSeedResumePdfBuffer(candidate);
-		await writeSeedAttachment({
-			storageKey: resumeStorageKey,
-			body: resumeBuffer
-		});
-		await prisma.candidateAttachment.create({
-			data: {
-				candidateId: candidate.id,
-				uploadedByUserId: owner?.id ?? null,
-				fileName: resumeFileName,
-				isResume: true,
-				contentType: 'application/pdf',
-				sizeBytes: resumeBuffer.length,
-				storageProvider: 'local',
-				storageBucket: 'local',
+		if (profileVariant.includeResume) {
+			const resumeFileName = `${firstName}-${lastName}-resume.pdf`;
+			const resumeStorageKey = buildSeedResumeStorageKey(candidate.recordId, resumeFileName);
+			const resumeBuffer = buildSeedResumePdfBuffer(candidate);
+			await writeSeedAttachment({
 				storageKey: resumeStorageKey,
-				createdAt: addMinutes(createdAt, 25),
-				updatedAt: addMinutes(createdAt, 25)
-			}
-		});
+				body: resumeBuffer
+			});
+			await prisma.candidateAttachment.create({
+				data: {
+					candidateId: candidate.id,
+					uploadedByUserId: owner?.id ?? null,
+					fileName: resumeFileName,
+					isResume: true,
+					contentType: 'application/pdf',
+					sizeBytes: resumeBuffer.length,
+					storageProvider: 'local',
+					storageBucket: 'local',
+					storageKey: resumeStorageKey,
+					createdAt: addMinutes(createdAt, 25),
+					updatedAt: addMinutes(createdAt, 25)
+				}
+			});
+		}
 	}
 
 	const jobOrders = [];

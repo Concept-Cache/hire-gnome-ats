@@ -5,6 +5,8 @@ Candidates stores profile, status, ownership, resume, skills, education, work hi
 
 It also includes an on-demand AI summary modal, opened from the candidate detail header, that turns the current candidate profile into a concise recruiter-facing brief.
 
+Candidate detail also includes a profile-completeness score in the Snapshot panel so recruiters can quickly see whether the record is ready for submission or still missing key profile pieces.
+
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.
 
@@ -49,6 +51,29 @@ The workspace provides linked execution views:
 - Activities
 - Files
 - Matched Job Orders
+
+## Profile Completeness
+Candidate detail calculates profile completeness from the live record and current form values.
+
+It looks at:
+- core identity/contact fields
+- status, source, and owner
+- current role and location
+- links
+- resume summary
+- skills
+- work history
+- education
+- primary resume attachment
+- required custom fields
+
+The score is intended as a recruiter readiness signal, not a hard validation rule.
+
+The Snapshot panel also calls out the top missing profile gaps so users know what to fix next.
+
+The candidates list also shows a compact profile-completeness chip so recruiters can spot weak records before opening detail.
+
+When a recruiter tries to create a submission from a candidate with a thin profile, the app now shows a soft warning with the top missing gaps. The recruiter can still continue.
 
 ## AI Summary
 Use the sparkles `AI Summary` header button on candidate detail to open the summary modal. If no summary exists yet, the modal starts generating one automatically from the current candidate record.

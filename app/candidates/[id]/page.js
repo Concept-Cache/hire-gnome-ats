@@ -32,6 +32,7 @@ import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { sortByConfig } from '@/lib/list-sort';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
+import { getCandidateCompleteness } from '@/lib/candidate-completeness';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { CANDIDATE_STATUS_OPTIONS, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 
@@ -327,6 +328,16 @@ export default function CandidateDetailsPage() {
 		statusIsChanging && !editForm.stageChangeReason.trim()
 			? 'Status change reason is required.'
 			: '';
+	const candidateCompleteness = useMemo(
+		() => getCandidateCompleteness({ candidate, editForm, customFieldDefinitions }),
+		[candidate, editForm, customFieldDefinitions]
+	);
+	const candidateCompletenessSeverityClass =
+		candidateCompleteness.scorePercent >= 85
+			? ' candidate-completeness-chip-good'
+			: candidateCompleteness.scorePercent >= 65
+				? ' candidate-completeness-chip-warn'
+				: ' candidate-completeness-chip-poor';
 
 	const submissionRows = useMemo(() => {
 		if (!candidate) return [];
@@ -643,6 +654,21 @@ export default function CandidateDetailsPage() {
 			toast.error('Candidate must be Qualified or beyond before adding a submission.');
 			return;
 		}
+		if (
+			candidateCompleteness.scorePercent < 70 &&
+			candidateCompleteness.topGaps.length > 0 &&
+			!(await requestConfirm({
+				title: 'Profile Needs Cleanup',
+				message:
+					`This candidate profile is only ${candidateCompleteness.scorePercent}% complete.\n\n` +
+					`Top gaps:\n- ${candidateCompleteness.topGaps.join('\n- ')}\n\n` +
+					'Continue to create a submission anyway?',
+				confirmLabel: 'Continue',
+				cancelLabel: 'Review Profile'
+			}))
+		) {
+			return;
+		}
 		if (!(await confirmNavigation())) return;
 
 		const query = new URLSearchParams();
@@ -750,6 +776,21 @@ export default function CandidateDetailsPage() {
 				...current,
 				error: 'Candidate must be Qualified or beyond before creating submissions.'
 			}));
+			return;
+		}
+		if (
+			candidateCompleteness.scorePercent < 70 &&
+			candidateCompleteness.topGaps.length > 0 &&
+			!(await requestConfirm({
+				title: 'Profile Needs Cleanup',
+				message:
+					`This candidate profile is only ${candidateCompleteness.scorePercent}% complete.\n\n` +
+					`Top gaps:\n- ${candidateCompleteness.topGaps.join('\n- ')}\n\n` +
+					'Continue to create a submission anyway?',
+				confirmLabel: 'Continue',
+				cancelLabel: 'Review Profile'
+			}))
+		) {
 			return;
 		}
 
@@ -1290,7 +1331,18 @@ export default function CandidateDetailsPage() {
 			) : null}
 
 			<article className="panel">
-				<h3>Snapshot</h3>
+				<div className="panel-header-row candidate-snapshot-head">
+					<h3>Snapshot</h3>
+					<div className="candidate-completeness-summary">
+						<span className="candidate-completeness-label">Profile Completeness</span>
+						<div className="candidate-completeness-summary-main">
+							<span className="candidate-completeness-score">{candidateCompleteness.scorePercent}%</span>
+							<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
+								{candidateCompleteness.levelLabel}
+							</span>
+						</div>
+					</div>
+				</div>
 				<div className="info-list snapshot-grid snapshot-grid-four">
 					<p>
 						<span>Record ID</span>
@@ -1310,6 +1362,31 @@ export default function CandidateDetailsPage() {
 							{candidate.email ? <a href={`mailto:${candidate.email}`}>{candidate.email}</a> : '-'}
 						</strong>
 					</p>
+				</div>
+				<div className="candidate-completeness-card">
+					<div className="candidate-completeness-meter" aria-hidden="true">
+						<span
+							className="candidate-completeness-meter-fill"
+							style={{ width: `${candidateCompleteness.scorePercent}%` }}
+						/>
+					</div>
+					<p className="panel-subtext candidate-completeness-copy">
+						{candidateCompleteness.completedSections} of {candidateCompleteness.totalSections} profile areas are complete.
+					</p>
+					{candidateCompleteness.topGaps.length > 0 ? (
+						<div className="candidate-completeness-gaps">
+							<span className="candidate-completeness-gaps-label">Top gaps</span>
+							<div className="candidate-completeness-gap-list">
+								{candidateCompleteness.topGaps.map((gap) => (
+									<span key={gap} className="chip candidate-completeness-gap-chip">
+										{gap}
+									</span>
+								))}
+							</div>
+						</div>
+					) : (
+						<p className="panel-subtext candidate-completeness-copy">Profile is in strong shape for recruiter review.</p>
+					)}
 				</div>
 			</article>
 

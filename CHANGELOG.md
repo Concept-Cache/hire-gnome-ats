@@ -20,6 +20,8 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Added a print-friendly submission packet from submission detail that compiles the write-up, primary resume, candidate snapshot, match explanation, and interview prep for internal review or PDF export.
 - Upgraded the dashboard `Needs Attention` queue with smarter workflow alerts for web responses, client portal engagement, unscheduled interview requests, and other stale follow-up states.
 - Added live dashboard KPI cards for web-response review and client interview requests so the home screen surfaces new recruiting pressure sooner.
+- Added candidate profile-completeness scoring with top-gap guidance so recruiters can see submission readiness directly from candidate detail.
+- Extended candidate completeness into the list view and added soft submission warnings so recruiters can keep moving while still seeing when a profile needs cleanup.
 
 ## [1.5.0] - 2026-03-17
 

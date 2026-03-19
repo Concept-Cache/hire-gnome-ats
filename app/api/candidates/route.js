@@ -40,6 +40,17 @@ const candidateListInclude = {
 		}
 	},
 	_count: { select: { submissions: true, notes: true, activities: true } },
+	candidateEducations: {
+		select: { id: true }
+	},
+	candidateWorkExperiences: {
+		select: { id: true }
+	},
+	attachments: {
+		where: { isResume: true },
+		select: { id: true, isResume: true },
+		take: 1
+	},
 	activities: {
 		select: { createdAt: true, updatedAt: true, dueAt: true },
 		orderBy: { updatedAt: 'desc' },
