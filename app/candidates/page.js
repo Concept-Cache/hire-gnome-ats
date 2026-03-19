@@ -7,11 +7,13 @@ import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import KanbanBoard from '@/app/components/kanban-board';
+import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { CANDIDATE_STATUS_OPTIONS } from '@/lib/candidate-status';
+import { getCandidateCompleteness } from '@/lib/candidate-completeness';
 
 const VIEW_MODE_STORAGE_KEY = 'candidates-list-view-mode';
 
@@ -33,6 +35,7 @@ function updateStatusDisplay(row, nextStatus, nextTimestamp) {
 export default function CandidatesPage() {
 	const router = useRouter();
 	const { requestPrompt } = useConfirmDialog();
+	const toast = useToast();
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
@@ -95,6 +98,36 @@ export default function CandidatesPage() {
 			setRows(
 				data.map((candidate) => {
 					const lastActivityAt = candidate.lastActivityAt || candidate.updatedAt || candidate.createdAt || null;
+					const completeness = getCandidateCompleteness({
+						candidate,
+						editForm: {
+							firstName: candidate.firstName || '',
+							lastName: candidate.lastName || '',
+							email: candidate.email || '',
+							mobile: candidate.mobile || candidate.phone || '',
+							status: candidate.status || '',
+							source: candidate.source || '',
+							ownerId: candidate.ownerId == null ? '' : String(candidate.ownerId),
+							currentJobTitle: candidate.currentJobTitle || '',
+							currentEmployer: candidate.currentEmployer || '',
+							address: candidate.address || '',
+							city: candidate.city || '',
+							state: candidate.state || '',
+							zipCode: candidate.zipCode || '',
+							website: candidate.website || '',
+							linkedinUrl: candidate.linkedinUrl || '',
+							summary: candidate.summary || '',
+							skillIds: Array.isArray(candidate.candidateSkills)
+								? candidate.candidateSkills
+										.map((candidateSkill) => candidateSkill?.skill?.id)
+										.filter(Boolean)
+										.map((skillId) => String(skillId))
+								: [],
+							skillSet: candidate.skillSet || '',
+							customFields: candidate.customFields || {}
+						},
+						customFieldDefinitions: []
+					});
 					return {
 						...candidate,
 						fullName: `${candidate.firstName} ${candidate.lastName}`,
@@ -102,6 +135,8 @@ export default function CandidatesPage() {
 						currentTitle: candidate.currentJobTitle || '-',
 						lastActivityAt,
 						lastActivityAtLabel: formatDateTime(lastActivityAt),
+						completenessScore: completeness.scorePercent,
+						completenessLabel: completeness.levelLabel,
 						ownerName: candidate.ownerUser
 							? `${candidate.ownerUser.firstName} ${candidate.ownerUser.lastName}`.trim()
 							: '-'
@@ -198,6 +233,25 @@ export default function CandidatesPage() {
 			key: 'statusLabel',
 			label: 'Status',
 			getSortValue: (row) => row.status || ''
+		},
+		{
+			key: 'completenessScore',
+			label: 'Profile',
+			getSortValue: (row) => Number(row.completenessScore || 0),
+			render: (row) => {
+				const score = Number(row.completenessScore || 0);
+				const severityClass =
+					score >= 85
+						? ' candidate-completeness-list-chip-good'
+						: score >= 65
+							? ' candidate-completeness-list-chip-warn'
+							: ' candidate-completeness-list-chip-poor';
+				return (
+				<span className={`chip candidate-completeness-list-chip${severityClass}`}>
+					{Number(row.completenessScore || 0)}%
+				</span>
+				);
+			}
 		},
 		{ key: 'ownerName', label: 'Owner' },
 		{

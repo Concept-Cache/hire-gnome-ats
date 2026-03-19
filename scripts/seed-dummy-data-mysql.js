@@ -164,6 +164,102 @@ function buildSeedResumePdfBuffer(candidate) {
 	]);
 }
 
+function buildCandidateProfileVariant(index) {
+	switch (index % 8) {
+		case 0:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: true,
+				summaryStyle: 'long',
+				skillCount: 4,
+				workHistoryCount: 2,
+				includeEducation: true
+			};
+		case 1:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'medium',
+				skillCount: 3,
+				workHistoryCount: 2,
+				includeEducation: true
+			};
+		case 2:
+			return {
+				includeResume: true,
+				includeLinkedin: false,
+				includeWebsite: false,
+				summaryStyle: 'medium',
+				skillCount: 2,
+				workHistoryCount: 1,
+				includeEducation: false
+			};
+		case 3:
+			return {
+				includeResume: false,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'short',
+				skillCount: 2,
+				workHistoryCount: 1,
+				includeEducation: true
+			};
+		case 4:
+			return {
+				includeResume: false,
+				includeLinkedin: false,
+				includeWebsite: false,
+				summaryStyle: 'none',
+				skillCount: 1,
+				workHistoryCount: 0,
+				includeEducation: false
+			};
+		case 5:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'long',
+				skillCount: 4,
+				workHistoryCount: 2,
+				includeEducation: false
+			};
+		case 6:
+			return {
+				includeResume: true,
+				includeLinkedin: true,
+				includeWebsite: false,
+				summaryStyle: 'short',
+				skillCount: 2,
+				workHistoryCount: 0,
+				includeEducation: true
+			};
+		default:
+			return {
+				includeResume: false,
+				includeLinkedin: false,
+				includeWebsite: true,
+				summaryStyle: 'medium',
+				skillCount: 2,
+				workHistoryCount: 1,
+				includeEducation: false
+			};
+	}
+}
+
+function buildCandidateSeedSummary({ title, city, employer, variant }) {
+	if (variant.summaryStyle === 'none') return null;
+	if (variant.summaryStyle === 'short') {
+		return `${title} in ${city}. Open to new opportunities.`;
+	}
+	if (variant.summaryStyle === 'medium') {
+		return `${title} with delivery experience across cross-functional teams in ${city}. Open to hybrid and remote opportunities.`;
+	}
+	return `${title} with strong delivery history across cross-functional teams in ${city}. Currently driving results at ${employer} with a focus on stakeholder communication, execution quality, and operational improvement.`;
+}
+
 async function tableExists(connection, tableName) {
 	const [rows] = await connection.query(
 		`SELECT 1
@@ -484,6 +580,7 @@ async function main() {
 			const division = divisions[i % divisions.length];
 			const divisionUsers = usersByDivision.get(division.id);
 			const owner = divisionUsers[(i + 1) % divisionUsers.length];
+			const profileVariant = buildCandidateProfileVariant(i);
 			const candidateSeed = {
 				firstName: `Candidate${i + 1}`,
 				lastName: `Demo${i + 1}`,
@@ -491,7 +588,12 @@ async function main() {
 				currentEmployer: `Employer ${i + 1}`,
 				city: i % 2 === 0 ? 'Austin' : 'Denver',
 				state: i % 2 === 0 ? 'TX' : 'CO',
-				summary: 'Demo candidate profile.'
+				summary: buildCandidateSeedSummary({
+					title: i % 2 === 0 ? 'Software Engineer' : 'Project Manager',
+					city: i % 2 === 0 ? 'Austin' : 'Denver',
+					employer: `Employer ${i + 1}`,
+					variant: profileVariant
+				})
 			};
 			const [result] = await connection.query(
 				`INSERT INTO \`Candidate\`
@@ -512,18 +614,62 @@ async function main() {
 					candidateSeed.city,
 					candidateSeed.state,
 					i % 2 === 0 ? '78701' : '80202',
-					`https://candidate${i + 1}.portfolio.example`,
-					`https://linkedin.com/in/candidate-demo-${i + 1}`,
+					profileVariant.includeWebsite ? `https://candidate${i + 1}.portfolio.example` : null,
+					profileVariant.includeLinkedin ? `https://linkedin.com/in/candidate-demo-${i + 1}` : null,
 					candidateSeed.summary
 				]
 			);
 			const candidateId = result.insertId;
 			candidates.push({ id: candidateId, divisionId: division.id });
 
-			for (const skill of [skills[i % skills.length], skills[(i + 3) % skills.length], skills[(i + 5) % skills.length]]) {
+			for (const skill of [skills[i % skills.length], skills[(i + 3) % skills.length], skills[(i + 5) % skills.length], skills[(i + 7) % skills.length]].slice(0, profileVariant.skillCount)) {
 				await connection.query(
 					'INSERT IGNORE INTO `CandidateSkill` (`candidateId`, `skillId`, `createdAt`) VALUES (?, ?, NOW())',
 					[candidateId, skill.id]
+				);
+			}
+
+			if (profileVariant.includeEducation) {
+				await connection.query(
+					'INSERT INTO `CandidateEducation` (`candidateId`, `schoolName`, `degree`, `fieldOfStudy`, `startDate`, `endDate`, `description`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+					[
+						candidateId,
+						i % 2 === 0 ? 'State University' : 'Metro College',
+						i % 3 === 0 ? 'MBA' : 'Bachelor of Science',
+						i % 2 === 0 ? 'Information Systems' : 'Business Administration',
+						daysFromToday(-(3650 + i), 9),
+						daysFromToday(-(2200 + i), 9),
+						'Completed coursework with emphasis on analytics and stakeholder communication.'
+					]
+				);
+			}
+
+			if (profileVariant.workHistoryCount >= 1) {
+				await connection.query(
+					'INSERT INTO `CandidateWorkExperience` (`candidateId`, `companyName`, `title`, `location`, `startDate`, `endDate`, `isCurrent`, `description`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW())',
+					[
+						candidateId,
+						`Previous Employer ${i + 1}`,
+						i % 2 === 0 ? 'Systems Analyst' : 'Project Coordinator',
+						`${candidateSeed.city}, ${candidateSeed.state}`,
+						daysFromToday(-(2800 + i), 9),
+						daysFromToday(-(1100 + i), 9),
+						'Led delivery initiatives, partnered with stakeholders, and improved operational metrics.'
+					]
+				);
+			}
+
+			if (profileVariant.workHistoryCount >= 2) {
+				await connection.query(
+					'INSERT INTO `CandidateWorkExperience` (`candidateId`, `companyName`, `title`, `location`, `startDate`, `endDate`, `isCurrent`, `description`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, NULL, 1, ?, NOW(), NOW())',
+					[
+						candidateId,
+						candidateSeed.currentEmployer,
+						candidateSeed.currentJobTitle,
+						`${candidateSeed.city}, ${candidateSeed.state}`,
+						daysFromToday(-(900 + i), 9),
+						'Currently leading projects with direct ownership of quality, timelines, and cross-functional communication.'
+					]
 				);
 			}
 
@@ -536,20 +682,22 @@ async function main() {
 				['call', 'Screening Call', 'Initial screening completed.', daysFromToday((i % 6) + 1), 'open', candidateId]
 			);
 
-			const resumeFileName = `${candidateSeed.firstName}-${candidateSeed.lastName}-resume.pdf`;
-			const resumeStorageKey = buildSeedResumeStorageKey(candidateId, resumeFileName);
-			const resumeBuffer = buildSeedResumePdfBuffer(candidateSeed);
-			await writeSeedAttachment({
-				storageKey: resumeStorageKey,
-				body: resumeBuffer
-			});
-			await connection.query(
-				`INSERT INTO \`CandidateAttachment\`
-				(\`fileName\`, \`isResume\`, \`contentType\`, \`sizeBytes\`, \`storageProvider\`, \`storageBucket\`, \`storageKey\`, \`candidateId\`, \`uploadedByUserId\`, \`createdAt\`, \`updatedAt\`)
-				VALUES (?, 1, 'application/pdf', ?, 'local', 'local', ?, ?, ?, NOW(), NOW())`,
-				[resumeFileName, resumeBuffer.length, resumeStorageKey, candidateId, owner.id]
-			);
-			candidateAttachmentCount += 1;
+			if (profileVariant.includeResume) {
+				const resumeFileName = `${candidateSeed.firstName}-${candidateSeed.lastName}-resume.pdf`;
+				const resumeStorageKey = buildSeedResumeStorageKey(candidateId, resumeFileName);
+				const resumeBuffer = buildSeedResumePdfBuffer(candidateSeed);
+				await writeSeedAttachment({
+					storageKey: resumeStorageKey,
+					body: resumeBuffer
+				});
+				await connection.query(
+					`INSERT INTO \`CandidateAttachment\`
+					(\`fileName\`, \`isResume\`, \`contentType\`, \`sizeBytes\`, \`storageProvider\`, \`storageBucket\`, \`storageKey\`, \`candidateId\`, \`uploadedByUserId\`, \`createdAt\`, \`updatedAt\`)
+					VALUES (?, 1, 'application/pdf', ?, 'local', 'local', ?, ?, ?, NOW(), NOW())`,
+					[resumeFileName, resumeBuffer.length, resumeStorageKey, candidateId, owner.id]
+				);
+				candidateAttachmentCount += 1;
+			}
 		}
 
 		const jobOrders = [];
