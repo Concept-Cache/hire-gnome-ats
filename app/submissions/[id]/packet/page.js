@@ -191,7 +191,9 @@ export default function SubmissionPacketPage() {
 								.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
 						</div>
 					) : (
-						<p className="panel-subtext">No recruiter write-up has been prepared yet.</p>
+						<div className="submission-packet-empty-state">
+							<p className="panel-subtext">No recruiter write-up has been prepared for this submission yet.</p>
+						</div>
 					)}
 					{submission.aiWriteUpGeneratedAt ? (
 						<p className="simple-list-meta submission-ai-meta">
