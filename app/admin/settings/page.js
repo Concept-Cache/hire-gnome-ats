@@ -184,7 +184,10 @@ export default function AdminSettingsPage() {
 		};
 	}, []);
 
-	const canSave = !demoMode && Boolean(form.siteName.trim()) && !loading;
+	const themeDirty = String(form.themeKey || '').trim() !== String(committedThemeRef.current || 'classic_blue').trim();
+	const canSave = demoMode
+		? themeDirty && !loading
+		: Boolean(form.siteName.trim()) && !loading;
 	const isS3ObjectStorage = form.objectStorageProvider !== 'local';
 	const displayedLogo = logoPreviewUrl || (form.removeLogo ? '/branding/hire-gnome.png' : currentBranding.logoUrl);
 
@@ -194,29 +197,31 @@ export default function AdminSettingsPage() {
 
 		setSaving(true);
 		const payload = new FormData();
-		payload.set('siteName', form.siteName);
 		payload.set('themeKey', form.themeKey);
-		payload.set('careerSiteEnabled', form.careerSiteEnabled ? 'true' : 'false');
-		payload.set('apiErrorLogRetentionDays', form.apiErrorLogRetentionDays || '90');
-		payload.set('removeLogo', form.removeLogo ? 'true' : 'false');
-		payload.set('googleMapsApiKey', form.googleMapsApiKey);
-		payload.set('openAiApiKey', form.openAiApiKey);
-		payload.set('objectStorageProvider', form.objectStorageProvider);
-		payload.set('objectStorageRegion', form.objectStorageRegion);
-		payload.set('objectStorageBucket', form.objectStorageBucket);
-		payload.set('objectStorageEndpoint', form.objectStorageEndpoint);
-		payload.set('objectStorageForcePathStyle', form.objectStorageForcePathStyle ? 'true' : 'false');
-		payload.set('objectStorageAccessKeyId', form.objectStorageAccessKeyId);
-		payload.set('objectStorageSecretAccessKey', form.objectStorageSecretAccessKey);
-		payload.set('smtpHost', form.smtpHost);
-		payload.set('smtpPort', form.smtpPort);
-		payload.set('smtpSecure', form.smtpSecure ? 'true' : 'false');
-		payload.set('smtpUser', form.smtpUser);
-		payload.set('smtpPass', form.smtpPass);
-		payload.set('smtpFromName', form.smtpFromName);
-		payload.set('smtpFromEmail', form.smtpFromEmail);
-		if (logoFile) {
-			payload.set('logoFile', logoFile);
+		if (!demoMode) {
+			payload.set('siteName', form.siteName);
+			payload.set('careerSiteEnabled', form.careerSiteEnabled ? 'true' : 'false');
+			payload.set('apiErrorLogRetentionDays', form.apiErrorLogRetentionDays || '90');
+			payload.set('removeLogo', form.removeLogo ? 'true' : 'false');
+			payload.set('googleMapsApiKey', form.googleMapsApiKey);
+			payload.set('openAiApiKey', form.openAiApiKey);
+			payload.set('objectStorageProvider', form.objectStorageProvider);
+			payload.set('objectStorageRegion', form.objectStorageRegion);
+			payload.set('objectStorageBucket', form.objectStorageBucket);
+			payload.set('objectStorageEndpoint', form.objectStorageEndpoint);
+			payload.set('objectStorageForcePathStyle', form.objectStorageForcePathStyle ? 'true' : 'false');
+			payload.set('objectStorageAccessKeyId', form.objectStorageAccessKeyId);
+			payload.set('objectStorageSecretAccessKey', form.objectStorageSecretAccessKey);
+			payload.set('smtpHost', form.smtpHost);
+			payload.set('smtpPort', form.smtpPort);
+			payload.set('smtpSecure', form.smtpSecure ? 'true' : 'false');
+			payload.set('smtpUser', form.smtpUser);
+			payload.set('smtpPass', form.smtpPass);
+			payload.set('smtpFromName', form.smtpFromName);
+			payload.set('smtpFromEmail', form.smtpFromEmail);
+			if (logoFile) {
+				payload.set('logoFile', logoFile);
+			}
 		}
 
 		const res = await fetch('/api/system-settings', {
@@ -423,13 +428,14 @@ export default function AdminSettingsPage() {
 									<section className="form-section">
 								<h4>Branding</h4>
 								{demoMode ? (
-									<p className="panel-subtext">Demo mode is enabled. System settings are read-only.</p>
+									<p className="panel-subtext">Demo mode is enabled. Only the theme preset can be changed here.</p>
 								) : null}
 								<FormField label="Site Name" required>
 									<input
 										value={form.siteName}
 										onChange={(event) => setForm((current) => ({ ...current, siteName: event.target.value }))}
 										required
+										disabled={demoMode}
 									/>
 								</FormField>
 
@@ -453,6 +459,7 @@ export default function AdminSettingsPage() {
 										onChange={(event) =>
 											setForm((current) => ({ ...current, careerSiteEnabled: event.target.checked }))
 										}
+										disabled={demoMode}
 									/>
 									<span className="switch-track" aria-hidden="true">
 										<span className="switch-thumb" />
@@ -475,6 +482,7 @@ export default function AdminSettingsPage() {
 													setForm((current) => ({ ...current, removeLogo: false }));
 												}
 											}}
+											disabled={demoMode}
 										/>
 									</FormField>
 
@@ -490,6 +498,7 @@ export default function AdminSettingsPage() {
 													setLogoFile(null);
 												}
 											}}
+											disabled={demoMode}
 										/>
 										<span className="switch-track" aria-hidden="true">
 											<span className="switch-thumb" />
@@ -516,6 +525,7 @@ export default function AdminSettingsPage() {
 										onChange={(event) =>
 											setForm((current) => ({ ...current, googleMapsApiKey: event.target.value }))
 										}
+										disabled={demoMode}
 									/>
 								</FormField>
 								<FormField label="OpenAI API Key" hint="Used for AI resume parsing. Leave blank to use the fallback parser only.">
@@ -525,6 +535,7 @@ export default function AdminSettingsPage() {
 										onChange={(event) =>
 											setForm((current) => ({ ...current, openAiApiKey: event.target.value }))
 										}
+										disabled={demoMode}
 									/>
 								</FormField>
 								<FormField label="API Error Log Retention (days)" hint="Old API error logs are automatically removed after this many days.">
@@ -536,6 +547,7 @@ export default function AdminSettingsPage() {
 										onChange={(event) =>
 											setForm((current) => ({ ...current, apiErrorLogRetentionDays: event.target.value }))
 										}
+										disabled={demoMode}
 									/>
 								</FormField>
 							</section>
@@ -547,6 +559,7 @@ export default function AdminSettingsPage() {
 										<input
 											value={form.smtpHost}
 											onChange={(event) => setForm((current) => ({ ...current, smtpHost: event.target.value }))}
+											disabled={demoMode}
 										/>
 									</FormField>
 									<FormField label="SMTP Port">
@@ -555,6 +568,7 @@ export default function AdminSettingsPage() {
 											min="1"
 											value={form.smtpPort}
 											onChange={(event) => setForm((current) => ({ ...current, smtpPort: event.target.value }))}
+											disabled={demoMode}
 										/>
 									</FormField>
 								</div>
@@ -563,6 +577,7 @@ export default function AdminSettingsPage() {
 										<input
 											value={form.smtpUser}
 											onChange={(event) => setForm((current) => ({ ...current, smtpUser: event.target.value }))}
+											disabled={demoMode}
 										/>
 									</FormField>
 									<FormField label="SMTP Password">
@@ -570,6 +585,7 @@ export default function AdminSettingsPage() {
 											type="password"
 											value={form.smtpPass}
 											onChange={(event) => setForm((current) => ({ ...current, smtpPass: event.target.value }))}
+											disabled={demoMode}
 										/>
 									</FormField>
 								</div>
@@ -580,6 +596,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, smtpFromName: event.target.value }))
 											}
+											disabled={demoMode}
 										/>
 									</FormField>
 									<FormField label="From Email">
@@ -589,6 +606,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, smtpFromEmail: event.target.value }))
 											}
+											disabled={demoMode}
 										/>
 									</FormField>
 								</div>
@@ -600,6 +618,7 @@ export default function AdminSettingsPage() {
 										onChange={(event) =>
 											setForm((current) => ({ ...current, smtpSecure: event.target.checked }))
 										}
+										disabled={demoMode}
 									/>
 									<span className="switch-track" aria-hidden="true">
 										<span className="switch-thumb" />
@@ -638,6 +657,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, objectStorageProvider: event.target.value }))
 											}
+											disabled={demoMode}
 										>
 											<option value="s3">S3 / S3-Compatible</option>
 											<option value="local">Local Filesystem</option>
@@ -649,7 +669,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, objectStorageRegion: event.target.value }))
 											}
-											disabled={!isS3ObjectStorage}
+											disabled={demoMode || !isS3ObjectStorage}
 										/>
 									</FormField>
 								</div>
@@ -660,7 +680,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, objectStorageBucket: event.target.value }))
 											}
-											disabled={!isS3ObjectStorage}
+											disabled={demoMode || !isS3ObjectStorage}
 										/>
 									</FormField>
 									<FormField label="Endpoint (optional)">
@@ -670,7 +690,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, objectStorageEndpoint: event.target.value }))
 											}
-											disabled={!isS3ObjectStorage}
+											disabled={demoMode || !isS3ObjectStorage}
 										/>
 									</FormField>
 								</div>
@@ -683,7 +703,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, objectStorageAccessKeyId: event.target.value }))
 											}
-											disabled={!isS3ObjectStorage}
+											disabled={demoMode || !isS3ObjectStorage}
 										/>
 									</FormField>
 									<FormField label="Secret Access Key">
@@ -694,7 +714,7 @@ export default function AdminSettingsPage() {
 											onChange={(event) =>
 												setForm((current) => ({ ...current, objectStorageSecretAccessKey: event.target.value }))
 											}
-											disabled={!isS3ObjectStorage}
+											disabled={demoMode || !isS3ObjectStorage}
 										/>
 									</FormField>
 								</div>
@@ -709,7 +729,7 @@ export default function AdminSettingsPage() {
 												objectStorageForcePathStyle: event.target.checked
 											}))
 										}
-										disabled={!isS3ObjectStorage}
+										disabled={demoMode || !isS3ObjectStorage}
 									/>
 									<span className="switch-track" aria-hidden="true">
 										<span className="switch-thumb" />
@@ -726,7 +746,7 @@ export default function AdminSettingsPage() {
 
 							<div className="form-actions">
 								<button type="submit" disabled={saving || !canSave}>
-									{saving ? 'Saving...' : demoMode ? 'Demo Mode (Read Only)' : 'Save Settings'}
+									{saving ? 'Saving...' : demoMode ? 'Save Theme' : 'Save Settings'}
 								</button>
 							</div>
 							</form>

@@ -103,6 +103,7 @@ async function parseBody(req) {
 	const contentType = req.headers.get('content-type') || '';
 	if (contentType.includes('multipart/form-data')) {
 		const formData = await req.formData();
+		const logoFile = normalizeLogoFile(formData.get(LOGO_FILE_FIELD));
 		return {
 			siteName: asTrimmedString(formData.get('siteName')),
 			themeKey: asTrimmedString(formData.get('themeKey')),
@@ -113,7 +114,7 @@ async function parseBody(req) {
 				? asTrimmedString(formData.get('apiErrorLogRetentionDays'))
 				: undefined,
 			removeLogo: toBoolean(formData.get('removeLogo')),
-			logoFile: normalizeLogoFile(formData.get(LOGO_FILE_FIELD)),
+			logoFile,
 			googleMapsApiKey: formData.has('googleMapsApiKey')
 				? asTrimmedString(formData.get('googleMapsApiKey'))
 				: undefined,
@@ -151,7 +152,31 @@ async function parseBody(req) {
 				: undefined,
 			objectStorageSecretAccessKey: formData.has('objectStorageSecretAccessKey')
 				? asTrimmedString(formData.get('objectStorageSecretAccessKey'))
-				: undefined
+				: undefined,
+			provided: {
+				siteName: formData.has('siteName'),
+				themeKey: formData.has('themeKey'),
+				careerSiteEnabled: formData.has('careerSiteEnabled'),
+				apiErrorLogRetentionDays: formData.has('apiErrorLogRetentionDays'),
+				removeLogo: formData.has('removeLogo'),
+				logoFile: Boolean(logoFile),
+				googleMapsApiKey: formData.has('googleMapsApiKey'),
+				openAiApiKey: formData.has('openAiApiKey'),
+				smtpHost: formData.has('smtpHost'),
+				smtpPort: formData.has('smtpPort'),
+				smtpSecure: formData.has('smtpSecure'),
+				smtpUser: formData.has('smtpUser'),
+				smtpPass: formData.has('smtpPass'),
+				smtpFromName: formData.has('smtpFromName'),
+				smtpFromEmail: formData.has('smtpFromEmail'),
+				objectStorageProvider: formData.has('objectStorageProvider'),
+				objectStorageRegion: formData.has('objectStorageRegion'),
+				objectStorageBucket: formData.has('objectStorageBucket'),
+				objectStorageEndpoint: formData.has('objectStorageEndpoint'),
+				objectStorageForcePathStyle: formData.has('objectStorageForcePathStyle'),
+				objectStorageAccessKeyId: formData.has('objectStorageAccessKeyId'),
+				objectStorageSecretAccessKey: formData.has('objectStorageSecretAccessKey')
+			}
 		};
 	}
 
@@ -204,7 +229,31 @@ async function parseBody(req) {
 			: undefined,
 		objectStorageSecretAccessKey: hasOwnProperty(body, 'objectStorageSecretAccessKey')
 			? asTrimmedString(body?.objectStorageSecretAccessKey)
-			: undefined
+			: undefined,
+		provided: {
+			siteName: hasOwnProperty(body, 'siteName'),
+			themeKey: hasOwnProperty(body, 'themeKey'),
+			careerSiteEnabled: hasOwnProperty(body, 'careerSiteEnabled'),
+			apiErrorLogRetentionDays: hasOwnProperty(body, 'apiErrorLogRetentionDays'),
+			removeLogo: hasOwnProperty(body, 'removeLogo'),
+			logoFile: false,
+			googleMapsApiKey: hasOwnProperty(body, 'googleMapsApiKey'),
+			openAiApiKey: hasOwnProperty(body, 'openAiApiKey'),
+			smtpHost: hasOwnProperty(body, 'smtpHost'),
+			smtpPort: hasOwnProperty(body, 'smtpPort'),
+			smtpSecure: hasOwnProperty(body, 'smtpSecure'),
+			smtpUser: hasOwnProperty(body, 'smtpUser'),
+			smtpPass: hasOwnProperty(body, 'smtpPass'),
+			smtpFromName: hasOwnProperty(body, 'smtpFromName'),
+			smtpFromEmail: hasOwnProperty(body, 'smtpFromEmail'),
+			objectStorageProvider: hasOwnProperty(body, 'objectStorageProvider'),
+			objectStorageRegion: hasOwnProperty(body, 'objectStorageRegion'),
+			objectStorageBucket: hasOwnProperty(body, 'objectStorageBucket'),
+			objectStorageEndpoint: hasOwnProperty(body, 'objectStorageEndpoint'),
+			objectStorageForcePathStyle: hasOwnProperty(body, 'objectStorageForcePathStyle'),
+			objectStorageAccessKeyId: hasOwnProperty(body, 'objectStorageAccessKeyId'),
+			objectStorageSecretAccessKey: hasOwnProperty(body, 'objectStorageSecretAccessKey')
+		}
 	};
 }
 
@@ -243,15 +292,58 @@ async function patchSystem_settingsHandler(req) {
 	if (actingUser.role !== 'ADMINISTRATOR') {
 		return NextResponse.json({ error: 'Only administrators can update system settings.' }, { status: 403 });
 	}
-	if (DEMO_MODE) {
-		return NextResponse.json(
-			{ error: 'System settings are read-only while demo mode is enabled.' },
-			{ status: 403 }
-		);
-	}
 
 	const existing = await getSystemSettingRecord();
 	const input = await parseBody(req);
+	if (DEMO_MODE) {
+		const attemptedSettingKeys = Object.entries(input.provided || {})
+			.filter(([key, provided]) => provided && key !== 'themeKey')
+			.map(([key]) => key);
+		if (attemptedSettingKeys.length > 0) {
+			return NextResponse.json(
+				{ error: 'Demo mode only allows changing the theme preset.' },
+				{ status: 403 }
+			);
+		}
+
+		const nextThemeKey = normalizeThemeKey(input.themeKey || existing?.themeKey || DEFAULT_THEME_KEY);
+		const saved = existing
+			? await prisma.systemSetting.update({
+					where: { id: existing.id },
+					data: { themeKey: nextThemeKey }
+				})
+			: await prisma.systemSetting.create({
+					data: {
+						siteName: DEFAULT_SITE_NAME,
+						themeKey: nextThemeKey
+					}
+				});
+
+		await Promise.allSettled([
+			existing
+				? logUpdate({
+						actorUserId: actingUser.id,
+						entityType: 'SYSTEM_SETTING',
+						before: existing,
+						after: saved
+					})
+				: logCreate({
+						actorUserId: actingUser.id,
+						entityType: 'SYSTEM_SETTING',
+						entity: saved
+					})
+		]);
+
+		clearSystemSettingsCache();
+
+		return NextResponse.json({
+			ok: true,
+			message: 'Demo theme updated.',
+			...serializeSystemBranding(saved),
+			...serializeAdminSystemSettings(saved)
+		});
+	}
+
 	const logoValidationError = validateLogoFile(input.logoFile);
 	if (logoValidationError) {
 		return NextResponse.json({ error: logoValidationError }, { status: 400 });

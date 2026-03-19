@@ -16,6 +16,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Portal management now tracks and displays the latest email-send timestamp alongside the existing view activity.
 - Audit trail viewing is now restricted to administrators in both the detail-screen UI and the audit-log API.
 - Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
+- In demo mode, system settings now allow theme changes while keeping all other admin settings read-only.
 
 ## [1.5.0] - 2026-03-17
 
