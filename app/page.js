@@ -27,6 +27,8 @@ const EMPTY_OVERVIEW = {
 	kpis: {
 		interviewsToday: 0,
 		submissionsAwaitingFeedback: 0,
+		webResponsesToReview: 0,
+		clientInterviewRequests: 0,
 		openJobsWithoutSubmissions7d: 0,
 		placementsThisMonth: 0
 	},
@@ -40,6 +42,8 @@ const EMPTY_OVERVIEW = {
 	detailLists: {
 		interviewsToday: [],
 		awaitingFeedback: [],
+		webResponsesToReview: [],
+		clientInterviewRequests: [],
 		stalledJobs: [],
 		placementsThisMonth: []
 	}
@@ -237,6 +241,12 @@ export default function HomePage() {
 						awaitingFeedback: Array.isArray(data.detailLists?.awaitingFeedback)
 							? data.detailLists.awaitingFeedback
 							: [],
+						webResponsesToReview: Array.isArray(data.detailLists?.webResponsesToReview)
+							? data.detailLists.webResponsesToReview
+							: [],
+						clientInterviewRequests: Array.isArray(data.detailLists?.clientInterviewRequests)
+							? data.detailLists.clientInterviewRequests
+							: [],
 						stalledJobs: Array.isArray(data.detailLists?.stalledJobs) ? data.detailLists.stalledJobs : [],
 						placementsThisMonth: Array.isArray(data.detailLists?.placementsThisMonth)
 							? data.detailLists.placementsThisMonth
@@ -274,6 +284,20 @@ export default function HomePage() {
 				detailItems: overview.detailLists.awaitingFeedback
 			},
 			{
+				key: 'webResponsesToReview',
+				label: 'Web Responses',
+				value: overview.kpis.webResponsesToReview,
+				detailTitle: 'Web Responses To Review',
+				detailItems: overview.detailLists.webResponsesToReview
+			},
+			{
+				key: 'clientInterviewRequests',
+				label: 'Interview Requests',
+				value: overview.kpis.clientInterviewRequests,
+				detailTitle: 'Client Interview Requests',
+				detailItems: overview.detailLists.clientInterviewRequests
+			},
+			{
 				key: 'openJobsWithoutSubmissions7d',
 				label: 'Open Jobs Stalled 7d',
 				value: overview.kpis.openJobsWithoutSubmissions7d,
@@ -309,7 +333,11 @@ export default function HomePage() {
 
 			<article className="panel panel-spacious">
 				<h3>Key Metrics</h3>
-				<div className="metric-grid dashboard-metric-grid">
+				<div
+					className="metric-grid dashboard-metric-grid"
+					data-count={kpiCards.length}
+					data-remainder={kpiCards.length % 4}
+				>
 					{kpiCards.map((card) => (
 						<button
 							key={card.key}

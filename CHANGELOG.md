@@ -18,6 +18,8 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
 - In demo mode, system settings now allow theme changes while keeping all other admin settings read-only.
 - Added a print-friendly submission packet from submission detail that compiles the write-up, primary resume, candidate snapshot, match explanation, and interview prep for internal review or PDF export.
+- Upgraded the dashboard `Needs Attention` queue with smarter workflow alerts for web responses, client portal engagement, unscheduled interview requests, and other stale follow-up states.
+- Added live dashboard KPI cards for web-response review and client interview requests so the home screen surfaces new recruiting pressure sooner.
 
 ## [1.5.0] - 2026-03-17
 

@@ -294,10 +294,12 @@ Expect to see:
 - Key metric cards for:
 	- Interviews Today
 	- Awaiting Feedback
+	- Web Responses
+	- Interview Requests
 	- Open Jobs Stalled 7d
 	- Placements This Month
 - A compact 7-day activity strip for candidates, job orders, submissions, interviews, and placements
-- Needs Attention items requiring follow-up.
+- Needs Attention items requiring follow-up, including smart workflow alerts like untouched web responses, unscheduled client interview requests, and stale client portal activity.
 - Upcoming interview schedule.
 - Recently added candidates.
 - Recently opened job orders.

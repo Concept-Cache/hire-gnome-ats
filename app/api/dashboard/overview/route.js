@@ -9,11 +9,15 @@ import {
 import { getArchivedEntityIdSet } from '@/lib/archive-entities';
 import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
 import { withApiLogging } from '@/lib/api-logging';
+import { WEB_RESPONSE_NOTE_PREFIX } from '@/lib/submission-origin';
 
 const AWAITING_FEEDBACK_SUBMISSION_STATUSES = ['submitted', 'under_review', 'qualified'];
 const ACTIVE_INTERVIEW_STATUSES = ['scheduled'];
 const OPEN_JOB_ORDER_STATUSES = ['open', 'active', 'on_hold'];
 const RECENT_PRIORITY_EXCLUDED_SUBMISSION_STATUSES = ['rejected', 'placed'];
+const PORTAL_OPEN_STALE_DAYS = 2;
+const PORTAL_RESPONSE_STALE_DAYS = 2;
+const WEB_RESPONSE_REVIEW_STALE_DAYS = 1;
 
 function andWhere(...clauses) {
 	const filtered = clauses.filter(Boolean);
@@ -47,6 +51,11 @@ function toOwnerName(user) {
 	return label || 'Unassigned';
 }
 
+function toContactName(contact) {
+	const label = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
+	return label || 'Client Contact';
+}
+
 function toDisplayLabel(value) {
 	const normalized = String(value || '').trim();
 	if (!normalized) return '-';
@@ -64,6 +73,24 @@ function toDayKey(date) {
 	const month = String(date.getMonth() + 1).padStart(2, '0');
 	const day = String(date.getDate()).padStart(2, '0');
 	return `${year}-${month}-${day}`;
+}
+
+function daysSince(value, now) {
+	const date = value instanceof Date ? value : value ? new Date(value) : null;
+	if (!date || Number.isNaN(date.getTime())) return 0;
+	return Math.max(1, Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000)));
+}
+
+function dedupePriorityItems(items) {
+	const seen = new Set();
+	const deduped = [];
+	for (const item of items) {
+		const key = `${item.type}:${item.href}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		deduped.push(item);
+	}
+	return deduped;
 }
 
 function buildTrendSeed(startDate, totalDays) {
@@ -109,6 +136,8 @@ async function getDashboard_overviewHandler(req) {
 		const tomorrowStart = addDays(todayStart, 1);
 		const sevenDaysAgo = addDays(now, -7);
 		const fiveDaysAgo = addDays(now, -5);
+		const twoDaysAgo = addDays(now, -PORTAL_OPEN_STALE_DAYS);
+		const oneDayAgo = addDays(now, -WEB_RESPONSE_REVIEW_STALE_DAYS);
 		const inSevenDays = addDays(now, 7);
 		const monthStart = startOfMonth(now);
 		const nextMonthStart = startOfNextMonth(now);
@@ -125,6 +154,10 @@ async function getDashboard_overviewHandler(req) {
 			upcomingInterviews,
 			recentCandidates,
 			recentJobOrders,
+			webResponseSubmissions,
+			clientPortalAccesses,
+			interviewRequestFeedback,
+			recentPortalInterviews,
 			candidateTrendRows,
 			jobOrderTrendRows,
 			submissionTrendRows,
@@ -291,6 +324,84 @@ async function getDashboard_overviewHandler(req) {
 				orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }],
 				take: 8
 			}),
+			prisma.submission.findMany({
+				where: andWhere(
+					relatedScope,
+					{ notes: { startsWith: WEB_RESPONSE_NOTE_PREFIX } },
+					{ status: { in: ['submitted', 'under_review'] } },
+					{ createdAt: { lt: oneDayAgo } }
+				),
+				select: {
+					id: true,
+					status: true,
+					createdAt: true,
+					updatedAt: true,
+					candidate: { select: { firstName: true, lastName: true } },
+					jobOrder: { select: { title: true, client: { select: { name: true } } } }
+				},
+				orderBy: { createdAt: 'asc' },
+				take: 12
+			}),
+			prisma.clientPortalAccess.findMany({
+				where: {
+					isRevoked: false,
+					jobOrder: addScopeToWhere({}, scope),
+					OR: [
+						{ lastEmailedAt: { not: null, lt: twoDaysAgo } },
+						{ lastViewedAt: { not: null, lt: addDays(now, -PORTAL_RESPONSE_STALE_DAYS) } }
+					]
+				},
+				select: {
+					id: true,
+					lastViewedAt: true,
+					lastActionAt: true,
+					lastEmailedAt: true,
+					contact: { select: { firstName: true, lastName: true } },
+					jobOrder: {
+						select: {
+							id: true,
+							title: true,
+							client: { select: { name: true } }
+						}
+					}
+				},
+				orderBy: { updatedAt: 'desc' },
+				take: 24
+			}),
+			prisma.clientSubmissionFeedback.findMany({
+				where: {
+					actionType: 'request_interview',
+					createdAt: { lt: oneDayAgo },
+					submission: relatedScope
+				},
+				select: {
+					id: true,
+					createdAt: true,
+					clientNameSnapshot: true,
+					submission: {
+						select: {
+							id: true,
+							status: true,
+							updatedAt: true,
+							candidateId: true,
+							jobOrderId: true,
+							candidate: { select: { firstName: true, lastName: true } },
+							jobOrder: { select: { title: true, client: { select: { name: true } } } }
+						}
+					}
+				},
+				orderBy: { createdAt: 'desc' },
+				take: 24
+			}),
+			prisma.interview.findMany({
+				where: andWhere(relatedScope, { status: { notIn: ['cancelled'] } }, { createdAt: { gte: sevenDaysAgo } }),
+				select: {
+					id: true,
+					candidateId: true,
+					jobOrderId: true,
+					createdAt: true
+				}
+			}),
 			prisma.candidate.findMany({
 				where: addScopeToWhere({ createdAt: { gte: trendStart } }, scope),
 				select: { id: true, createdAt: true }
@@ -349,6 +460,12 @@ async function getDashboard_overviewHandler(req) {
 		const activeUpcomingInterviews = upcomingInterviews.filter((record) => !archivedInterviewIds.has(record.id));
 		const activeRecentCandidates = recentCandidates.filter((record) => !archivedCandidateIds.has(record.id));
 		const activeRecentJobOrders = recentJobOrders.filter((record) => !archivedJobOrderIds.has(record.id));
+		const activeWebResponseSubmissions = webResponseSubmissions.filter((record) => !archivedSubmissionIds.has(record.id));
+		const activeClientPortalAccesses = clientPortalAccesses.filter((record) => !archivedJobOrderIds.has(record.jobOrder?.id));
+		const activeInterviewRequestFeedback = interviewRequestFeedback.filter(
+			(record) => record?.submission?.id && !archivedSubmissionIds.has(record.submission.id)
+		);
+		const activeRecentPortalInterviews = recentPortalInterviews.filter((record) => !archivedInterviewIds.has(record.id));
 		const activeCandidateTrendRows = candidateTrendRows.filter((record) => !archivedCandidateIds.has(record.id));
 		const activeJobOrderTrendRows = jobOrderTrendRows.filter((record) => !archivedJobOrderIds.has(record.id));
 		const activeSubmissionTrendRows = submissionTrendRows.filter((record) => !archivedSubmissionIds.has(record.id));
@@ -356,55 +473,123 @@ async function getDashboard_overviewHandler(req) {
 		const activePlacementTrendRows = placementTrendRows.filter((record) => !archivedPlacementIds.has(record.id));
 		const activePlacementsThisMonth = placementsThisMonth.filter((record) => !archivedPlacementIds.has(record.id));
 
-		const stalePriorityQueue = [
-			...activeStaleSubmissions.map((record) => {
-				const staleDays = Math.max(
-					1,
-					Math.floor((now.getTime() - new Date(record.createdAt).getTime()) / (24 * 60 * 60 * 1000))
+		const interviewRequestPriorityQueue = activeInterviewRequestFeedback
+			.filter((record) => {
+				if (['rejected', 'placed'].includes(String(record.submission?.status || '').toLowerCase())) {
+					return false;
+				}
+				const feedbackTime = new Date(record.createdAt).getTime();
+				return !activeRecentPortalInterviews.some(
+					(interview) =>
+						interview.candidateId === record.submission.candidateId &&
+						interview.jobOrderId === record.submission.jobOrderId &&
+						new Date(interview.createdAt).getTime() >= feedbackTime
 				);
+			})
+			.map((record) => ({
+				id: `client-interview-request-${record.id}`,
+				type: 'submission',
+				title: `${toCandidateName(record.submission.candidate)} | ${record.submission.jobOrder?.title || '-'}`,
+				subtitle: `Status: ${toDisplayLabel(record.submission.status)}`,
+				meta: `${record.submission.jobOrder?.client?.name || '-'} | ${record.clientNameSnapshot || 'Client Contact'}`,
+				dateLabel: 'Requested',
+				dateValue: record.createdAt,
+				urgencyLabel: 'Client requested interview, not scheduled',
+				urgencyRank: 500000 + daysSince(record.createdAt, now),
+				href: `/submissions/${record.submission.id}`
+			}));
+
+		const webResponsePriorityQueue = activeWebResponseSubmissions.map((record) => ({
+			id: `web-response-${record.id}`,
+			type: 'submission',
+			title: `${toCandidateName(record.candidate)} | ${record.jobOrder?.title || '-'}`,
+			subtitle: `Status: ${toDisplayLabel(record.status)}`,
+			meta: record.jobOrder?.client?.name || '-',
+			dateLabel: 'Applied',
+			dateValue: record.createdAt,
+			urgencyLabel: 'Web response awaiting recruiter review',
+			urgencyRank: 400000 + daysSince(record.createdAt, now),
+			href: `/submissions/${record.id}`
+		}));
+
+		const portalResponsePriorityQueue = activeClientPortalAccesses
+			.filter((record) => record.lastViewedAt && (!record.lastActionAt || record.lastActionAt < record.lastViewedAt))
+			.map((record) => ({
+				id: `portal-viewed-${record.id}`,
+				type: 'jobOrder',
+				title: record.jobOrder?.title || `Job Order #${record.jobOrder?.id || record.id}`,
+				subtitle: record.jobOrder?.client?.name || '-',
+				meta: `Viewed by ${toContactName(record.contact)}`,
+				dateLabel: 'Viewed',
+				dateValue: record.lastViewedAt,
+				urgencyLabel: 'Client portal viewed, no response yet',
+				urgencyRank: 300000 + daysSince(record.lastViewedAt, now),
+				href: `/job-orders/${record.jobOrder.id}`
+			}));
+
+		const unopenedPortalPriorityQueue = activeClientPortalAccesses
+			.filter((record) => record.lastEmailedAt && (!record.lastViewedAt || record.lastViewedAt < record.lastEmailedAt))
+			.map((record) => ({
+				id: `portal-unopened-${record.id}`,
+				type: 'jobOrder',
+				title: record.jobOrder?.title || `Job Order #${record.jobOrder?.id || record.id}`,
+				subtitle: record.jobOrder?.client?.name || '-',
+				meta: `Sent to ${toContactName(record.contact)}`,
+				dateLabel: 'Sent',
+				dateValue: record.lastEmailedAt,
+				urgencyLabel: 'Portal link sent, not opened',
+				urgencyRank: 250000 + daysSince(record.lastEmailedAt, now),
+				href: `/job-orders/${record.jobOrder.id}`
+			}));
+
+		const smartPriorityQueue = dedupePriorityItems([
+			...interviewRequestPriorityQueue,
+			...webResponsePriorityQueue,
+			...portalResponsePriorityQueue,
+			...unopenedPortalPriorityQueue,
+			...activeStaleSubmissions.map((record) => {
 				return {
 					id: `submission-${record.id}`,
 					type: 'submission',
 					title: `${toCandidateName(record.candidate)} | ${record.jobOrder?.title || '-'}`,
 					subtitle: `Status: ${toDisplayLabel(record.status)}`,
 					meta: record.jobOrder?.client?.name || '-',
+					dateLabel: 'Submitted',
+					dateValue: record.createdAt,
 					urgencyLabel: 'Awaiting feedback for over 5 days',
-					urgencyRank: 200000 + staleDays,
+					urgencyRank: 200000 + daysSince(record.createdAt, now),
 					href: `/submissions/${record.id}`
 				};
 			}),
 			...activeStaleOpenJobOrders.map((record) => {
-				const staleDays = Math.max(
-					1,
-					Math.floor((now.getTime() - new Date(record.updatedAt).getTime()) / (24 * 60 * 60 * 1000))
-				);
 				return {
 					id: `job-${record.id}`,
 					type: 'jobOrder',
 					title: record.title || `Job Order #${record.id}`,
 					subtitle: record.client?.name || '-',
-					meta: `Last updated ${staleDays} day${staleDays === 1 ? '' : 's'} ago`,
+					meta: `Owner: ${toOwnerName(record.ownerUser)}`,
+					dateLabel: 'Updated',
+					dateValue: record.updatedAt,
 					urgencyLabel: 'No new submissions in the last 7 days',
-					urgencyRank: 100000 + staleDays,
+					urgencyRank: 100000 + daysSince(record.updatedAt, now),
 					href: `/job-orders/${record.id}`
 				};
 			})
-		]
+		])
 			.sort((a, b) => b.urgencyRank - a.urgencyRank)
 			.slice(0, 8);
 
-		const fallbackPriorityQueue = [
+		const fallbackPriorityQueue = dedupePriorityItems([
 			...activeAwaitingFeedbackSubmissions.map((record) => {
-				const staleDays = Math.max(
-					1,
-					Math.floor((now.getTime() - new Date(record.updatedAt || record.createdAt).getTime()) / (24 * 60 * 60 * 1000))
-				);
+				const staleDays = daysSince(record.updatedAt || record.createdAt, now);
 				return {
 					id: `fallback-submission-${record.id}`,
 					type: 'submission',
 					title: `${toCandidateName(record.candidate)} | ${record.jobOrder?.title || '-'}`,
 					subtitle: `Status: ${toDisplayLabel(record.status)}`,
 					meta: record.jobOrder?.client?.name || '-',
+					dateLabel: 'Updated',
+					dateValue: record.updatedAt || record.createdAt,
 					urgencyLabel: staleDays >= 5 ? 'Awaiting feedback for over 5 days' : 'Awaiting feedback follow-up',
 					urgencyRank: 50000 + staleDays,
 					href: `/submissions/${record.id}`
@@ -415,27 +600,28 @@ async function getDashboard_overviewHandler(req) {
 				type: 'jobOrder',
 				title: record.title || `Job Order #${record.id}`,
 				subtitle: record.client?.name || '-',
-				meta: 'Open job order',
+				meta: `Owner: ${toOwnerName(record.ownerUser)}`,
+				dateLabel: 'Updated',
+				dateValue: record.updatedAt,
 				urgencyLabel: 'Review pipeline health',
 				urgencyRank: 1000,
 				href: `/job-orders/${record.id}`
 			}))
-		]
+		])
 			.sort((a, b) => b.urgencyRank - a.urgencyRank)
 			.slice(0, 8);
 
-		const recentPriorityQueue = [
+		const recentPriorityQueue = dedupePriorityItems([
 			...activeRecentPrioritySubmissions.map((record) => {
-				const daysSinceUpdate = Math.max(
-					1,
-					Math.floor((now.getTime() - new Date(record.updatedAt || record.createdAt).getTime()) / (24 * 60 * 60 * 1000))
-				);
+				const daysSinceUpdate = daysSince(record.updatedAt || record.createdAt, now);
 				return {
 					id: `recent-submission-${record.id}`,
 					type: 'submission',
 					title: `${toCandidateName(record.candidate)} | ${record.jobOrder?.title || '-'}`,
 					subtitle: `Status: ${toDisplayLabel(record.status)}`,
 					meta: record.jobOrder?.client?.name || '-',
+					dateLabel: 'Updated',
+					dateValue: record.updatedAt || record.createdAt,
 					urgencyLabel: 'Recent active submission',
 					urgencyRank: 500 + (10 - Math.min(daysSinceUpdate, 10)),
 					href: `/submissions/${record.id}`
@@ -446,18 +632,20 @@ async function getDashboard_overviewHandler(req) {
 				type: 'jobOrder',
 				title: record.title || `Job Order #${record.id}`,
 				subtitle: record.client?.name || '-',
-				meta: 'Open job order',
+				meta: `Owner: ${toOwnerName(record.ownerUser)}`,
+				dateLabel: 'Opened',
+				dateValue: record.openedAt || record.updatedAt,
 				urgencyLabel: 'Recent open job order',
 				urgencyRank: 400,
 				href: `/job-orders/${record.id}`
 			}))
-		]
+		])
 			.sort((a, b) => b.urgencyRank - a.urgencyRank)
 			.slice(0, 8);
 
 		const priorityQueue =
-			stalePriorityQueue.length > 0
-				? stalePriorityQueue
+			smartPriorityQueue.length > 0
+				? smartPriorityQueue
 				: fallbackPriorityQueue.length > 0
 					? fallbackPriorityQueue
 					: recentPriorityQueue;
@@ -494,6 +682,28 @@ async function getDashboard_overviewHandler(req) {
 				badgeLabel: 'Awaiting feedback',
 				href: `/submissions/${record.id}`
 			})),
+			webResponsesToReview: webResponsePriorityQueue.map((item) => ({
+				id: item.id,
+				entityType: item.type,
+				title: item.title,
+				subtitle: item.subtitle,
+				meta: item.meta,
+				dateLabel: item.dateLabel,
+				dateValue: item.dateValue,
+				badgeLabel: item.urgencyLabel,
+				href: item.href
+			})),
+			clientInterviewRequests: interviewRequestPriorityQueue.map((item) => ({
+				id: item.id,
+				entityType: item.type,
+				title: item.title,
+				subtitle: item.subtitle,
+				meta: item.meta,
+				dateLabel: item.dateLabel,
+				dateValue: item.dateValue,
+				badgeLabel: item.urgencyLabel,
+				href: item.href
+			})),
 			stalledJobs: activeStaleOpenJobOrders.map((record) => ({
 				id: `stalled-job-${record.id}`,
 				entityType: 'jobOrder',
@@ -525,6 +735,8 @@ async function getDashboard_overviewHandler(req) {
 				title: item.title,
 				subtitle: item.subtitle,
 				meta: item.meta,
+				dateLabel: item.dateLabel,
+				dateValue: item.dateValue,
 				badgeLabel: item.urgencyLabel,
 				href: item.href
 			})),
@@ -566,6 +778,8 @@ async function getDashboard_overviewHandler(req) {
 			kpis: {
 				interviewsToday: activeInterviewsToday.length,
 				submissionsAwaitingFeedback: activeAwaitingFeedbackSubmissions.length,
+				webResponsesToReview: webResponsePriorityQueue.length,
+				clientInterviewRequests: interviewRequestPriorityQueue.length,
 				openJobsWithoutSubmissions7d: activeStaleOpenJobOrders.length,
 				placementsThisMonth: activePlacementsThisMonth.length
 			},

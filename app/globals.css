@@ -2384,6 +2384,30 @@ p {
 	grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.dashboard-metric-grid[data-remainder='1'] > :last-child {
+	grid-column: 2 / span 2;
+}
+
+.dashboard-metric-grid[data-remainder='2'] > :nth-last-child(2) {
+	grid-column: 2;
+}
+
+.dashboard-metric-grid[data-remainder='2'] > :last-child {
+	grid-column: 3;
+}
+
+.dashboard-metric-grid[data-remainder='3'] > :nth-last-child(3) {
+	grid-column: 1 / span 2;
+}
+
+.dashboard-metric-grid[data-remainder='3'] > :nth-last-child(2) {
+	grid-column: 3;
+}
+
+.dashboard-metric-grid[data-remainder='3'] > :last-child {
+	grid-column: 4;
+}
+
 .dashboard-metric-button {
 	display: block;
 	width: 100%;
@@ -7194,6 +7218,10 @@ small {
 
 	.metric-grid {
 		grid-template-columns: 1fr 1fr;
+	}
+
+	.dashboard-metric-grid[data-remainder] > * {
+		grid-column: auto !important;
 	}
 
 	.dashboard-trend-strip {
