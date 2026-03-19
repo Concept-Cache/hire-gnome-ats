@@ -11,6 +11,7 @@ import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
+import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 
 function formatDate(value) {
 	return formatDateTimeAt(value);
@@ -31,10 +32,10 @@ export default function SubmissionsPage() {
 	);
 
 	const statusOptions = useMemo(() => {
-		return [...new Set(activeRows.map((row) => row.status).filter(Boolean))]
+		return [...new Set(activeRows.map((row) => row.effectiveStatus).filter(Boolean))]
 			.map((status) => ({
 				value: status,
-				label: activeRows.find((row) => row.status === status)?.statusLabel || status
+				label: activeRows.find((row) => row.effectiveStatus === status)?.statusLabel || status
 			}))
 			.sort((a, b) => a.label.localeCompare(b.label));
 	}, [activeRows]);
@@ -50,10 +51,10 @@ export default function SubmissionsPage() {
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.candidate} ${row.jobOrder} ${row.client} ${row.status} ${row.statusLabel} ${row.originLabel ?? ''} ${row.submittedBy ?? ''}`
+				`${row.candidate} ${row.jobOrder} ${row.client} ${row.effectiveStatus} ${row.statusLabel} ${row.originLabel ?? ''} ${row.submittedBy ?? ''}`
 					.toLowerCase()
 					.includes(q);
-			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
+			const matchesStatus = statusFilter === 'all' || row.effectiveStatus === statusFilter;
 			const matchesSubmitter = submitterFilter === 'all' || row.submittedBy === submitterFilter;
 			return matchesQuery && matchesStatus && matchesSubmitter;
 		});
@@ -69,6 +70,7 @@ export default function SubmissionsPage() {
 			setRows(
 				rows.map((submission) => ({
 					...submission,
+					effectiveStatus: getEffectiveSubmissionStatus(submission),
 					candidate: submission.candidate
 						? `${submission.candidate.firstName} ${submission.candidate.lastName}`
 						: '-',
@@ -77,7 +79,7 @@ export default function SubmissionsPage() {
 					jobOrderId: submission.jobOrder?.id || null,
 					client: submission.jobOrder?.client?.name || '-',
 					clientId: submission.jobOrder?.client?.id || null,
-					statusLabel: formatSelectValueLabel(submission.status),
+					statusLabel: formatSelectValueLabel(getEffectiveSubmissionStatus(submission)),
 					originLabel: submissionOriginLabel(submission),
 					submittedBy: submissionCreatedByLabel(submission),
 					submittedAt: formatDate(submission.createdAt)

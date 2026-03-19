@@ -26,9 +26,23 @@ After creation:
 Key actions:
 - Schedule interview
 - Promote to / hide from client portal
+- Open submission packet
 - Convert to placement (with confirmation)
 - View audit trail (administrators only)
 - Archive
+
+## Submission Packet
+Submission detail includes a `Submission Packet` action for a print-friendly internal packet.
+
+Behavior:
+- Opens in a dedicated packet view from the submission actions menu
+- Designed for browser print / Save as PDF
+- Compiles:
+	- recruiter write-up
+	- primary resume download link
+	- candidate snapshot
+	- cached match explanation
+	- recent interview activity and latest AI question set when available
 
 ## Client Write-Up
 Submission detail includes a dedicated `Client Write-Up` field for polished recruiter/client-facing candidate summaries.

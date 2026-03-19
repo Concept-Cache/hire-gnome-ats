@@ -30,6 +30,7 @@ import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { sortByConfig } from '@/lib/list-sort';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
+import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
 import { toBooleanFlag } from '@/lib/boolean-flag';
@@ -1769,7 +1770,7 @@ export default function JobOrderDetailsPage() {
 														<ArrowUpRight aria-hidden="true" />
 													</Link>
 													<div className="submission-chip-stack">
-														<span className="chip">{formatSelectValueLabel(submission.status)}</span>
+														<span className="chip">{formatSelectValueLabel(getEffectiveSubmissionStatus(submission))}</span>
 														<span
 															className={
 																submissionOriginLabel(submission) === 'Web'

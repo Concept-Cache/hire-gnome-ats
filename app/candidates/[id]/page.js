@@ -31,6 +31,7 @@ import { isValidEmailAddress } from '@/lib/email-validation';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { sortByConfig } from '@/lib/list-sort';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
+import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { CANDIDATE_STATUS_OPTIONS, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 
@@ -334,7 +335,7 @@ export default function CandidateDetailsPage() {
 			id: submission.id,
 			jobOrder: submission.jobOrder?.title || '-',
 			client: submission.jobOrder?.client?.name || '-',
-			status: formatSelectValueLabel(submission.status),
+			status: formatSelectValueLabel(getEffectiveSubmissionStatus(submission)),
 			createdAt: formatDate(submission.createdAt),
 			createdAtRaw: submission.createdAt || '',
 			createdBy: submissionCreatedByLabel(submission)

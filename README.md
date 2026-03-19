@@ -177,6 +177,8 @@ Use `Admin Area > Data Export` for:
 - Incremental date-range exports using `updatedAt` (fallback `createdAt`)
 - Export payload includes `customFieldDefinitions` so custom schema can be moved across instances
 
+Submission workflows include a print-friendly `Submission Packet` from submission detail for internal review or browser PDF export. The packet compiles the recruiter write-up, primary resume link, candidate snapshot, cached match explanation, and recent interview prep/questions.
+
 Use `Admin Area > Data Import` for:
 - Source selection:
 	- Hire Gnome export (`JSON`, `NDJSON`, `ZIP`)

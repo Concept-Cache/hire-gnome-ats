@@ -15,6 +15,7 @@ import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { submissionOriginLabel } from '@/lib/submission-origin';
+import { getEffectiveSubmissionStatus, isSubmissionPlacementLocked } from '@/lib/submission-status';
 
 const initialForm = {
 	candidateId: '',
@@ -91,7 +92,7 @@ export default function SubmissionDetailsPage() {
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(submission)
 	});
-	const isConvertedToPlacement = Boolean(submission?.offer?.id);
+	const isConvertedToPlacement = isSubmissionPlacementLocked(submission);
 	const customFieldsComplete = areRequiredCustomFieldsComplete(
 		customFieldDefinitions,
 		form.customFields
@@ -248,6 +249,11 @@ export default function SubmissionDetailsPage() {
 		if (!submission?.jobOrderId) return;
 		if (!(await confirmNavigation())) return;
 		router.push(`/job-orders/${submission.jobOrderId}`);
+	}
+
+	function onOpenSubmissionPacket() {
+		setActionsOpen(false);
+		router.push(`/submissions/${id}/packet`);
 	}
 
 	async function onConvertToPlacement() {
@@ -497,6 +503,14 @@ export default function SubmissionDetailsPage() {
 									type="button"
 									role="menuitem"
 									className="actions-menu-item"
+									onClick={onOpenSubmissionPacket}
+								>
+									Submission Packet
+								</button>
+								<button
+									type="button"
+									role="menuitem"
+									className="actions-menu-item"
 									onClick={onToggleClientPortalVisibility}
 									disabled={convertState.converting || saveState.saving || writeUpState.generating || isConvertedToPlacement}
 								>
@@ -656,7 +670,7 @@ export default function SubmissionDetailsPage() {
 							<FormField label="Status">
 								{isConvertedToPlacement ? (
 									<div className="locked-field">
-										<input value={formatSubmissionStatusLabel(form.status)} disabled readOnly />
+										<input value={formatSubmissionStatusLabel(getEffectiveSubmissionStatus(submission))} disabled readOnly />
 										<span className="locked-field-icon" aria-label="Locked field" title="Locked field">
 											<Lock aria-hidden="true" />
 										</span>
