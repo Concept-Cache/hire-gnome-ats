@@ -206,6 +206,97 @@ function formatDateRange(startDate, endDate, isCurrent) {
 	return `${start} - ${end}`;
 }
 
+function truncateText(value, maxLength = 220) {
+	const text = String(value || '').trim();
+	if (!text) return '';
+	if (text.length <= maxLength) return text;
+	return `${text.slice(0, maxLength).trimEnd()}...`;
+}
+
+function buildCandidateLocation(form) {
+	const city = String(form?.city || '').trim();
+	const state = String(form?.state || '').trim();
+	const zipCode = String(form?.zipCode || '').trim();
+	const address = String(form?.address || '').trim();
+
+	if (city && state) return `${city}, ${state}`;
+	if (city) return city;
+	if (state) return state;
+	if (zipCode) return zipCode;
+	return address;
+}
+
+function getLatestCandidateActivity(candidate) {
+	if (!candidate) return null;
+
+	const events = [];
+	const latestByDate = (items, getDateValue) =>
+		(Array.isArray(items) ? items : []).reduce((latest, item) => {
+			const rawValue = getDateValue(item);
+			const timestamp = rawValue ? new Date(rawValue).getTime() : Number.NaN;
+			if (Number.isNaN(timestamp)) return latest;
+			if (!latest || timestamp > latest.timestamp) {
+				return { item, timestamp, rawValue };
+			}
+			return latest;
+		}, null);
+
+	const latestNote = latestByDate(candidate.notes, (note) => note?.createdAt);
+	if (latestNote) {
+		events.push({
+			label: latestNote.item?.noteType === 'email' ? 'Inbound email note' : 'Candidate note added',
+			rawValue: latestNote.rawValue,
+			timestamp: latestNote.timestamp
+		});
+	}
+
+	const latestActivity = latestByDate(candidate.activities, (activity) => activity?.dueAt || activity?.createdAt);
+	if (latestActivity) {
+		const activityType = formatSelectValueLabel(latestActivity.item?.type || 'activity');
+		events.push({
+			label: `${activityType} activity updated`,
+			rawValue: latestActivity.rawValue,
+			timestamp: latestActivity.timestamp
+		});
+	}
+
+	const latestSubmission = latestByDate(candidate.submissions, (submission) => submission?.createdAt);
+	if (latestSubmission) {
+		events.push({
+			label: `Submitted to ${latestSubmission.item?.jobOrder?.title || 'job order'}`,
+			rawValue: latestSubmission.rawValue,
+			timestamp: latestSubmission.timestamp
+		});
+	}
+
+	const latestAttachment = latestByDate(candidate.attachments, (attachment) => attachment?.createdAt);
+	if (latestAttachment) {
+		events.push({
+			label: latestAttachment.item?.isResume ? 'Primary resume updated' : 'Candidate file uploaded',
+			rawValue: latestAttachment.rawValue,
+			timestamp: latestAttachment.timestamp
+		});
+	}
+
+	if (candidate.aiSummary?.updatedAt) {
+		const timestamp = new Date(candidate.aiSummary.updatedAt).getTime();
+		if (!Number.isNaN(timestamp)) {
+			events.push({
+				label: 'AI summary refreshed',
+				rawValue: candidate.aiSummary.updatedAt,
+				timestamp
+			});
+		}
+	}
+
+	const latestEvent = events.sort((left, right) => right.timestamp - left.timestamp)[0];
+	if (!latestEvent) return null;
+	return {
+		label: latestEvent.label,
+		formattedAt: formatDate(latestEvent.rawValue)
+	};
+}
+
 export default function CandidateDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
@@ -338,6 +429,22 @@ export default function CandidateDetailsPage() {
 			: candidateCompleteness.scorePercent >= 65
 				? ' candidate-completeness-chip-warn'
 				: ' candidate-completeness-chip-poor';
+	const candidateLocation = useMemo(() => buildCandidateLocation(editForm), [editForm]);
+	const candidateTopSkillNames = useMemo(() => {
+		const selectedSkillNames = Array.isArray(editForm.skillIds)
+			? editForm.skillIds
+					.map((skillId) => skills.find((skill) => String(skill.id) === String(skillId))?.name)
+					.filter(Boolean)
+			: [];
+		const otherSkillNames = uniqueSkillNames(String(editForm.skillSet || '').split(/[,;\n|/]+/));
+		return uniqueSkillNames([...selectedSkillNames, ...otherSkillNames]).slice(0, 8);
+	}, [editForm.skillIds, editForm.skillSet, skills]);
+	const candidateSummarySnippet = useMemo(() => {
+		if (candidate?.aiSummary?.overview) return truncateText(candidate.aiSummary.overview, 240);
+		if (editForm.summary) return truncateText(editForm.summary, 220);
+		return '';
+	}, [candidate?.aiSummary?.overview, editForm.summary]);
+	const latestCandidateActivity = useMemo(() => getLatestCandidateActivity(candidate), [candidate]);
 
 	const submissionRows = useMemo(() => {
 		if (!candidate) return [];
@@ -1330,63 +1437,103 @@ export default function CandidateDetailsPage() {
 				</p>
 			) : null}
 
-			<article className="panel">
-				<div className="panel-header-row candidate-snapshot-head">
-					<h3>Snapshot</h3>
-					<div className="candidate-completeness-summary">
-						<span className="candidate-completeness-label">Profile Completeness</span>
-						<div className="candidate-completeness-summary-main">
-							<span className="candidate-completeness-score">{candidateCompleteness.scorePercent}%</span>
-							<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
-								{candidateCompleteness.levelLabel}
-							</span>
+			<article className="panel candidate-hero-card">
+				<div className="candidate-hero-grid">
+					<div className="candidate-hero-main">
+						<div className="candidate-hero-kicker">Candidate Snapshot</div>
+						<div className="candidate-hero-heading-row">
+							<div>
+								<h3 className="candidate-hero-title">
+									{editForm.currentJobTitle || 'Current title not set'}
+								</h3>
+								<p className="candidate-hero-subtitle">
+									{editForm.currentEmployer || 'Current employer not set'}
+									{candidateLocation ? ` | ${candidateLocation}` : ''}
+								</p>
+							</div>
+							<div className="candidate-hero-chip-group">
+								<span className="chip candidate-hero-status-chip">
+									{formatSelectValueLabel(editForm.status)}
+								</span>
+								<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
+									{candidateCompleteness.scorePercent}% {candidateCompleteness.levelLabel}
+								</span>
+							</div>
 						</div>
-					</div>
-				</div>
-				<div className="info-list snapshot-grid snapshot-grid-four">
-					<p>
-						<span>Record ID</span>
-						<strong>{candidate.recordId || '-'}</strong>
-					</p>
-					<p>
-						<span>Current Employer</span>
-						<strong>{candidate.currentEmployer || '-'}</strong>
-					</p>
-					<p>
-						<span>Current Job Title</span>
-						<strong>{candidate.currentJobTitle || '-'}</strong>
-					</p>
-					<p>
-						<span>Email</span>
-						<strong>
-							{candidate.email ? <a href={`mailto:${candidate.email}`}>{candidate.email}</a> : '-'}
-						</strong>
-					</p>
-				</div>
-				<div className="candidate-completeness-card">
-					<div className="candidate-completeness-meter" aria-hidden="true">
-						<span
-							className="candidate-completeness-meter-fill"
-							style={{ width: `${candidateCompleteness.scorePercent}%` }}
-						/>
-					</div>
-					<p className="panel-subtext candidate-completeness-copy">
-						{candidateCompleteness.completedSections} of {candidateCompleteness.totalSections} profile areas are complete.
-					</p>
-					{candidateCompleteness.topGaps.length > 0 ? (
-						<div className="candidate-completeness-gaps">
-							<span className="candidate-completeness-gaps-label">Top gaps</span>
-							<div className="candidate-completeness-gap-list">
-								{candidateCompleteness.topGaps.map((gap) => (
-									<span key={gap} className="chip candidate-completeness-gap-chip">
-										{gap}
+
+						{candidateTopSkillNames.length > 0 ? (
+							<div className="candidate-hero-skills">
+								{candidateTopSkillNames.map((skillName) => (
+									<span key={skillName} className="skill-chip">
+										{skillName}
 									</span>
 								))}
 							</div>
+						) : (
+							<p className="panel-subtext candidate-hero-empty-row">Add skills to make this profile easier to scan and submit.</p>
+						)}
+
+						<div className="candidate-hero-summary-card">
+							<span className="candidate-hero-section-label">AI Summary</span>
+							<p className="candidate-hero-summary-copy">
+								{candidateSummarySnippet || 'No AI summary snippet yet. Generate one from the sparkles action to add a recruiter-ready summary here.'}
+							</p>
 						</div>
-					) : (
-						<p className="panel-subtext candidate-completeness-copy">Profile is in strong shape for recruiter review.</p>
-					)}
+
+						<div className="candidate-hero-meta-row">
+							<p className="simple-list-meta candidate-hero-last-activity">
+								Last activity:{' '}
+								{latestCandidateActivity ? (
+									<>
+										{latestCandidateActivity.label} @{' '}
+										<span className="meta-emphasis-time">{latestCandidateActivity.formattedAt}</span>
+									</>
+								) : (
+									'No activity yet'
+								)}
+							</p>
+							<p className="simple-list-meta candidate-hero-record-id">
+								Record ID: <span className="meta-emphasis-time">{candidate.recordId || '-'}</span>
+							</p>
+						</div>
+					</div>
+
+					<div className="candidate-hero-side">
+						<div className="candidate-completeness-summary">
+							<span className="candidate-completeness-label">Profile Completeness</span>
+							<div className="candidate-completeness-summary-main">
+								<span className="candidate-completeness-score">{candidateCompleteness.scorePercent}%</span>
+								<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
+									{candidateCompleteness.levelLabel}
+								</span>
+							</div>
+						</div>
+						<div className="candidate-completeness-card">
+							<div className="candidate-completeness-meter" aria-hidden="true">
+								<span
+									className="candidate-completeness-meter-fill"
+									style={{ width: `${candidateCompleteness.scorePercent}%` }}
+								/>
+							</div>
+							<p className="panel-subtext candidate-completeness-copy">
+								{candidateCompleteness.completedSections} of {candidateCompleteness.totalSections} profile areas are complete.
+							</p>
+							{candidateCompleteness.topGaps.length > 0 ? (
+								<div className="candidate-completeness-gaps">
+									<span className="candidate-completeness-gaps-label">Top gaps</span>
+									<div className="candidate-completeness-gap-list">
+										{candidateCompleteness.topGaps.map((gap) => (
+											<span key={gap} className="chip candidate-completeness-gap-chip">
+												{gap}
+											</span>
+										))}
+									</div>
+								</div>
+							) : (
+								<p className="panel-subtext candidate-completeness-copy">Profile is in strong shape for recruiter review.</p>
+							)}
+						</div>
+					</div>
 				</div>
 			</article>
 

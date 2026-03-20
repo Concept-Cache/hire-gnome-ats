@@ -97,7 +97,7 @@ Common actions:
 3. Add status, source, owner, and current employment details.
 4. Add notes, education, work history, and file attachments.
 5. Use the candidate detail sparkles `AI Summary` header button to open the summary modal. If no summary exists yet, it generates automatically.
-6. Use the candidate detail `Profile Completeness` score in Snapshot to see what still needs cleanup before submission.
+6. Use the candidate detail snapshot card to quickly review title, location, status, top skills, AI summary snippet, last activity, and profile completeness before submission.
 7. Use `Actions` for fast create:
 - Add submission
 - Add interview
@@ -125,7 +125,7 @@ AI summary:
 - Matched job orders also support `Explain Match`, which stores a reusable explanation of fit, likely gaps, and what the recruiter should validate.
 
 Profile completeness:
-- Shown in the candidate Snapshot panel.
+- Shown in the candidate snapshot card.
 - Uses existing profile data to score recruiter readiness.
 - Highlights top missing profile gaps like resume summary, skills, work history, education, resume attachment, and required custom fields.
 - Also appears as a compact score chip on the candidates list.
