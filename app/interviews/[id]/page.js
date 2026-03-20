@@ -498,6 +498,7 @@ export default function InterviewDetailsPage() {
 								>
 									{inviteState.downloading ? 'Generating .ics...' : 'Download .ics Invite'}
 								</button>
+								<div className="actions-menu-divider" role="separator" />
 								<button
 									type="button"
 									role="menuitem"

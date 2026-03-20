@@ -14,6 +14,8 @@ The top row shows quick operational counts with direct links into the related mo
 - Open Jobs Stalled 7d
 - Placements This Month
 
+`Interview Requests` is shown only when the client portal feature is enabled in system settings.
+
 Clicking a metric opens a detail modal so users can see the actual records behind the count without leaving the dashboard.
 
 ### 7-Day Activity
@@ -36,6 +38,8 @@ Typical examples:
 - Client portals that were viewed without a follow-up action
 - Active submissions that are aging without movement
 - Open jobs with no new submissions in the last 7 days
+
+Portal-specific alerts are suppressed when the client portal feature is disabled.
 
 ### Upcoming Interviews
 Shows scheduled interviews you can access based on your role/division permissions.

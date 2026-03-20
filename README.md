@@ -157,7 +157,9 @@ Quick smoke test after first login:
 ### Admin UI Configuration (Database-backed)
 Use `Admin Area > System Settings` for:
 - Site name, logo, theme
+- Public careers hero headline/body copy
 - Career site enabled/disabled
+- Client review portal enabled/disabled
 - Google Maps API key
 - OpenAI API key
 - SMTP settings
@@ -165,8 +167,12 @@ Use `Admin Area > System Settings` for:
 - API error log retention days
 
 When `DEMO_MODE` is enabled:
-- administrators can still change the theme preset for presentation purposes
-- all other system settings remain read-only
+- administrators can still save the full branding card
+- integrations, SMTP, and object storage settings remain read-only
+
+System settings are split into:
+- `Branding`
+- `Platform Settings`
 
 Use `Admin Area > Custom Fields` for:
 - Module-scoped custom fields on Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
@@ -433,6 +439,7 @@ Inbound email webhook:
 - Recent inbound events and attachment skip reasons are visible in `Admin Area > System Settings > System Diagnostics`.
 
 Client review portal:
+- The client portal can be disabled globally from `Admin Area > System Settings`.
 - Internal users can issue a persistent magic link from `Job Order Detail > Actions > Client Review Portal`.
 - Portal access is scoped to the job order's assigned client contact and remains valid for the life of the job unless revoked.
 - Internal users can copy, open, email, revoke, or restore the portal link from the job-order modal.

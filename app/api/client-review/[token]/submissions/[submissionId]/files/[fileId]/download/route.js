@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { downloadObjectBuffer } from '@/lib/object-storage';
 import { loadClientPortalAccessByToken } from '@/lib/client-portal';
+import { getSystemBranding } from '@/lib/system-settings';
 
 import { withApiLogging } from '@/lib/api-logging';
 
@@ -13,6 +14,10 @@ function quotedFileName(fileName) {
 
 async function getClient_review_token_submissions_submissionid_files_fileid_downloadHandler(req, { params }) {
 	try {
+		const branding = await getSystemBranding();
+		if (!branding.clientPortalEnabled) {
+			return NextResponse.json({ error: 'File not found.' }, { status: 404 });
+		}
 		const awaitedParams = await params;
 		const token = String(awaitedParams?.token || '').trim();
 		const submissionId = Number(awaitedParams?.submissionId);

@@ -77,6 +77,10 @@ function buildClientFeedbackEmail({
 
 async function getClient_review_tokenHandler(req, { params }) {
 	try {
+		const branding = await getSystemBranding();
+		if (!branding.clientPortalEnabled) {
+			return NextResponse.json({ error: 'Client review portal not found.' }, { status: 404 });
+		}
 		const awaitedParams = await params;
 		const token = String(awaitedParams?.token || '').trim();
 		const portalAccess = await loadClientPortalAccessByToken(token);
@@ -96,6 +100,10 @@ async function getClient_review_tokenHandler(req, { params }) {
 
 async function postClient_review_tokenHandler(req, { params }) {
 	try {
+		const branding = await getSystemBranding();
+		if (!branding.clientPortalEnabled) {
+			return NextResponse.json({ error: 'Client review portal not found.' }, { status: 404 });
+		}
 		const awaitedParams = await params;
 		const token = String(awaitedParams?.token || '').trim();
 		const portalAccess = await loadClientPortalAccessByToken(token);
@@ -158,7 +166,6 @@ async function postClient_review_tokenHandler(req, { params }) {
 			linkHref: `/submissions/${result.submission.id}`
 		});
 
-		const branding = await getSystemBranding();
 		const candidateName = `${result.submission.candidate?.firstName || ''} ${result.submission.candidate?.lastName || ''}`.trim() || 'candidate';
 		const clientName = `${portalAccess.contact?.firstName || ''} ${portalAccess.contact?.lastName || ''}`.trim() || 'Client Contact';
 		const submissionLinkHref = `/submissions/${result.submission.id}`;

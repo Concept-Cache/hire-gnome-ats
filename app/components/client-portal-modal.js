@@ -268,12 +268,6 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 									{!hasValidContactEmail ? (
 										<p className="panel-subtext">Add a valid email address to the assigned client contact to send the portal link from the app.</p>
 									) : null}
-									<p className="simple-list-meta">
-										Last viewed: <span className="meta-emphasis-time">{state.access.lastViewedAt ? new Date(state.access.lastViewedAt).toLocaleString() : 'Never'}</span>
-									</p>
-									<p className="simple-list-meta">
-										Last emailed: <span className="meta-emphasis-time">{state.access.lastEmailedAt ? new Date(state.access.lastEmailedAt).toLocaleString() : 'Never'}</span>
-									</p>
 									<div className="client-portal-analytics-grid">
 										<div className="client-portal-analytics-item">
 											<span>Sent</span>
@@ -292,12 +286,17 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 											<strong>{state.access.analytics?.actedOn ? 'Yes' : 'No'}</strong>
 										</div>
 									</div>
-									<p className="simple-list-meta">
-										Last acted on: <span className="meta-emphasis-time">{formatPortalAnalyticsValue(state.access.analytics?.lastActionAt)}</span>
-									</p>
-									<p className="simple-list-meta">
-										Client actions logged: <span className="meta-emphasis-time">{Number(state.access.analytics?.feedbackCount || 0)}</span>
-									</p>
+									<div className="client-portal-meta-lines">
+										<p className="simple-list-meta">
+											Last emailed: <span className="meta-emphasis-time">{state.access.lastEmailedAt ? new Date(state.access.lastEmailedAt).toLocaleString() : 'Never'}</span>
+										</p>
+										<p className="simple-list-meta">
+											Last acted on: <span className="meta-emphasis-time">{formatPortalAnalyticsValue(state.access.analytics?.lastActionAt)}</span>
+										</p>
+										<p className="simple-list-meta">
+											Client actions logged: <span className="meta-emphasis-time">{Number(state.access.analytics?.feedbackCount || 0)}</span>
+										</p>
+									</div>
 								</div>
 							) : (
 								<div className="client-portal-modal-card">

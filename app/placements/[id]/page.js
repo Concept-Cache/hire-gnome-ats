@@ -694,6 +694,7 @@ export default function PlacementDetailsPage() {
 										</button>
 									</>
 									)}
+								<div className="actions-menu-divider" role="separator" />
 								<button
 									type="button"
 									role="menuitem"

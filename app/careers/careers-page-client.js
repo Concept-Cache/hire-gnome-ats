@@ -139,7 +139,12 @@ function matchesQuickPreset(job, quickPreset) {
 	return true;
 }
 
-export default function CareersPageClient({ siteName = 'Hire Gnome ATS', initialJobs = [] }) {
+export default function CareersPageClient({
+	siteName = 'Hire Gnome ATS',
+	initialJobs = [],
+	heroTitle = 'Find your next placement opportunity.',
+	heroBody = 'Explore active roles across healthcare, technology, and professional services. Apply directly through the listing in under two minutes.'
+}) {
 	const searchParams = useSearchParams();
 	const quickPreset = normalizeQuickPreset(searchParams.get('quick'));
 	const jobs = Array.isArray(initialJobs) ? initialJobs : [];
@@ -224,11 +229,8 @@ export default function CareersPageClient({ siteName = 'Hire Gnome ATS', initial
 			<header className="careers-hero">
 				<div className="careers-hero-copy">
 					<p className="careers-eyebrow">{siteName} Careers</p>
-					<h1>Find your next placement opportunity.</h1>
-					<p>
-						Explore active roles across healthcare, technology, and professional services. Apply directly
-						through the listing in under two minutes.
-					</p>
+					<h1>{heroTitle}</h1>
+					<p>{heroBody}</p>
 				</div>
 				<div className="careers-hero-stats">
 					<p>

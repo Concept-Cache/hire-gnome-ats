@@ -18,7 +18,9 @@ Admin Area controls platform-level configuration, access, diagnostics, and opera
 Configuration includes:
 - Site name and logo
 - Theme preset
+- Public careers hero headline/body copy
 - Career site enabled/disabled
+- Client review portal enabled/disabled
 - API keys (Google, OpenAI)
 - SMTP/email configuration
 - Storage configuration (S3/local fallback)
@@ -27,8 +29,12 @@ Configuration includes:
 - Recent inbound email event visibility inside diagnostics
 
 When demo mode is enabled:
-- only the theme preset remains editable
-- all other system settings stay read-only
+- the branding card remains editable and saveable
+- integrations, SMTP/email delivery, and object storage stay read-only
+
+Layout:
+- `Branding` uses its own save action
+- `Platform Settings` groups integrations, email delivery, and object storage under a separate save action
 
 Inbound email diagnostics includes:
 - Postmark webhook activity for `/api/inbound/postmark`
