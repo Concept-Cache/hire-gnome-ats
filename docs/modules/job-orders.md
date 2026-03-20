@@ -70,7 +70,9 @@ Behavior:
 - Creates or reuses a persistent magic link for the assigned hiring-contact record on the job order
 - Portal access is scoped to that job order only
 - Link remains valid for the life of the job unless revoked
-- Internal users can copy, email, open, revoke, or restore the portal link from the modal, and the modal tracks the latest view/send timestamps
+- Internal users can copy, email, open, revoke, or restore the portal link from the modal
+- Job order detail also shows portal analytics for sent, opened, last viewed, acted on, and total client actions logged
+- The modal shows the same lifecycle analytics so recruiters can quickly confirm whether the link is being used
 - The external portal shows submitted candidates, recruiter write-ups, the candidate's labeled primary resume when available, and response actions
 
 ## Best Practice

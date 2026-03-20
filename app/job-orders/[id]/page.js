@@ -179,6 +179,7 @@ export default function JobOrderDetailsPage() {
 	const router = useRouter();
 	const [actingUser, setActingUser] = useState(null);
 	const [jobOrder, setJobOrder] = useState(null);
+	const [portalAccess, setPortalAccess] = useState(null);
 	const [ownerDivisionId, setOwnerDivisionId] = useState(null);
 	const [selectedClientDivisionId, setSelectedClientDivisionId] = useState(null);
 	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
@@ -341,9 +342,10 @@ export default function JobOrderDetailsPage() {
 		setLoading(true);
 		setError('');
 
-		const [jobRes, settingsRes] = await Promise.all([
+		const [jobRes, settingsRes, portalRes] = await Promise.all([
 			fetch(`/api/job-orders/${id}`),
-			fetch('/api/system-settings', { cache: 'no-store' })
+			fetch('/api/system-settings', { cache: 'no-store' }),
+			fetch(`/api/job-orders/${id}/client-portal`)
 		]);
 		const settingsData = await settingsRes.json().catch(() => ({}));
 		setCareerSiteEnabled(toBooleanFlag(settingsData?.careerSiteEnabled, false));
@@ -356,9 +358,11 @@ export default function JobOrderDetailsPage() {
 		}
 
 		const jobData = await jobRes.json();
+		const portalData = portalRes.ok ? await portalRes.json().catch(() => ({})) : {};
 
 		const nextForm = toForm(jobData);
 		setJobOrder(jobData);
+		setPortalAccess(portalData.access || null);
 		setOwnerDivisionId(jobData.ownerUser?.divisionId ?? null);
 		setSelectedClientDivisionId(jobData.client?.divisionId ?? null);
 		setForm(nextForm);
@@ -1190,6 +1194,7 @@ export default function JobOrderDetailsPage() {
 				onClose={() => setShowClientPortalModal(false)}
 				jobOrderId={jobOrder.id}
 				jobOrderTitle={jobOrder.title}
+				onAccessChange={setPortalAccess}
 			/>
 
 			<article className="panel">
@@ -1235,6 +1240,49 @@ export default function JobOrderDetailsPage() {
 								: '-'}
 						</strong>
 					</p>
+				</div>
+				<div className="job-order-portal-analytics-card">
+					<div className="panel-header-row job-order-portal-analytics-head">
+						<div>
+							<h4>Portal Analytics</h4>
+							<p className="panel-subtext">Client review link health for this job order.</p>
+						</div>
+					</div>
+					{!jobOrder.contactId ? (
+						<p className="panel-subtext">Assign a client contact to create and track a client review portal.</p>
+					) : !portalAccess ? (
+						<p className="panel-subtext">No client review portal link has been created yet.</p>
+					) : (
+						<>
+							<div className="info-list snapshot-grid snapshot-grid-four">
+								<p>
+									<span>Sent</span>
+									<strong>{portalAccess.analytics?.sent ? 'Yes' : 'No'}</strong>
+								</p>
+								<p>
+									<span>Opened</span>
+									<strong>{portalAccess.analytics?.opened ? 'Yes' : 'No'}</strong>
+								</p>
+								<p>
+									<span>Last Viewed</span>
+									<strong>{portalAccess.analytics?.lastViewedAt ? formatDate(portalAccess.analytics.lastViewedAt) : 'Not yet'}</strong>
+								</p>
+								<p>
+									<span>Acted On</span>
+									<strong>{portalAccess.analytics?.actedOn ? 'Yes' : 'No'}</strong>
+								</p>
+							</div>
+							<p className="simple-list-meta job-order-portal-analytics-meta">
+								Last emailed: <span className="meta-emphasis-time">{portalAccess.analytics?.lastEmailedAt ? formatDate(portalAccess.analytics.lastEmailedAt) : 'Not yet'}</span>
+							</p>
+							<p className="simple-list-meta job-order-portal-analytics-meta">
+								Last client action: <span className="meta-emphasis-time">{portalAccess.analytics?.lastActionAt ? formatDate(portalAccess.analytics.lastActionAt) : 'Not yet'}</span>
+							</p>
+							<p className="simple-list-meta job-order-portal-analytics-meta">
+								Client actions logged: <span className="meta-emphasis-time">{Number(portalAccess.analytics?.feedbackCount || 0)}</span>
+							</p>
+						</>
+					)}
 				</div>
 			</article>
 

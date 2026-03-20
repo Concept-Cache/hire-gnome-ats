@@ -436,7 +436,7 @@ Client review portal:
 - Internal users can issue a persistent magic link from `Job Order Detail > Actions > Client Review Portal`.
 - Portal access is scoped to the job order's assigned client contact and remains valid for the life of the job unless revoked.
 - Internal users can copy, open, email, revoke, or restore the portal link from the job-order modal.
-- Portal management shows the latest view and email-send timestamps so recruiters can track whether the link was already sent or opened.
+- Portal management shows lifecycle analytics for sent, opened, last viewed, acted on, and total client actions logged on job order detail and in the modal.
 - Clients can review submitted candidates, read the recruiter write-up, download only the candidate's labeled primary resume, leave comments, request interviews, or pass.
 - Client responses are written back to `Submission Detail > Client Feedback` and generate in-app plus email notifications for users who keep `Client Feedback Notifications` enabled in `Account Settings`.
 - If `POSTMARK_INBOUND_WEBHOOK_SECRET` is set, include it either as `?secret=...` on the webhook URL or as the `x-webhook-secret` header.

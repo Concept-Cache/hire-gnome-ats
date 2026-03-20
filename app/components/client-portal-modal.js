@@ -13,7 +13,11 @@ const initialState = {
 	access: null
 };
 
-export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderTitle }) {
+function formatPortalAnalyticsValue(value) {
+	return value ? new Date(value).toLocaleString() : 'Not yet';
+}
+
+export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderTitle, onAccessChange = null }) {
 	const [state, setState] = useState(initialState);
 	const [busyAction, setBusyAction] = useState('');
 	const toast = useToast();
@@ -31,6 +35,9 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 					throw new Error(data.error || 'Failed to load client portal.');
 				}
 				if (!cancelled) {
+					if (typeof onAccessChange === 'function') {
+						onAccessChange(data.access || null);
+					}
 					setState({
 						loading: false,
 						error: '',
@@ -66,6 +73,9 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 			if (!response.ok) {
 				throw new Error(data.error || 'Failed to create client portal.');
 			}
+			if (typeof onAccessChange === 'function') {
+				onAccessChange(data.access || null);
+			}
 			setState((current) => ({ ...current, access: data.access || null }));
 			toast.success('Client portal link is ready.');
 		} catch (error) {
@@ -87,6 +97,9 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 			if (!response.ok) {
 				throw new Error(data.error || 'Failed to update client portal.');
 			}
+			if (typeof onAccessChange === 'function') {
+				onAccessChange(data.access || null);
+			}
 			setState((current) => ({ ...current, access: data.access || null }));
 			toast.success(action === 'revoke' ? 'Client portal disabled.' : 'Client portal restored.');
 		} catch (error) {
@@ -107,6 +120,9 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 			const data = await response.json().catch(() => ({}));
 			if (!response.ok) {
 				throw new Error(data.error || 'Failed to send client portal email.');
+			}
+			if (typeof onAccessChange === 'function') {
+				onAccessChange(data.access || null);
 			}
 			setState((current) => ({ ...current, access: data.access || current.access }));
 			if (data.testMode && Array.isArray(data.deliveredTo) && data.deliveredTo.length) {
@@ -257,6 +273,30 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 									</p>
 									<p className="simple-list-meta">
 										Last emailed: <span className="meta-emphasis-time">{state.access.lastEmailedAt ? new Date(state.access.lastEmailedAt).toLocaleString() : 'Never'}</span>
+									</p>
+									<div className="client-portal-analytics-grid">
+										<div className="client-portal-analytics-item">
+											<span>Sent</span>
+											<strong>{state.access.analytics?.sent ? 'Yes' : 'No'}</strong>
+										</div>
+										<div className="client-portal-analytics-item">
+											<span>Opened</span>
+											<strong>{state.access.analytics?.opened ? 'Yes' : 'No'}</strong>
+										</div>
+										<div className="client-portal-analytics-item">
+											<span>Last Viewed</span>
+											<strong>{formatPortalAnalyticsValue(state.access.analytics?.lastViewedAt)}</strong>
+										</div>
+										<div className="client-portal-analytics-item">
+											<span>Acted On</span>
+											<strong>{state.access.analytics?.actedOn ? 'Yes' : 'No'}</strong>
+										</div>
+									</div>
+									<p className="simple-list-meta">
+										Last acted on: <span className="meta-emphasis-time">{formatPortalAnalyticsValue(state.access.analytics?.lastActionAt)}</span>
+									</p>
+									<p className="simple-list-meta">
+										Client actions logged: <span className="meta-emphasis-time">{Number(state.access.analytics?.feedbackCount || 0)}</span>
 									</p>
 								</div>
 							) : (

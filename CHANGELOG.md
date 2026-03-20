@@ -13,7 +13,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Added a user-level `Client Feedback Notifications` setting so portal responses only notify users who have opted in through Account Settings.
 - Added an in-app portal email workflow so recruiters can send the persistent client-review link directly to the assigned contact from the job-order portal modal.
 - Client feedback notification opt-ins now trigger actual email alerts in addition to in-app notifications.
-- Portal management now tracks and displays the latest email-send timestamp alongside the existing view activity.
+- Portal management now tracks and displays sent/opened/viewed/acted-on analytics directly on job order detail and in the portal modal.
 - Audit trail viewing is now restricted to administrators in both the detail-screen UI and the audit-log API.
 - Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
 - In demo mode, system settings now allow theme changes while keeping all other admin settings read-only.
