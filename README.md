@@ -43,7 +43,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Admin-defined custom fields for Candidates, Clients, Contacts, Job Orders, Submissions, Interviews, and Placements
 - AI-assisted resume parsing with fallback parsing if AI is unavailable
 - AI candidate summaries opened from a dedicated sparkles button on candidate detail, with first-run auto-generation from profile, resume, history, skills, and recent notes
-- Candidate detail profile-completeness scoring with top-gap guidance for recruiter submission readiness
+- Candidate detail snapshot card with title, location, status, top skills, AI summary snippet, last activity, and profile-completeness guidance
 - Candidate list profile-completeness chips plus soft submission warnings when recruiters try to submit thin profiles
 - AI-generated submission write-ups for polished client-facing candidate introductions
 - AI-generated interview question sets stored on the interview record and refreshable on demand

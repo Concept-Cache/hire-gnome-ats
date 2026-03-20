@@ -5,7 +5,7 @@ Candidates stores profile, status, ownership, resume, skills, education, work hi
 
 It also includes an on-demand AI summary modal, opened from the candidate detail header, that turns the current candidate profile into a concise recruiter-facing brief.
 
-Candidate detail also includes a profile-completeness score in the Snapshot panel so recruiters can quickly see whether the record is ready for submission or still missing key profile pieces.
+Candidate detail now opens with a stronger candidate snapshot card that surfaces title, location, status, top skills, AI summary snippet, last activity, and profile completeness in one recruiter-friendly block.
 
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.
@@ -69,7 +69,7 @@ It looks at:
 
 The score is intended as a recruiter readiness signal, not a hard validation rule.
 
-The Snapshot panel also calls out the top missing profile gaps so users know what to fix next.
+The candidate snapshot card also calls out the top missing profile gaps so users know what to fix next.
 
 The candidates list also shows a compact profile-completeness chip so recruiters can spot weak records before opening detail.
 
