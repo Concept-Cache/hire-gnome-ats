@@ -76,6 +76,7 @@ export default function SubmissionDetailsPage() {
 	const actionsMenuRef = useRef(null);
 	const [submission, setSubmission] = useState(null);
 	const [aiAvailable, setAiAvailable] = useState(false);
+	const [clientPortalEnabled, setClientPortalEnabled] = useState(true);
 	const [form, setForm] = useState(initialForm);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
@@ -119,6 +120,7 @@ export default function SubmissionDetailsPage() {
 
 		const nextForm = toForm(submissionData);
 		setAiAvailable(Boolean(settingsData?.aiAvailable));
+		setClientPortalEnabled(typeof settingsData?.clientPortalEnabled === 'boolean' ? settingsData.clientPortalEnabled : true);
 		setSubmission(submissionData);
 		setForm(nextForm);
 		markAsClean(nextForm);
@@ -507,15 +509,17 @@ export default function SubmissionDetailsPage() {
 								>
 									Submission Packet
 								</button>
-								<button
-									type="button"
-									role="menuitem"
-									className="actions-menu-item"
-									onClick={onToggleClientPortalVisibility}
-									disabled={convertState.converting || saveState.saving || writeUpState.generating || isConvertedToPlacement}
-								>
-									{submission.isClientVisible ? 'Hide from Client Portal' : 'Promote to Client Portal'}
-								</button>
+								{clientPortalEnabled ? (
+									<button
+										type="button"
+										role="menuitem"
+										className="actions-menu-item"
+										onClick={onToggleClientPortalVisibility}
+										disabled={convertState.converting || saveState.saving || writeUpState.generating || isConvertedToPlacement}
+									>
+										{submission.isClientVisible ? 'Hide from Client Portal' : 'Promote to Client Portal'}
+									</button>
+								) : null}
 								{submission.offer?.id ? (
 									<Link
 										href={`/placements/${submission.offer.id}`}
@@ -536,6 +540,7 @@ export default function SubmissionDetailsPage() {
 										{convertState.converting ? 'Converting...' : 'Convert to Placement'}
 									</button>
 								)}
+								<div className="actions-menu-divider" role="separator" />
 								<button
 									type="button"
 									role="menuitem"
@@ -594,6 +599,7 @@ export default function SubmissionDetailsPage() {
 				</div>
 			</article>
 
+			{clientPortalEnabled ? (
 			<article className="panel">
 				<h3>Client Feedback</h3>
 				<p className="panel-subtext">Responses submitted through the client review portal appear here.</p>
@@ -620,6 +626,7 @@ export default function SubmissionDetailsPage() {
 					<p className="panel-subtext">No client feedback yet.</p>
 				)}
 			</article>
+			) : null}
 
 			<article className="panel panel-spacious">
 				<h3>Submission Details</h3>
@@ -659,14 +666,16 @@ export default function SubmissionDetailsPage() {
 									</span>
 								</div>
 							</FormField>
-							<FormField label="Client Portal">
-								<div className="locked-field">
-									<input value={formatClientPortalVisibilityLabel(submission.isClientVisible)} disabled readOnly />
-									<span className="locked-field-icon" aria-label="Locked field" title="Locked field">
-										<Lock aria-hidden="true" />
-									</span>
-								</div>
-							</FormField>
+							{clientPortalEnabled ? (
+								<FormField label="Client Portal">
+									<div className="locked-field">
+										<input value={formatClientPortalVisibilityLabel(submission.isClientVisible)} disabled readOnly />
+										<span className="locked-field-icon" aria-label="Locked field" title="Locked field">
+											<Lock aria-hidden="true" />
+										</span>
+									</div>
+								</FormField>
+							) : null}
 							<FormField label="Status">
 								{isConvertedToPlacement ? (
 									<div className="locked-field">

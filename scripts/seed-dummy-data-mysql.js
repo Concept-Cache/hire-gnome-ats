@@ -436,9 +436,16 @@ async function ensureDemoSystemSettings(connection) {
 
 	const [result] = await connection.query(
 		`INSERT INTO \`SystemSetting\`
-		(\`recordId\`, \`siteName\`, \`siteTitle\`, \`themeKey\`, \`careerSiteEnabled\`, \`createdAt\`, \`updatedAt\`)
-		VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
-		['SYS-DEMO', DEMO_SITE_NAME, DEMO_SITE_NAME, DEMO_THEME_KEY]
+		(\`recordId\`, \`siteName\`, \`siteTitle\`, \`themeKey\`, \`careerSiteEnabled\`, \`clientPortalEnabled\`, \`careerHeroTitle\`, \`careerHeroBody\`, \`createdAt\`, \`updatedAt\`)
+		VALUES (?, ?, ?, ?, 1, 1, ?, ?, NOW(), NOW())`,
+		[
+			'SYS-DEMO',
+			DEMO_SITE_NAME,
+			DEMO_SITE_NAME,
+			DEMO_THEME_KEY,
+			'Find your next placement opportunity.',
+			'Explore active roles across healthcare, technology, and professional services. Apply directly through the listing in under two minutes.'
+		]
 	);
 	return { id: result.insertId };
 }

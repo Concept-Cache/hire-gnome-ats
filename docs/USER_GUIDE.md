@@ -85,6 +85,7 @@ What users will see:
 
 Admin troubleshooting:
 - `Admin Area > System Settings > System Diagnostics` shows recent inbound email events, match counts, notes created, files saved, and attachment skip reasons.
+- `Admin Area > System Settings` branding controls also manage the public careers hero headline/body copy.
 
 ## Candidates
 
@@ -200,6 +201,7 @@ Submission workflow:
 - Candidate suggestions use qualification scoring and typeahead safeguards.
 - Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.
 - Use `Actions > Client Review Portal` to create, copy, email, open, revoke, or restore the persistent client-facing magic link for the assigned hiring contact, with portal analytics on job order detail and in the modal showing sent, opened, last viewed, and acted-on status.
+- If the client portal is disabled in `Admin Area > System Settings`, passive portal UI is hidden and the actions-menu entry will explain that an administrator must enable it.
 
 ## Submissions
 
@@ -331,6 +333,7 @@ Account notification settings:
 - `Account Settings` lets each user control whether they receive:
 - Career site application emails
 - Client feedback notifications from the client review portal, including email alerts when enabled
+- The client feedback notification toggle is hidden when the client portal is disabled globally
 
 ## 8) Audit Trail And Accountability
 

@@ -39,6 +39,9 @@ model SystemSetting {
 	siteTitle         String   @default("Hire Gnome ATS")
 	themeKey          String   @default("classic_blue")
 	careerSiteEnabled Boolean  @default(false)
+	clientPortalEnabled Boolean @default(true)
+	careerHeroTitle   String?  @db.Text
+	careerHeroBody    String?  @db.Text
 	apiErrorLogRetentionDays Int @default(90)
 	googleMapsApiKey  String?  @db.Text
 	openAiApiKey      String?  @db.Text

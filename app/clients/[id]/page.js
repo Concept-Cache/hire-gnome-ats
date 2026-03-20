@@ -403,6 +403,7 @@ export default function ClientDetailsPage() {
 								<button type="button" role="menuitem" className="actions-menu-item" onClick={onAddJobOrder}>
 									Add Job Order
 								</button>
+								<div className="actions-menu-divider" role="separator" />
 								<button
 									type="button"
 									role="menuitem"

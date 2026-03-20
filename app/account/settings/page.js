@@ -21,6 +21,7 @@ export default function AccountSettingsPage() {
 	const toast = useToast();
 	const [loading, setLoading] = useState(true);
 	const [loadingError, setLoadingError] = useState('');
+	const [clientPortalEnabled, setClientPortalEnabled] = useState(true);
 	const [profile, setProfile] = useState({
 		firstName: '',
 		lastName: '',
@@ -36,10 +37,14 @@ export default function AccountSettingsPage() {
 		() =>
 			(
 				settingsForm.notifyCareerSiteApplications !== savedSettingsForm.notifyCareerSiteApplications
-				|| settingsForm.notifyClientPortalFeedback !== savedSettingsForm.notifyClientPortalFeedback
+				|| (
+					clientPortalEnabled
+					&& settingsForm.notifyClientPortalFeedback !== savedSettingsForm.notifyClientPortalFeedback
+				)
 			) &&
 			!loading,
 		[
+			clientPortalEnabled,
 			settingsForm.notifyCareerSiteApplications,
 			settingsForm.notifyClientPortalFeedback,
 			savedSettingsForm.notifyCareerSiteApplications,
@@ -58,9 +63,12 @@ export default function AccountSettingsPage() {
 		async function loadSettings() {
 			setLoading(true);
 			setLoadingError('');
-			const res = await fetch('/api/session/settings', { cache: 'no-store' });
-			if (!res.ok) {
-				const data = await res.json().catch(() => ({}));
+			const [settingsRes, systemSettingsRes] = await Promise.all([
+				fetch('/api/session/settings', { cache: 'no-store' }),
+				fetch('/api/system-settings', { cache: 'no-store' })
+			]);
+			if (!settingsRes.ok) {
+				const data = await settingsRes.json().catch(() => ({}));
 				if (cancelled) return;
 				const message = data.error || 'Failed to load account settings.';
 				setLoadingError(message);
@@ -69,12 +77,18 @@ export default function AccountSettingsPage() {
 				return;
 			}
 
-			const data = await res.json().catch(() => ({}));
+			const [data, systemData] = await Promise.all([
+				settingsRes.json().catch(() => ({})),
+				systemSettingsRes.ok ? systemSettingsRes.json().catch(() => ({})) : Promise.resolve({})
+			]);
 			if (cancelled) return;
 			const nextSettings = {
 				notifyCareerSiteApplications: Boolean(data.notifyCareerSiteApplications),
 				notifyClientPortalFeedback: Boolean(data.notifyClientPortalFeedback)
 			};
+			setClientPortalEnabled(
+				typeof systemData?.clientPortalEnabled === 'boolean' ? systemData.clientPortalEnabled : true
+			);
 			setProfile({
 				firstName: data.firstName || '',
 				lastName: data.lastName || '',
@@ -96,10 +110,16 @@ export default function AccountSettingsPage() {
 		if (settingsState.saving || !canSaveSettings) return;
 
 		setSettingsState({ saving: true });
+		const payload = {
+			notifyCareerSiteApplications: settingsForm.notifyCareerSiteApplications,
+			...(clientPortalEnabled
+				? { notifyClientPortalFeedback: settingsForm.notifyClientPortalFeedback }
+				: {})
+		};
 		const res = await fetch('/api/session/settings', {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(settingsForm)
+			body: JSON.stringify(payload)
 		});
 		const data = await res.json().catch(() => ({}));
 		if (!res.ok) {
@@ -193,28 +213,30 @@ export default function AccountSettingsPage() {
 									</span>
 								</span>
 							</label>
-							<label className="switch-field">
-								<input
-									type="checkbox"
-									className="switch-input"
-									checked={settingsForm.notifyClientPortalFeedback}
-									onChange={(event) =>
-										setSettingsForm((current) => ({
-											...current,
-											notifyClientPortalFeedback: event.target.checked
-										}))
-									}
-								/>
-								<span className="switch-track" aria-hidden="true">
-									<span className="switch-thumb" />
-								</span>
-								<span className="switch-copy">
-									<span className="switch-label">Client Feedback Notifications</span>
-									<span className="switch-hint">
-										Notify me when a client comments, requests an interview, or passes through the portal.
+							{clientPortalEnabled ? (
+								<label className="switch-field">
+									<input
+										type="checkbox"
+										className="switch-input"
+										checked={settingsForm.notifyClientPortalFeedback}
+										onChange={(event) =>
+											setSettingsForm((current) => ({
+												...current,
+												notifyClientPortalFeedback: event.target.checked
+											}))
+										}
+									/>
+									<span className="switch-track" aria-hidden="true">
+										<span className="switch-thumb" />
 									</span>
-								</span>
-							</label>
+									<span className="switch-copy">
+										<span className="switch-label">Client Feedback Notifications</span>
+										<span className="switch-hint">
+											Notify me when a client comments, requests an interview, or passes through the portal.
+										</span>
+									</span>
+								</label>
+							) : null}
 							<div className="auth-reset-actions">
 								<button type="submit" disabled={settingsState.saving || !canSaveSettings}>
 									{settingsState.saving ? 'Saving...' : 'Save Notification Settings'}

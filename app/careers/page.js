@@ -94,7 +94,12 @@ export default async function CareersPage() {
 					</section>
 				}
 			>
-				<CareersPageClient siteName={siteName} initialJobs={jobs} />
+				<CareersPageClient
+					siteName={siteName}
+					initialJobs={jobs}
+					heroTitle={branding.careerHeroTitle}
+					heroBody={branding.careerHeroBody}
+				/>
 			</Suspense>
 		</>
 	);

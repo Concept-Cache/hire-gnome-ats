@@ -10,6 +10,7 @@ import { getArchivedEntityIdSet } from '@/lib/archive-entities';
 import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
 import { withApiLogging } from '@/lib/api-logging';
 import { WEB_RESPONSE_NOTE_PREFIX } from '@/lib/submission-origin';
+import { getSystemBranding } from '@/lib/system-settings';
 
 const AWAITING_FEEDBACK_SUBMISSION_STATUSES = ['submitted', 'under_review', 'qualified'];
 const ACTIVE_INTERVIEW_STATUSES = ['scheduled'];
@@ -131,6 +132,8 @@ async function getDashboard_overviewHandler(req) {
 		const actingUser = await getActingUser(req);
 		const scope = getEntityScope(actingUser);
 		const relatedScope = getCandidateJobOrderScope(actingUser);
+		const branding = await getSystemBranding();
+		const clientPortalEnabled = Boolean(branding.clientPortalEnabled);
 		const now = new Date();
 		const todayStart = startOfDay(now);
 		const tomorrowStart = addDays(todayStart, 1);
@@ -342,7 +345,8 @@ async function getDashboard_overviewHandler(req) {
 				orderBy: { createdAt: 'asc' },
 				take: 12
 			}),
-			prisma.clientPortalAccess.findMany({
+			clientPortalEnabled
+				? prisma.clientPortalAccess.findMany({
 				where: {
 					isRevoked: false,
 					jobOrder: addScopeToWhere({}, scope),
@@ -367,8 +371,10 @@ async function getDashboard_overviewHandler(req) {
 				},
 				orderBy: { updatedAt: 'desc' },
 				take: 24
-			}),
-			prisma.clientSubmissionFeedback.findMany({
+			})
+				: Promise.resolve([]),
+			clientPortalEnabled
+				? prisma.clientSubmissionFeedback.findMany({
 				where: {
 					actionType: 'request_interview',
 					createdAt: { lt: oneDayAgo },
@@ -392,8 +398,10 @@ async function getDashboard_overviewHandler(req) {
 				},
 				orderBy: { createdAt: 'desc' },
 				take: 24
-			}),
-			prisma.interview.findMany({
+			})
+				: Promise.resolve([]),
+			clientPortalEnabled
+				? prisma.interview.findMany({
 				where: andWhere(relatedScope, { status: { notIn: ['cancelled'] } }, { createdAt: { gte: sevenDaysAgo } }),
 				select: {
 					id: true,
@@ -401,7 +409,8 @@ async function getDashboard_overviewHandler(req) {
 					jobOrderId: true,
 					createdAt: true
 				}
-			}),
+			})
+				: Promise.resolve([]),
 			prisma.candidate.findMany({
 				where: addScopeToWhere({ createdAt: { gte: trendStart } }, scope),
 				select: { id: true, createdAt: true }
@@ -461,11 +470,17 @@ async function getDashboard_overviewHandler(req) {
 		const activeRecentCandidates = recentCandidates.filter((record) => !archivedCandidateIds.has(record.id));
 		const activeRecentJobOrders = recentJobOrders.filter((record) => !archivedJobOrderIds.has(record.id));
 		const activeWebResponseSubmissions = webResponseSubmissions.filter((record) => !archivedSubmissionIds.has(record.id));
-		const activeClientPortalAccesses = clientPortalAccesses.filter((record) => !archivedJobOrderIds.has(record.jobOrder?.id));
-		const activeInterviewRequestFeedback = interviewRequestFeedback.filter(
+		const activeClientPortalAccesses = clientPortalEnabled
+			? clientPortalAccesses.filter((record) => !archivedJobOrderIds.has(record.jobOrder?.id))
+			: [];
+		const activeInterviewRequestFeedback = clientPortalEnabled
+			? interviewRequestFeedback.filter(
 			(record) => record?.submission?.id && !archivedSubmissionIds.has(record.submission.id)
-		);
-		const activeRecentPortalInterviews = recentPortalInterviews.filter((record) => !archivedInterviewIds.has(record.id));
+		)
+			: [];
+		const activeRecentPortalInterviews = clientPortalEnabled
+			? recentPortalInterviews.filter((record) => !archivedInterviewIds.has(record.id))
+			: [];
 		const activeCandidateTrendRows = candidateTrendRows.filter((record) => !archivedCandidateIds.has(record.id));
 		const activeJobOrderTrendRows = jobOrderTrendRows.filter((record) => !archivedJobOrderIds.has(record.id));
 		const activeSubmissionTrendRows = submissionTrendRows.filter((record) => !archivedSubmissionIds.has(record.id));
@@ -693,7 +708,7 @@ async function getDashboard_overviewHandler(req) {
 				badgeLabel: item.urgencyLabel,
 				href: item.href
 			})),
-			clientInterviewRequests: interviewRequestPriorityQueue.map((item) => ({
+			clientInterviewRequests: clientPortalEnabled ? interviewRequestPriorityQueue.map((item) => ({
 				id: item.id,
 				entityType: item.type,
 				title: item.title,
@@ -703,7 +718,7 @@ async function getDashboard_overviewHandler(req) {
 				dateValue: item.dateValue,
 				badgeLabel: item.urgencyLabel,
 				href: item.href
-			})),
+			})) : [],
 			stalledJobs: activeStaleOpenJobOrders.map((record) => ({
 				id: `stalled-job-${record.id}`,
 				entityType: 'jobOrder',
@@ -779,13 +794,16 @@ async function getDashboard_overviewHandler(req) {
 				interviewsToday: activeInterviewsToday.length,
 				submissionsAwaitingFeedback: activeAwaitingFeedbackSubmissions.length,
 				webResponsesToReview: webResponsePriorityQueue.length,
-				clientInterviewRequests: interviewRequestPriorityQueue.length,
+				clientInterviewRequests: clientPortalEnabled ? interviewRequestPriorityQueue.length : 0,
 				openJobsWithoutSubmissions7d: activeStaleOpenJobOrders.length,
 				placementsThisMonth: activePlacementsThisMonth.length
 			},
 			trend: trendItems,
 			sections,
-			detailLists
+			detailLists,
+			featureFlags: {
+				clientPortalEnabled
+			}
 		});
 	} catch (error) {
 		return handleError(error, 'Failed to load dashboard overview.');

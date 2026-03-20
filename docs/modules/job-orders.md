@@ -67,6 +67,7 @@ Typical actions include:
 Job order detail includes `Actions > Client Review Portal` for client-facing candidate review without a separate login.
 
 Behavior:
+- If the client portal is disabled in `Admin Area > System Settings`, job-order portal analytics stay hidden and the actions-menu entry explains that an administrator must enable the feature
 - Creates or reuses a persistent magic link for the assigned hiring-contact record on the job order
 - Portal access is scoped to that job order only
 - Link remains valid for the life of the job unless revoked

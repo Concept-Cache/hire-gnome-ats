@@ -110,6 +110,15 @@ async function parseBody(req) {
 			careerSiteEnabled: formData.has('careerSiteEnabled')
 				? toBoolean(formData.get('careerSiteEnabled'))
 				: undefined,
+			clientPortalEnabled: formData.has('clientPortalEnabled')
+				? toBoolean(formData.get('clientPortalEnabled'))
+				: undefined,
+			careerHeroTitle: formData.has('careerHeroTitle')
+				? asTrimmedString(formData.get('careerHeroTitle'))
+				: undefined,
+			careerHeroBody: formData.has('careerHeroBody')
+				? asTrimmedString(formData.get('careerHeroBody'))
+				: undefined,
 			apiErrorLogRetentionDays: formData.has('apiErrorLogRetentionDays')
 				? asTrimmedString(formData.get('apiErrorLogRetentionDays'))
 				: undefined,
@@ -157,6 +166,9 @@ async function parseBody(req) {
 				siteName: formData.has('siteName'),
 				themeKey: formData.has('themeKey'),
 				careerSiteEnabled: formData.has('careerSiteEnabled'),
+				clientPortalEnabled: formData.has('clientPortalEnabled'),
+				careerHeroTitle: formData.has('careerHeroTitle'),
+				careerHeroBody: formData.has('careerHeroBody'),
 				apiErrorLogRetentionDays: formData.has('apiErrorLogRetentionDays'),
 				removeLogo: formData.has('removeLogo'),
 				logoFile: Boolean(logoFile),
@@ -186,6 +198,15 @@ async function parseBody(req) {
 		themeKey: asTrimmedString(body?.themeKey),
 		careerSiteEnabled: hasOwnProperty(body, 'careerSiteEnabled')
 			? Boolean(body?.careerSiteEnabled)
+			: undefined,
+		clientPortalEnabled: hasOwnProperty(body, 'clientPortalEnabled')
+			? Boolean(body?.clientPortalEnabled)
+			: undefined,
+		careerHeroTitle: hasOwnProperty(body, 'careerHeroTitle')
+			? asTrimmedString(body?.careerHeroTitle)
+			: undefined,
+		careerHeroBody: hasOwnProperty(body, 'careerHeroBody')
+			? asTrimmedString(body?.careerHeroBody)
 			: undefined,
 		apiErrorLogRetentionDays: hasOwnProperty(body, 'apiErrorLogRetentionDays')
 			? asTrimmedString(body?.apiErrorLogRetentionDays)
@@ -234,6 +255,9 @@ async function parseBody(req) {
 			siteName: hasOwnProperty(body, 'siteName'),
 			themeKey: hasOwnProperty(body, 'themeKey'),
 			careerSiteEnabled: hasOwnProperty(body, 'careerSiteEnabled'),
+			clientPortalEnabled: hasOwnProperty(body, 'clientPortalEnabled'),
+			careerHeroTitle: hasOwnProperty(body, 'careerHeroTitle'),
+			careerHeroBody: hasOwnProperty(body, 'careerHeroBody'),
 			apiErrorLogRetentionDays: hasOwnProperty(body, 'apiErrorLogRetentionDays'),
 			removeLogo: hasOwnProperty(body, 'removeLogo'),
 			logoFile: false,
@@ -296,26 +320,114 @@ async function patchSystem_settingsHandler(req) {
 	const existing = await getSystemSettingRecord();
 	const input = await parseBody(req);
 	if (DEMO_MODE) {
+		const allowedDemoSettingKeys = new Set([
+			'siteName',
+			'themeKey',
+			'careerSiteEnabled',
+			'clientPortalEnabled',
+			'careerHeroTitle',
+			'careerHeroBody',
+			'removeLogo',
+			'logoFile'
+		]);
 		const attemptedSettingKeys = Object.entries(input.provided || {})
-			.filter(([key, provided]) => provided && key !== 'themeKey')
+			.filter(([key, provided]) => provided && !allowedDemoSettingKeys.has(key))
 			.map(([key]) => key);
 		if (attemptedSettingKeys.length > 0) {
 			return NextResponse.json(
-				{ error: 'Demo mode only allows changing the theme preset.' },
+				{ error: 'Demo mode only allows changing branding settings.' },
 				{ status: 403 }
 			);
 		}
 
+		const logoValidationError = validateLogoFile(input.logoFile);
+		if (logoValidationError) {
+			return NextResponse.json({ error: logoValidationError }, { status: 400 });
+		}
+
+		let uploadedLogo = null;
+		if (input.logoFile) {
+			const logoBuffer = Buffer.from(await input.logoFile.arrayBuffer());
+			uploadedLogo = await uploadObjectBuffer({
+				key: buildSystemLogoStorageKey(input.logoFile.name),
+				body: logoBuffer,
+				contentType: input.logoFile.type || 'application/octet-stream'
+			});
+		}
+
+		const nextSiteName = input.siteName || existing?.siteName || DEFAULT_SITE_NAME;
 		const nextThemeKey = normalizeThemeKey(input.themeKey || existing?.themeKey || DEFAULT_THEME_KEY);
+		const siteNameError = validateSiteName(nextSiteName);
+		if (siteNameError) {
+			return NextResponse.json({ error: siteNameError }, { status: 400 });
+		}
+
+		const shouldClearLogo = input.removeLogo && !uploadedLogo;
 		const saved = existing
 			? await prisma.systemSetting.update({
 					where: { id: existing.id },
-					data: { themeKey: nextThemeKey }
+					data: {
+						siteName: nextSiteName,
+						themeKey: nextThemeKey,
+						careerSiteEnabled:
+							input.careerSiteEnabled === undefined
+								? Boolean(existing?.careerSiteEnabled)
+								: Boolean(input.careerSiteEnabled),
+						clientPortalEnabled:
+							input.clientPortalEnabled === undefined
+								? typeof existing?.clientPortalEnabled === 'boolean'
+									? existing.clientPortalEnabled
+									: true
+								: Boolean(input.clientPortalEnabled),
+						careerHeroTitle:
+							input.careerHeroTitle === undefined
+								? existing?.careerHeroTitle || null
+								: input.careerHeroTitle || null,
+						careerHeroBody:
+							input.careerHeroBody === undefined
+								? existing?.careerHeroBody || null
+								: input.careerHeroBody || null,
+						logoStorageProvider: uploadedLogo
+							? uploadedLogo.storageProvider
+							: shouldClearLogo
+								? null
+								: existing?.logoStorageProvider || null,
+						logoStorageBucket: uploadedLogo
+							? uploadedLogo.storageBucket
+							: shouldClearLogo
+								? null
+								: existing?.logoStorageBucket || null,
+						logoStorageKey: uploadedLogo
+							? uploadedLogo.storageKey
+							: shouldClearLogo
+								? null
+								: existing?.logoStorageKey || null,
+						logoContentType: uploadedLogo
+							? input.logoFile?.type || null
+							: shouldClearLogo
+								? null
+								: existing?.logoContentType || null,
+						logoFileName: uploadedLogo
+							? input.logoFile?.name || null
+							: shouldClearLogo
+								? null
+								: existing?.logoFileName || null
+					}
 				})
 			: await prisma.systemSetting.create({
 					data: {
-						siteName: DEFAULT_SITE_NAME,
-						themeKey: nextThemeKey
+						siteName: nextSiteName,
+						themeKey: nextThemeKey,
+						careerSiteEnabled: Boolean(input.careerSiteEnabled),
+						clientPortalEnabled:
+							input.clientPortalEnabled === undefined ? true : Boolean(input.clientPortalEnabled),
+						careerHeroTitle: input.careerHeroTitle || null,
+						careerHeroBody: input.careerHeroBody || null,
+						logoStorageProvider: uploadedLogo?.storageProvider || null,
+						logoStorageBucket: uploadedLogo?.storageBucket || null,
+						logoStorageKey: uploadedLogo?.storageKey || null,
+						logoContentType: uploadedLogo ? input.logoFile?.type || null : null,
+						logoFileName: uploadedLogo ? input.logoFile?.name || null : null
 					}
 				});
 
@@ -331,14 +443,21 @@ async function patchSystem_settingsHandler(req) {
 						actorUserId: actingUser.id,
 						entityType: 'SYSTEM_SETTING',
 						entity: saved
+					}),
+			(existing?.logoStorageKey && (uploadedLogo || shouldClearLogo))
+				? deleteObject({
+						key: existing.logoStorageKey,
+						storageProvider: existing.logoStorageProvider,
+						storageBucket: existing.logoStorageBucket
 					})
+				: Promise.resolve()
 		]);
 
 		clearSystemSettingsCache();
 
 		return NextResponse.json({
 			ok: true,
-			message: 'Demo theme updated.',
+			message: 'Branding updated.',
 			...serializeSystemBranding(saved),
 			...serializeAdminSystemSettings(saved)
 		});
@@ -407,6 +526,17 @@ async function patchSystem_settingsHandler(req) {
 		careerSiteEnabled: input.careerSiteEnabled === undefined
 			? Boolean(existing?.careerSiteEnabled)
 			: Boolean(input.careerSiteEnabled),
+		clientPortalEnabled: input.clientPortalEnabled === undefined
+			? typeof existing?.clientPortalEnabled === 'boolean'
+				? existing.clientPortalEnabled
+				: true
+			: Boolean(input.clientPortalEnabled),
+		careerHeroTitle: input.careerHeroTitle === undefined
+			? existing?.careerHeroTitle || null
+			: input.careerHeroTitle || null,
+		careerHeroBody: input.careerHeroBody === undefined
+			? existing?.careerHeroBody || null
+			: input.careerHeroBody || null,
 		apiErrorLogRetentionDays: parsedApiErrorLogRetentionDays,
 		logoStorageProvider: uploadedLogo
 			? uploadedLogo.storageProvider

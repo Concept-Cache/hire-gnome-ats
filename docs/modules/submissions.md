@@ -63,6 +63,7 @@ Behavior:
 - Submission detail shows both submission `Origin` and `Client Portal` visibility so recruiters can differentiate career-site responses from recruiter-curated submissions.
 - Career-site `Web` responses start hidden from the client portal until a recruiter explicitly promotes them.
 - Recruiters can later hide a submission from the client portal again from the same actions menu.
+- Submission portal visibility controls and client feedback are hidden when the client portal is disabled globally.
 - Shows comments and action history submitted through the client review portal
 - Includes the client name/email snapshot and timestamp for each entry
 - Captures actions like `Request Interview`, `Comment`, and `Pass`

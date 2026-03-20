@@ -46,6 +46,9 @@ const EMPTY_OVERVIEW = {
 		clientInterviewRequests: [],
 		stalledJobs: [],
 		placementsThisMonth: []
+	},
+	featureFlags: {
+		clientPortalEnabled: true
 	}
 };
 
@@ -251,6 +254,12 @@ export default function HomePage() {
 						placementsThisMonth: Array.isArray(data.detailLists?.placementsThisMonth)
 							? data.detailLists.placementsThisMonth
 							: []
+					},
+					featureFlags: {
+						clientPortalEnabled:
+							typeof data.featureFlags?.clientPortalEnabled === 'boolean'
+								? data.featureFlags.clientPortalEnabled
+								: true
 					}
 				});
 			} catch {
@@ -311,8 +320,13 @@ export default function HomePage() {
 				detailTitle: 'Placements This Month',
 				detailItems: overview.detailLists.placementsThisMonth
 			}
-		],
-		[overview.kpis, overview.detailLists]
+		].filter((card) => {
+			if (card.key === 'clientInterviewRequests') {
+				return overview.featureFlags.clientPortalEnabled;
+			}
+			return true;
+		}),
+		[overview.kpis, overview.detailLists, overview.featureFlags.clientPortalEnabled]
 	);
 
 	function openDetail(title, items) {

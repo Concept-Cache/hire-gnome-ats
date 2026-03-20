@@ -890,7 +890,11 @@ async function main() {
 				siteName: DEMO_SITE_NAME,
 				siteTitle: DEMO_SITE_NAME,
 				themeKey: DEMO_THEME_KEY,
-				careerSiteEnabled: true
+				careerSiteEnabled: true,
+				clientPortalEnabled: true,
+				careerHeroTitle: 'Find your next placement opportunity.',
+				careerHeroBody:
+					'Explore active roles across healthcare, technology, and professional services. Apply directly through the listing in under two minutes.'
 			}
 		});
 	}

@@ -183,6 +183,7 @@ export default function JobOrderDetailsPage() {
 	const [ownerDivisionId, setOwnerDivisionId] = useState(null);
 	const [selectedClientDivisionId, setSelectedClientDivisionId] = useState(null);
 	const [careerSiteEnabled, setCareerSiteEnabled] = useState(false);
+	const [clientPortalEnabled, setClientPortalEnabled] = useState(true);
 	const [aiAvailable, setAiAvailable] = useState(false);
 	const [form, setForm] = useState(initialForm);
 	const [submissionForm, setSubmissionForm] = useState(initialSubmissionForm);
@@ -349,6 +350,7 @@ export default function JobOrderDetailsPage() {
 		]);
 		const settingsData = await settingsRes.json().catch(() => ({}));
 		setCareerSiteEnabled(toBooleanFlag(settingsData?.careerSiteEnabled, false));
+		setClientPortalEnabled(toBooleanFlag(settingsData?.clientPortalEnabled, true));
 		setAiAvailable(Boolean(settingsData?.aiAvailable));
 
 		if (!jobRes.ok) {
@@ -1010,6 +1012,10 @@ export default function JobOrderDetailsPage() {
 
 	function onOpenClientPortal() {
 		setActionsOpen(false);
+		if (!clientPortalEnabled) {
+			toast.error('Client review portal is disabled. An administrator must enable it in Admin Area > System Settings.');
+			return;
+		}
 		setShowClientPortalModal(true);
 	}
 
@@ -1157,6 +1163,7 @@ export default function JobOrderDetailsPage() {
 								>
 									Client Review Portal
 								</button>
+								<div className="actions-menu-divider" role="separator" />
 								<button
 									type="button"
 									role="menuitem"
@@ -1241,7 +1248,8 @@ export default function JobOrderDetailsPage() {
 						</strong>
 					</p>
 				</div>
-				<div className="job-order-portal-analytics-card">
+				{clientPortalEnabled ? (
+					<div className="job-order-portal-analytics-card">
 					<div className="panel-header-row job-order-portal-analytics-head">
 						<div>
 							<h4>Portal Analytics</h4>
@@ -1274,16 +1282,15 @@ export default function JobOrderDetailsPage() {
 							</div>
 							<p className="simple-list-meta job-order-portal-analytics-meta">
 								Last emailed: <span className="meta-emphasis-time">{portalAccess.analytics?.lastEmailedAt ? formatDate(portalAccess.analytics.lastEmailedAt) : 'Not yet'}</span>
-							</p>
-							<p className="simple-list-meta job-order-portal-analytics-meta">
+								<span className="job-order-portal-analytics-separator" aria-hidden="true">|</span>
 								Last client action: <span className="meta-emphasis-time">{portalAccess.analytics?.lastActionAt ? formatDate(portalAccess.analytics.lastActionAt) : 'Not yet'}</span>
-							</p>
-							<p className="simple-list-meta job-order-portal-analytics-meta">
+								<span className="job-order-portal-analytics-separator" aria-hidden="true">|</span>
 								Client actions logged: <span className="meta-emphasis-time">{Number(portalAccess.analytics?.feedbackCount || 0)}</span>
 							</p>
 						</>
 					)}
-				</div>
+					</div>
+				) : null}
 			</article>
 
 			<div className="detail-layout detail-layout-equal">
@@ -1736,10 +1743,12 @@ export default function JobOrderDetailsPage() {
 									<ul className="simple-list simple-list-reorderable">
 										{sortedSubmissions.map((submission) => {
 											const latestClientFeedback =
-												Array.isArray(submission.clientFeedback) && submission.clientFeedback.length > 0
+												clientPortalEnabled
+													&& Array.isArray(submission.clientFeedback)
+													&& submission.clientFeedback.length > 0
 													? submission.clientFeedback[0]
 													: null;
-											const feedbackCount = Array.isArray(submission.clientFeedback)
+											const feedbackCount = clientPortalEnabled && Array.isArray(submission.clientFeedback)
 												? submission.clientFeedback.length
 												: 0;
 											return (

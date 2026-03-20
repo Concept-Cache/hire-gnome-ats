@@ -1858,7 +1858,7 @@ p {
 }
 
 .careers-hero-copy p {
-	max-width: 48ch;
+	max-width: 64ch;
 	font-size: 0.95rem;
 	line-height: 1.5;
 	color: var(--careers-hero-body-ink);
@@ -1868,15 +1868,19 @@ p {
 	display: grid;
 	gap: 0.6rem;
 	align-content: start;
+	justify-items: end;
 }
 
 .careers-hero-stats p {
 	display: grid;
 	gap: 0.18rem;
+	justify-items: center;
 	padding: 0.76rem 0.84rem;
+	width: min(11.5rem, 100%);
 	border: 1px solid var(--careers-hero-stats-border);
 	border-radius: 12px;
 	background: var(--careers-hero-stats-bg);
+	text-align: center;
 }
 
 .careers-hero-stats span {
@@ -3063,7 +3067,7 @@ p {
 }
 
 .client-portal-modal-card .simple-list-meta {
-	margin-top: 0.22rem;
+	margin-top: 0;
 	font-size: 0.68rem;
 	line-height: 1.35;
 }
@@ -3072,7 +3076,14 @@ p {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 0.48rem;
-	margin-top: 0.42rem;
+	margin-top: 0.62rem;
+}
+
+.client-portal-meta-lines {
+	display: flex;
+	flex-direction: column;
+	gap: 0.24rem;
+	margin-top: 0.62rem;
 }
 
 .client-portal-analytics-item {
@@ -3097,6 +3108,12 @@ p {
 	font-weight: 600;
 	color: var(--ink);
 	line-height: 1.35;
+}
+
+@media (max-width: 720px) {
+	.client-portal-analytics-grid {
+		grid-template-columns: 1fr;
+	}
 }
 
 .portal-inline-alert {
@@ -5668,6 +5685,14 @@ button:disabled {
 	margin-top: 0.45rem;
 	font-size: 0.68rem;
 	line-height: 1.35;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.28rem;
+}
+
+.job-order-portal-analytics-separator {
+	color: #8aa0c3;
 }
 
 .candidate-snapshot-head {

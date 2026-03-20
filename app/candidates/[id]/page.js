@@ -1405,6 +1405,7 @@ export default function CandidateDetailsPage() {
 									{!aiAvailable ? (
 										<p className="actions-menu-hint">Enable OpenAI in Admin Area &gt; System Settings to use this.</p>
 									) : null}
+									<div className="actions-menu-divider" role="separator" />
 									<button
 										type="button"
 										role="menuitem"

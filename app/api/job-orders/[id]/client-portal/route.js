@@ -5,7 +5,7 @@ import { AccessControlError, addScopeToWhere, getActingUser, getEntityScope } fr
 import { logCreate, logUpdate } from '@/lib/audit-log';
 import { sendEmailMessage } from '@/lib/email-delivery';
 import { isValidEmailAddress } from '@/lib/email-validation';
-import { getSystemBranding } from '@/lib/system-settings';
+import { getSystemBranding, getSystemSettingRecord } from '@/lib/system-settings';
 import { parseJsonBody, parseRouteId, ValidationError } from '@/lib/request-validation';
 
 import { withApiLogging } from '@/lib/api-logging';
@@ -119,11 +119,22 @@ async function loadPortalAccess(jobOrder) {
 	});
 }
 
+async function isClientPortalEnabled() {
+	const setting = await getSystemSettingRecord();
+	if (typeof setting?.clientPortalEnabled === 'boolean') {
+		return setting.clientPortalEnabled;
+	}
+	return true;
+}
+
 async function getJob_orders_id_client_portalHandler(req, { params }) {
 	try {
 		const awaitedParams = await params;
 		const id = parseRouteId(awaitedParams);
 		const { jobOrder } = await loadScopedJobOrder(req, id);
+		if (!(await isClientPortalEnabled())) {
+			return NextResponse.json({ error: 'Client review portal is disabled.' }, { status: 403 });
+		}
 		const access = await loadPortalAccess(jobOrder);
 
 		return NextResponse.json({
@@ -146,6 +157,9 @@ async function postJob_orders_id_client_portalHandler(req, { params }) {
 		const awaitedParams = await params;
 		const id = parseRouteId(awaitedParams);
 		const { actingUser, jobOrder } = await loadScopedJobOrder(req, id);
+		if (!(await isClientPortalEnabled())) {
+			return NextResponse.json({ error: 'Client review portal is disabled.' }, { status: 403 });
+		}
 		if (!jobOrder.contactId) {
 			return NextResponse.json(
 				{ error: 'Assign a client contact to this job order before creating a portal link.' },
@@ -231,6 +245,9 @@ async function patchJob_orders_id_client_portalHandler(req, { params }) {
 		const awaitedParams = await params;
 		const id = parseRouteId(awaitedParams);
 		const { actingUser, jobOrder } = await loadScopedJobOrder(req, id);
+		if (!(await isClientPortalEnabled())) {
+			return NextResponse.json({ error: 'Client review portal is disabled.' }, { status: 403 });
+		}
 		const existing = await loadPortalAccess(jobOrder);
 		if (!existing) {
 			return NextResponse.json({ error: 'Client portal link not found.' }, { status: 404 });
