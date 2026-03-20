@@ -3068,6 +3068,37 @@ p {
 	line-height: 1.35;
 }
 
+.client-portal-analytics-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.48rem;
+	margin-top: 0.42rem;
+}
+
+.client-portal-analytics-item {
+	display: flex;
+	flex-direction: column;
+	gap: 0.14rem;
+	padding: 0.52rem 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: #ffffff;
+}
+
+.client-portal-analytics-item span {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--muted);
+}
+
+.client-portal-analytics-item strong {
+	font-size: 0.84rem;
+	font-weight: 600;
+	color: var(--ink);
+	line-height: 1.35;
+}
+
 .portal-inline-alert {
 	margin: 0;
 	padding: 0.68rem 0.82rem;
@@ -5617,6 +5648,26 @@ button:disabled {
 	opacity: 0.72;
 	stroke-width: 2.2;
 	transform: translateY(0.08em);
+}
+
+.job-order-portal-analytics-card {
+	margin-top: 0.85rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--line);
+}
+
+.job-order-portal-analytics-head {
+	margin-bottom: 0.55rem;
+}
+
+.job-order-portal-analytics-head h4 {
+	margin-bottom: 0.18rem;
+}
+
+.job-order-portal-analytics-meta {
+	margin-top: 0.45rem;
+	font-size: 0.68rem;
+	line-height: 1.35;
 }
 
 .candidate-snapshot-head {

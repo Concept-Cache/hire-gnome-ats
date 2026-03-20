@@ -109,6 +109,11 @@ async function loadPortalAccess(jobOrder) {
 					email: true,
 					title: true
 				}
+			},
+			_count: {
+				select: {
+					feedbackEntries: true
+				}
 			}
 		}
 	});
@@ -163,6 +168,11 @@ async function postJob_orders_id_client_portalHandler(req, { params }) {
 								email: true,
 								title: true
 							}
+						},
+						_count: {
+							select: {
+								feedbackEntries: true
+							}
 						}
 					}
 				})
@@ -181,6 +191,11 @@ async function postJob_orders_id_client_portalHandler(req, { params }) {
 								lastName: true,
 								email: true,
 								title: true
+							}
+						},
+						_count: {
+							select: {
+								feedbackEntries: true
 							}
 						}
 					}
@@ -278,6 +293,11 @@ async function patchJob_orders_id_client_portalHandler(req, { params }) {
 							email: true,
 							title: true
 						}
+					},
+					_count: {
+						select: {
+							feedbackEntries: true
+						}
 					}
 				}
 			});
@@ -312,6 +332,11 @@ async function patchJob_orders_id_client_portalHandler(req, { params }) {
 						lastName: true,
 						email: true,
 						title: true
+					}
+				},
+				_count: {
+					select: {
+						feedbackEntries: true
 					}
 				}
 			}
