@@ -69,7 +69,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 	- Built-in CSV template downloads per profile
 - Global search with cross-entity results
 - In-app notifications, unsaved-change navigation guard, archive/restore flows
-- Per-list column chooser with persisted preferences
+- Per-list column chooser with persisted preferences and hidden-by-default optional columns
 - Mobile-aware list/detail layouts
 
 ## User Documentation

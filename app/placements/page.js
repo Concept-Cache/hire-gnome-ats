@@ -8,7 +8,12 @@ import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
+
+function formatDateTime(value) {
+	return formatDateTimeAt(value);
+}
 
 function formatCurrency(currency, value) {
 	if (value === '') return '-';
@@ -154,9 +159,13 @@ export default function PlacementsPage() {
 						jobOrder: placement.jobOrder?.title || '-',
 						jobOrderId: placement.jobOrder?.id || null,
 						client: placement.jobOrder?.client?.name || '-',
+						clientId: placement.jobOrder?.client?.id || null,
 						statusLabel: formatSelectValueLabel(placement.status),
 						placementTypeLabel: formatPlacementType(placement.placementType),
-						compensationLabel: formatCompensation(placement)
+						compensationLabel: formatCompensation(placement),
+						offeredOnLabel: formatDateTime(placement.offeredOn),
+						expectedJoinDateLabel: formatDateTime(placement.expectedJoinDate),
+						endDateLabel: formatDateTime(placement.endDate)
 					}))
 				);
 			} finally {
@@ -197,9 +206,23 @@ export default function PlacementsPage() {
 					row.jobOrder
 				)
 		},
+		{
+			key: 'client',
+			label: 'Client',
+			defaultVisible: false,
+			render: (row) =>
+				row.clientId ? (
+					<TableEntityLink href={`/clients/${row.clientId}`}>{row.client}</TableEntityLink>
+				) : (
+					row.client
+				)
+		},
 		{ key: 'placementTypeLabel', label: 'Type' },
 		{ key: 'compensationLabel', label: 'Compensation' },
-		{ key: 'statusLabel', label: 'Status' }
+		{ key: 'statusLabel', label: 'Status' },
+		{ key: 'offeredOnLabel', label: 'Offered On', defaultVisible: false, getSortValue: (row) => row.offeredOn || '' },
+		{ key: 'expectedJoinDateLabel', label: 'Expected Join', defaultVisible: false, getSortValue: (row) => row.expectedJoinDate || '' },
+		{ key: 'endDateLabel', label: 'End Date', defaultVisible: false, getSortValue: (row) => row.endDate || '' }
 	];
 
 	return (

@@ -18,7 +18,7 @@ import {
 import {
 	columnsStorageKey,
 	normalizeTableKey,
-	readHiddenColumnKeys,
+	readColumnVisibilityState,
 	TABLE_COLUMNS_CHANGED_EVENT
 } from '@/lib/table-columns';
 
@@ -150,14 +150,14 @@ export default function EntityTable({
 			setHiddenColumnKeys([]);
 			return;
 		}
-		setHiddenColumnKeys(readHiddenColumnKeys(effectiveTableKey));
-	}, [canCustomizeColumns, effectiveTableKey]);
+		setHiddenColumnKeys(readColumnVisibilityState(effectiveTableKey, columns).hiddenColumnKeys);
+	}, [canCustomizeColumns, columns, effectiveTableKey]);
 
 	useEffect(() => {
 		if (!canCustomizeColumns || typeof window === 'undefined') return undefined;
 
 		function refreshHiddenColumns() {
-			setHiddenColumnKeys(readHiddenColumnKeys(effectiveTableKey));
+			setHiddenColumnKeys(readColumnVisibilityState(effectiveTableKey, columns).hiddenColumnKeys);
 		}
 
 		function onStorage(event) {
@@ -177,7 +177,7 @@ export default function EntityTable({
 			window.removeEventListener('storage', onStorage);
 			window.removeEventListener(TABLE_COLUMNS_CHANGED_EVENT, onColumnsChanged);
 		};
-	}, [canCustomizeColumns, effectiveTableKey]);
+	}, [canCustomizeColumns, columns, effectiveTableKey]);
 
 	const totalRows = sortedRows.length;
 	const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));

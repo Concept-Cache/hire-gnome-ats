@@ -9,6 +9,11 @@ import TableColumnPicker from '@/app/components/table-column-picker';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { CLIENT_STATUS_OPTIONS, normalizeClientStatusValue } from '@/lib/client-status-options';
 
+function formatLocation(city, state) {
+	const parts = [city, state].map((value) => String(value || '').trim()).filter(Boolean);
+	return parts.length > 0 ? parts.join(', ') : '-';
+}
+
 export default function ClientsPage() {
 	const router = useRouter();
 	const [rows, setRows] = useState([]);
@@ -52,6 +57,11 @@ export default function ClientsPage() {
 				data.map((client) => ({
 					...client,
 					status: normalizeClientStatusValue(client.status),
+					locationLabel: formatLocation(client.city, client.state),
+					divisionName: client.division?.name || '-',
+					websiteLabel: client.website || '-',
+					contactCount: client._count?.contacts || 0,
+					jobOrderCount: client._count?.jobOrders || 0,
 					owner: client.ownerUser
 						? `${client.ownerUser.firstName} ${client.ownerUser.lastName}`
 						: '-'
@@ -74,7 +84,12 @@ export default function ClientsPage() {
 		{ key: 'name', label: 'Name' },
 		{ key: 'industry', label: 'Industry' },
 		{ key: 'status', label: 'Status' },
-		{ key: 'owner', label: 'Owner' }
+		{ key: 'owner', label: 'Owner' },
+		{ key: 'locationLabel', label: 'Location', defaultVisible: false },
+		{ key: 'divisionName', label: 'Division', defaultVisible: false },
+		{ key: 'websiteLabel', label: 'Website', defaultVisible: false },
+		{ key: 'contactCount', label: 'Contacts', defaultVisible: false },
+		{ key: 'jobOrderCount', label: 'Job Orders', defaultVisible: false }
 	];
 
 	return (
