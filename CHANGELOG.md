@@ -29,6 +29,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Extended candidate completeness into the list view and added soft submission warnings so recruiters can keep moving while still seeing when a profile needs cleanup.
 - Owner performance chips in operational reporting now open the same drill-through detail modal used by the rest of the report, filtered to that owner and metric.
 - Expanded the list-view column chooser so core module lists expose more hidden-by-default optional columns without changing the default layouts users already know.
+- Split production scripts so app-only builds and deploy-time migrate+build runs are explicit, keeping server deploys automatic while preventing CI build jobs from requiring a database.
 
 ## [1.5.0] - 2026-03-17
 

@@ -360,7 +360,8 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 | Script | Purpose |
 |---|---|
 | `npm run dev` | Run Next.js in development mode |
-| `npm run build` | Production build |
+| `npm run build` | Production app build only |
+| `npm run build:deploy` | Apply production migrations, then build the app |
 | `npm run start` | Start production server |
 | `npm run bootstrap` | Validate environment + migration status + deploy migrations |
 | `npm run bootstrap:admin` | Provision default admin from bootstrap env vars (only when no users exist) |
@@ -462,7 +463,7 @@ Client review portal:
 	- Google/OpenAI keys as needed
 - Run:
 	- `npm run ci:preflight`
-	- `npm run build`
+	- `npm run build:deploy`
 - Validate backup and restore before go-live:
 	- `npm run db:backup`
 	- `npm run db:restore -- --input <backup-file> --drop-first`
