@@ -18,6 +18,7 @@ import {
 import {
 	columnsStorageKey,
 	normalizeTableKey,
+	orderColumns,
 	readColumnVisibilityState,
 	TABLE_COLUMNS_CHANGED_EVENT
 } from '@/lib/table-columns';
@@ -101,15 +102,16 @@ export default function EntityTable({
 	const [currentPage, setCurrentPage] = useState(1);
 	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 	const [hiddenColumnKeys, setHiddenColumnKeys] = useState([]);
+	const [orderedColumnKeys, setOrderedColumnKeys] = useState([]);
 
 	const effectiveTableKey = normalizeTableKey(tableKey);
 	const canCustomizeColumns = Boolean(effectiveTableKey) && columns.length > 1;
 
 	const visibleColumns = useMemo(() => {
-		const next = columns.filter((column) => !hiddenColumnKeys.includes(column.key));
+		const next = orderColumns(columns, orderedColumnKeys).filter((column) => !hiddenColumnKeys.includes(column.key));
 		if (next.length > 0) return next;
-		return columns;
-	}, [columns, hiddenColumnKeys]);
+		return orderColumns(columns, orderedColumnKeys);
+	}, [columns, hiddenColumnKeys, orderedColumnKeys]);
 
 	const sortedRows = useMemo(() => {
 		if (!sortState.key) return rows;
@@ -148,16 +150,21 @@ export default function EntityTable({
 	useEffect(() => {
 		if (!canCustomizeColumns || typeof window === 'undefined') {
 			setHiddenColumnKeys([]);
+			setOrderedColumnKeys([]);
 			return;
 		}
-		setHiddenColumnKeys(readColumnVisibilityState(effectiveTableKey, columns).hiddenColumnKeys);
+		const visibilityState = readColumnVisibilityState(effectiveTableKey, columns);
+		setHiddenColumnKeys(visibilityState.hiddenColumnKeys);
+		setOrderedColumnKeys(visibilityState.orderedColumnKeys);
 	}, [canCustomizeColumns, columns, effectiveTableKey]);
 
 	useEffect(() => {
 		if (!canCustomizeColumns || typeof window === 'undefined') return undefined;
 
 		function refreshHiddenColumns() {
-			setHiddenColumnKeys(readColumnVisibilityState(effectiveTableKey, columns).hiddenColumnKeys);
+			const visibilityState = readColumnVisibilityState(effectiveTableKey, columns);
+			setHiddenColumnKeys(visibilityState.hiddenColumnKeys);
+			setOrderedColumnKeys(visibilityState.orderedColumnKeys);
 		}
 
 		function onStorage(event) {

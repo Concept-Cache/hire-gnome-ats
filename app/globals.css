@@ -7206,7 +7206,7 @@ button:disabled {
 
 .table-columns-option {
 	display: grid;
-	grid-template-columns: auto 1fr;
+	grid-template-columns: auto auto 1fr;
 	align-items: center;
 	gap: 0.36rem;
 	min-height: 0;
@@ -7224,6 +7224,33 @@ button:disabled {
 .table-columns-option:hover {
 	background: var(--ui-secondary-hover-bg);
 	color: var(--ui-secondary-hover-ink);
+}
+
+.table-columns-option.is-dragging {
+	opacity: 0.6;
+}
+
+.table-columns-option.is-drop-before {
+	box-shadow: inset 0 2px 0 var(--ui-primary-border);
+}
+
+.table-columns-option.is-drop-after {
+	box-shadow: inset 0 -2px 0 var(--ui-primary-border);
+}
+
+.table-columns-drag-handle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 0.8rem;
+	height: 0.8rem;
+	color: var(--muted);
+	cursor: grab;
+}
+
+.table-columns-drag-handle svg {
+	width: 0.8rem;
+	height: 0.8rem;
 }
 
 .table-columns-input {
