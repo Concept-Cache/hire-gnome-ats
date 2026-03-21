@@ -3,9 +3,16 @@
 import { useMemo, useState } from 'react';
 import { ArrowUpRight, FileText, LoaderCircle } from 'lucide-react';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
+import {
+	CLIENT_FEEDBACK_RECOMMENDATION_OPTIONS,
+	CLIENT_FEEDBACK_SCORECARD_FIELDS,
+	CLIENT_FEEDBACK_SCORE_OPTIONS,
+	formatClientFeedbackScore,
+	hasAnyClientFeedbackScorecard
+} from '@/lib/client-feedback-scorecard';
 
 const ACTION_BUTTONS = [
-	{ value: 'comment', label: 'Save Comment', requiresComment: true, className: 'btn-secondary' },
+	{ value: 'comment', label: 'Save Feedback', className: 'btn-secondary' },
 	{ value: 'request_interview', label: 'Request Interview', className: 'btn-primary' },
 	{ value: 'pass', label: 'Pass', className: 'btn-secondary btn-danger-soft' }
 ];
@@ -37,13 +44,25 @@ export default function ClientReviewPortal({ initialData, token }) {
 		}
 		return next;
 	});
+	const [scorecardDrafts, setScorecardDrafts] = useState(() => {
+		const next = {};
+		for (const submission of initialData?.submissions || []) {
+			next[String(submission.id)] = {
+				communicationScore: '',
+				technicalFitScore: '',
+				cultureFitScore: '',
+				overallRecommendationScore: ''
+			};
+		}
+		return next;
+	});
 
 	const submissions = useMemo(
 		() => (Array.isArray(portalData?.submissions) ? portalData.submissions : []),
 		[portalData]
 	);
 
-	async function onAction(submissionId, actionType, requiresComment = false) {
+	async function onAction(submissionId, actionType) {
 		const key = String(submissionId);
 		const actionKey = `${key}:${actionType}`;
 		const targetSubmission = submissions.find((submission) => String(submission.id) === key);
@@ -53,8 +72,10 @@ export default function ClientReviewPortal({ initialData, token }) {
 			return;
 		}
 		const comment = String(commentDrafts[key] || '').trim();
-		if (requiresComment && !comment) {
-			setError('Add a comment before saving.');
+		const scorecard = scorecardDrafts[key] || {};
+		const hasScorecard = hasAnyClientFeedbackScorecard(scorecard);
+		if (actionType === 'comment' && !comment && !hasScorecard) {
+			setError('Add a comment or complete part of the scorecard before saving.');
 			setSuccess('');
 			return;
 		}
@@ -80,7 +101,8 @@ export default function ClientReviewPortal({ initialData, token }) {
 				body: JSON.stringify({
 					submissionId,
 					actionType,
-					comment
+					comment,
+					scorecard
 				})
 			});
 			const data = await response.json().catch(() => ({}));
@@ -90,6 +112,15 @@ export default function ClientReviewPortal({ initialData, token }) {
 
 			setPortalData(data.portal || portalData);
 			setCommentDrafts((current) => ({ ...current, [key]: '' }));
+			setScorecardDrafts((current) => ({
+				...current,
+				[key]: {
+					communicationScore: '',
+					technicalFitScore: '',
+					cultureFitScore: '',
+					overallRecommendationScore: ''
+				}
+			}));
 			setSuccess(data.message || 'Response saved.');
 		} catch (requestError) {
 			setError(requestError instanceof Error ? requestError.message : 'Failed to save your response.');
@@ -179,14 +210,47 @@ export default function ClientReviewPortal({ initialData, token }) {
 									)}
 								</div>
 
-								<div className="client-portal-section">
-									<h3>Share Feedback</h3>
-									{isLocked ? (
-										<p className="client-portal-subtle">This submission has been passed. Further client actions are disabled.</p>
-									) : null}
-									<textarea
-										rows={4}
-										value={commentDrafts[submissionKey] || ''}
+									<div className="client-portal-section">
+										<h3>Share Feedback</h3>
+										{isLocked ? (
+											<p className="client-portal-subtle">This submission has been passed. Further client actions are disabled.</p>
+										) : null}
+										<div className="client-portal-scorecard-grid">
+											{CLIENT_FEEDBACK_SCORECARD_FIELDS.map((field) => {
+												const isRecommendation = field.key === 'overallRecommendationScore';
+												const options = isRecommendation
+													? CLIENT_FEEDBACK_RECOMMENDATION_OPTIONS
+													: CLIENT_FEEDBACK_SCORE_OPTIONS;
+												return (
+													<label key={field.key} className="client-portal-scorecard-field">
+														<span>{field.label}</span>
+														<select
+															value={scorecardDrafts[submissionKey]?.[field.key] || ''}
+															onChange={(event) =>
+																setScorecardDrafts((current) => ({
+																	...current,
+																	[submissionKey]: {
+																		...(current[submissionKey] || {}),
+																		[field.key]: event.target.value
+																	}
+																}))
+															}
+															disabled={isLocked || isSavingSubmission}
+														>
+															<option value="">Not rated</option>
+															{options.map((option) => (
+																<option key={option.value} value={option.value}>
+																	{option.label}
+																</option>
+															))}
+														</select>
+													</label>
+												);
+											})}
+										</div>
+										<textarea
+											rows={4}
+											value={commentDrafts[submissionKey] || ''}
 										onChange={(event) =>
 											setCommentDrafts((current) => ({
 												...current,
@@ -202,7 +266,7 @@ export default function ClientReviewPortal({ initialData, token }) {
 												key={action.value}
 												type="button"
 												className={`${action.className} client-portal-action-button`}
-												onClick={() => onAction(submission.id, action.value, action.requiresComment)}
+												onClick={() => onAction(submission.id, action.value)}
 												disabled={isLocked || isSavingSubmission}
 											>
 												{savingActionKey === `${submission.id}:${action.value}` ? (
@@ -226,6 +290,17 @@ export default function ClientReviewPortal({ initialData, token }) {
 												<li key={entry.id}>
 													<div>
 														<strong>{entry.actionLabel}</strong>
+														{entry.hasScorecard ? (
+															<div className="client-portal-feedback-scorecard">
+																{CLIENT_FEEDBACK_SCORECARD_FIELDS.map((field) =>
+																	entry.scorecard?.[field.key] ? (
+																		<span key={field.key} className="chip client-portal-feedback-score">
+																			{field.label}: {formatClientFeedbackScore(entry.scorecard[field.key], field.key)}
+																		</span>
+																	) : null
+																)}
+															</div>
+														) : null}
 														{entry.comment ? <p>{entry.comment}</p> : null}
 														<p className="simple-list-meta">
 															By {entry.clientName || 'Client Contact'} @ <span className="meta-emphasis-time">{formatDateTime(entry.createdAt)}</span>

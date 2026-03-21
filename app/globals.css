@@ -5201,6 +5201,38 @@ button:disabled {
 	justify-content: center;
 }
 
+.client-portal-scorecard-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.6rem 0.7rem;
+}
+
+.client-portal-scorecard-field {
+	display: grid;
+	gap: 0.28rem;
+}
+
+.client-portal-scorecard-field > span {
+	font-size: var(--text-micro);
+	font-weight: var(--weight-ui);
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.client-portal-feedback-scorecard {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin: 0.5rem 0 0.7rem;
+}
+
+.chip.client-portal-feedback-score {
+	background: var(--ui-secondary-bg);
+	color: var(--ui-secondary-ink);
+	border-color: var(--ui-secondary-border);
+}
+
 .client-portal-button-busy {
 	display: inline-flex;
 	align-items: center;
@@ -5230,6 +5262,50 @@ button:disabled {
 .client-portal-empty {
 	text-align: center;
 	padding: 2rem 1.2rem;
+}
+
+.client-feedback-scorecard {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.42rem 0.7rem;
+	margin: 0.55rem 0 0.7rem;
+	padding: 0.65rem 0.72rem;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: #fbfcff;
+}
+
+.client-feedback-scorecard p {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.08rem;
+}
+
+.client-feedback-scorecard span {
+	font-size: var(--text-micro);
+	font-weight: var(--weight-ui);
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.client-feedback-scorecard strong {
+	font-size: 0.88rem;
+	font-weight: 600;
+	color: var(--ink);
+}
+
+@media (max-width: 1080px) {
+	.client-portal-scorecard-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.client-portal-scorecard-grid {
+		grid-template-columns: 1fr;
+	}
 }
 
 .workspace-meta {

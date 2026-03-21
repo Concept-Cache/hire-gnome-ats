@@ -202,6 +202,7 @@ Submission workflow:
 - Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.
 - Use `Actions > Client Review Portal` to create, copy, email, open, revoke, or restore the persistent client-facing magic link for the assigned hiring contact, with portal analytics on job order detail and in the modal showing sent, opened, last viewed, and acted-on status.
 - Sending the portal link from the modal uses a branded email invite that follows the selected theme, with a direct portal CTA and job context for the client contact.
+- In the client portal, hiring managers can save structured scorecards for `Communication`, `Technical Fit`, `Culture Fit`, and `Overall Recommendation` alongside comments or interview/pass actions.
 - If the client portal is disabled in `Admin Area > System Settings`, passive portal UI is hidden and the actions-menu entry will explain that an administrator must enable it.
 
 ## Submissions
@@ -222,7 +223,7 @@ Behavior notes:
 - If converted to placement, submission becomes non-editable.
 - `Client Write-Up` can be AI-generated from the candidate and job order, then edited before saving.
 - The write-up toolbar sits above the field and supports regenerate + copy to clipboard.
-- `Client Feedback` on submission detail shows comments and actions received through the client review portal, including interview requests and passes.
+- `Client Feedback` on submission detail shows comments, structured scorecards, and actions received through the client review portal, including interview requests and passes.
 - If the client uses `Pass`, the portal confirms the action first and then locks that submission against any further client responses.
 - Client `Pass` actions also move that submission to the bottom of the job order's `Priority Order` ranking.
 - The client portal only exposes the candidate's labeled primary resume. If no primary resume is set, the portal does not offer a file download.

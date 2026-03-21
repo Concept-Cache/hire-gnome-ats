@@ -1434,6 +1434,10 @@ async function main() {
 					i % 2 === 0
 						? 'Please coordinate the next interview round with the hiring team.'
 						: 'Strong profile. We would like to review this candidate with the broader team.',
+				communicationScore: 3 + (i % 3),
+				technicalFitScore: 3 + ((i + 1) % 3),
+				cultureFitScore: 2 + ((i + 2) % 4),
+				overallRecommendationScore: i % 2 === 0 ? 4 + (i % 2) : 3 + (i % 2),
 				clientNameSnapshot: `${portalContact.firstName || ''} ${portalContact.lastName || ''}`.trim(),
 				clientEmailSnapshot: portalContact.email || '',
 				ipAddress: '127.0.0.1',
@@ -1467,6 +1471,10 @@ async function main() {
 					actionType: 'pass',
 					statusApplied: 'rejected',
 					comment: 'Thank you. We are passing on this candidate for now.',
+					communicationScore: 2,
+					technicalFitScore: 2 + (i % 2),
+					cultureFitScore: 2,
+					overallRecommendationScore: 1,
 					clientNameSnapshot: `${portalContact.firstName || ''} ${portalContact.lastName || ''}`.trim(),
 					clientEmailSnapshot: portalContact.email || '',
 					ipAddress: '127.0.0.1',

@@ -15,6 +15,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Client feedback notification opt-ins now trigger actual email alerts in addition to in-app notifications.
 - Portal management now tracks and displays sent/opened/viewed/acted-on analytics directly on job order detail and in the portal modal.
 - Added a global client-portal toggle in admin settings so teams that do not use external client review can disable the feature, hide passive portal UI, and keep the actions-menu entry as a guided prompt.
+- Added structured hiring-manager scorecards to the client portal so clients can rate communication, technical fit, culture fit, and overall recommendation, with the ratings written back to submission detail and included in portal feedback emails.
 - Split system settings into separate branding vs. platform cards so branding can always be saved, while integrations, SMTP, and object storage stay separately saveable and remain demo-locked.
 - Added configurable public careers hero headline/body copy in branding and tightened the public careers stat boxes so they no longer read overly wide.
 - Upgraded client-portal invite emails to a branded HTML template that follows the selected theme, with a clearer CTA, job context, and matching plain-text fallback.
