@@ -20,6 +20,12 @@ npm ci
 npm run ci:build
 ```
 
+Server deploy equivalent:
+```bash
+npm ci
+npm run build:deploy
+```
+
 ## 2) Backups
 
 ### One-off backup
