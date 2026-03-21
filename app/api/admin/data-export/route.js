@@ -253,6 +253,8 @@ async function getAdmin_dataExportHandler(req) {
 				lastName: true,
 				email: true,
 				notifyCareerSiteApplications: true,
+				notifyClientPortalFeedback: true,
+				tableColumnPreferences: true,
 				role: true,
 				divisionId: true,
 				isActive: true,

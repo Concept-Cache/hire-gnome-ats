@@ -40,7 +40,7 @@ Use this sequence as your default process:
 - Top search: global search across records.
 - User menu (`top-right`): account settings, Help, and sign out.
 - List pages: search, filters, sorting, paging, and column chooser.
-- Column chooser keeps the default list layouts intact while letting users reveal extra optional columns per module and save those preferences.
+- Column chooser keeps the default list layouts intact while letting users reveal extra optional columns per module, drag columns into a preferred order, and save those preferences to their user account so the same view follows them across devices.
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
 - Actions menu (`...`): context actions like archive, close, cancel, convert, and administrator-only audit access where supported.
 
