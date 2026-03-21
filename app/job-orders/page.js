@@ -21,6 +21,13 @@ function formatDateTime(value) {
 	return formatDateTimeAt(value);
 }
 
+function formatLocation(location, city, state) {
+	const direct = String(location || '').trim();
+	if (direct) return direct;
+	const parts = [city, state].map((value) => String(value || '').trim()).filter(Boolean);
+	return parts.length > 0 ? parts.join(', ') : '-';
+}
+
 function updateStatusDisplay(row, nextStatus, nextTimestamp) {
 	const timestamp = nextTimestamp || row.lastActivityAt || row.updatedAt || new Date().toISOString();
 	return {
@@ -104,6 +111,12 @@ export default function JobOrdersPage() {
 						clientId: job.client?.id || null,
 						contact: job.contact ? `${job.contact.firstName} ${job.contact.lastName}` : '-',
 						statusLabel: formatSelectValueLabel(job.status),
+						locationLabel: formatLocation(job.location, job.city, job.state),
+						employmentTypeLabel: formatSelectValueLabel(job.employmentType) || job.employmentType || '-',
+						divisionName: job.division?.name || '-',
+						openedAtLabel: formatDateTime(job.openedAt),
+						closedAtLabel: formatDateTime(job.closedAt),
+						publishLabel: job.publishToCareerSite ? 'Published' : 'Hidden',
 						owner: job.ownerUser
 							? `${job.ownerUser.firstName} ${job.ownerUser.lastName}`.trim()
 							: '-',
@@ -217,6 +230,14 @@ export default function JobOrdersPage() {
 			label: 'Submissions'
 		},
 		{ key: 'owner', label: 'Owner' },
+		{ key: 'contact', label: 'Contact', defaultVisible: false },
+		{ key: 'locationLabel', label: 'Location', defaultVisible: false },
+		{ key: 'employmentTypeLabel', label: 'Employment Type', defaultVisible: false },
+		{ key: 'openings', label: 'Openings', defaultVisible: false },
+		{ key: 'publishLabel', label: 'Career Site', defaultVisible: false },
+		{ key: 'divisionName', label: 'Division', defaultVisible: false },
+		{ key: 'openedAtLabel', label: 'Opened At', defaultVisible: false, getSortValue: (row) => row.openedAt || '' },
+		{ key: 'closedAtLabel', label: 'Closed At', defaultVisible: false, getSortValue: (row) => row.closedAt || '' },
 		{
 			key: 'lastActivityAtLabel',
 			label: 'Last Activity Date',

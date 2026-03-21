@@ -81,8 +81,10 @@ export default function SubmissionsPage() {
 					clientId: submission.jobOrder?.client?.id || null,
 					statusLabel: formatSelectValueLabel(getEffectiveSubmissionStatus(submission)),
 					originLabel: submissionOriginLabel(submission),
+					clientPortalLabel: submission.isClientVisible ? 'Visible' : 'Hidden',
 					submittedBy: submissionCreatedByLabel(submission),
-					submittedAt: formatDate(submission.createdAt)
+					submittedAt: formatDate(submission.createdAt),
+					updatedAtLabel: formatDate(submission.updatedAt)
 				}))
 			);
 		} finally {
@@ -132,6 +134,7 @@ export default function SubmissionsPage() {
 		{ key: 'statusLabel', label: 'Status' },
 		{ key: 'submittedBy', label: 'Submitted By' },
 		{ key: 'submittedAt', label: 'Submitted At' },
+		{ key: 'updatedAtLabel', label: 'Updated At', defaultVisible: false, getSortValue: (row) => row.updatedAt || '' },
 		{
 			key: 'originLabel',
 			label: 'Origin',
@@ -146,7 +149,19 @@ export default function SubmissionsPage() {
 					{row.originLabel}
 				</span>
 			)
-		}
+		},
+		{
+			key: 'clientPortalLabel',
+			label: 'Client Portal',
+			defaultVisible: false,
+			getSortValue: (row) => row.isClientVisible ? 'visible' : 'hidden',
+			render: (row) => (
+				<span className="chip">
+					{row.clientPortalLabel}
+				</span>
+			)
+		},
+		{ key: 'recordId', label: 'Record ID', defaultVisible: false }
 	];
 
 	return (

@@ -21,6 +21,11 @@ function formatDateTime(value) {
 	return formatDateTimeAt(value);
 }
 
+function formatLocation(city, state) {
+	const parts = [city, state].map((value) => String(value || '').trim()).filter(Boolean);
+	return parts.length > 0 ? parts.join(', ') : '-';
+}
+
 function updateStatusDisplay(row, nextStatus, nextTimestamp) {
 	const timestamp = nextTimestamp || row.lastActivityAt || row.updatedAt || new Date().toISOString();
 	return {
@@ -133,10 +138,19 @@ export default function CandidatesPage() {
 						fullName: `${candidate.firstName} ${candidate.lastName}`,
 						statusLabel: formatSelectValueLabel(candidate.status),
 						currentTitle: candidate.currentJobTitle || '-',
+						currentEmployerLabel: candidate.currentEmployer || '-',
+						emailLabel: candidate.email || '-',
+						mobileLabel: candidate.mobile || candidate.phone || '-',
+						sourceLabel: candidate.source || '-',
+						locationLabel: formatLocation(candidate.city, candidate.state),
+						divisionName: candidate.division?.name || '-',
 						lastActivityAt,
 						lastActivityAtLabel: formatDateTime(lastActivityAt),
 						completenessScore: completeness.scorePercent,
 						completenessLabel: completeness.levelLabel,
+						submissionCount: candidate._count?.submissions || 0,
+						noteCount: candidate._count?.notes || 0,
+						activityCount: candidate._count?.activities || 0,
 						ownerName: candidate.ownerUser
 							? `${candidate.ownerUser.firstName} ${candidate.ownerUser.lastName}`.trim()
 							: '-'
@@ -229,6 +243,9 @@ export default function CandidatesPage() {
 	const columns = [
 		{ key: 'fullName', label: 'Name' },
 		{ key: 'currentTitle', label: 'Current Title' },
+		{ key: 'currentEmployerLabel', label: 'Current Employer', defaultVisible: false },
+		{ key: 'emailLabel', label: 'Email', defaultVisible: false },
+		{ key: 'mobileLabel', label: 'Mobile', defaultVisible: false },
 		{
 			key: 'statusLabel',
 			label: 'Status',
@@ -254,6 +271,12 @@ export default function CandidatesPage() {
 			}
 		},
 		{ key: 'ownerName', label: 'Owner' },
+		{ key: 'sourceLabel', label: 'Source', defaultVisible: false },
+		{ key: 'locationLabel', label: 'Location', defaultVisible: false },
+		{ key: 'divisionName', label: 'Division', defaultVisible: false },
+		{ key: 'submissionCount', label: 'Submissions', defaultVisible: false },
+		{ key: 'noteCount', label: 'Notes', defaultVisible: false },
+		{ key: 'activityCount', label: 'Activities', defaultVisible: false },
 		{
 			key: 'lastActivityAtLabel',
 			label: 'Last Activity Date',

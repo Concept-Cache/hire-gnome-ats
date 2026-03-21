@@ -68,6 +68,10 @@ export default function ContactsPage() {
 					fullName: `${contact.firstName} ${contact.lastName}`,
 					client: contact.client?.name || '-',
 					clientId: contact.client?.id || null,
+					emailLabel: contact.email || '-',
+					mobileLabel: contact.mobile || contact.phone || '-',
+					departmentLabel: contact.department || '-',
+					divisionName: contact.division?.name || '-',
 					statusLabel: formatSelectValueLabel(contact.status),
 					lastActivityAtLabel: formatDateTime(contact.lastActivityAt),
 					owner: contact.ownerUser
@@ -91,6 +95,7 @@ export default function ContactsPage() {
 	const columns = [
 		{ key: 'fullName', label: 'Name' },
 		{ key: 'title', label: 'Title' },
+		{ key: 'departmentLabel', label: 'Department', defaultVisible: false },
 		{
 			key: 'client',
 			label: 'Client',
@@ -107,6 +112,9 @@ export default function ContactsPage() {
 			getSortValue: (row) => row.status || ''
 		},
 		{ key: 'owner', label: 'Owner' },
+		{ key: 'emailLabel', label: 'Email', defaultVisible: false },
+		{ key: 'mobileLabel', label: 'Mobile', defaultVisible: false },
+		{ key: 'divisionName', label: 'Division', defaultVisible: false },
 		{
 			key: 'lastActivityAtLabel',
 			label: 'Last Activity Date',

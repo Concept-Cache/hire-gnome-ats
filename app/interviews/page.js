@@ -8,8 +8,13 @@ import EntityTable from '@/app/components/entity-table';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { normalizeInterviewType } from '@/app/constants/interview-type-options';
+
+function formatDateTime(value) {
+	return formatDateTimeAt(value);
+}
 
 export default function InterviewsPage() {
 	const router = useRouter();
@@ -64,7 +69,11 @@ export default function InterviewsPage() {
 						jobOrderId: interview.jobOrder?.id || null,
 						client: interview.jobOrder?.client?.name || '-',
 						clientId: interview.jobOrder?.client?.id || null,
-						interviewModeLabel: formatSelectValueLabel(normalizeInterviewType(interview.interviewMode))
+						interviewModeLabel: formatSelectValueLabel(normalizeInterviewType(interview.interviewMode)),
+						statusLabel: formatSelectValueLabel(interview.status),
+						startsAtLabel: formatDateTime(interview.startsAt),
+						interviewerLabel: interview.interviewer || '-',
+						locationLabel: interview.location || '-'
 					};
 				})
 			);
@@ -82,6 +91,7 @@ export default function InterviewsPage() {
 	}
 
 	const columns = [
+		{ key: 'subject', label: 'Subject', defaultVisible: false },
 		{
 			key: 'candidate',
 			label: 'Candidate',
@@ -112,7 +122,11 @@ export default function InterviewsPage() {
 					row.client
 				)
 		},
-		{ key: 'interviewModeLabel', label: 'Type' }
+		{ key: 'interviewModeLabel', label: 'Type' },
+		{ key: 'statusLabel', label: 'Status', defaultVisible: false, getSortValue: (row) => row.status || '' },
+		{ key: 'startsAtLabel', label: 'Starts At', defaultVisible: false, getSortValue: (row) => row.startsAt || '' },
+		{ key: 'interviewerLabel', label: 'Interviewer', defaultVisible: false },
+		{ key: 'locationLabel', label: 'Location', defaultVisible: false }
 	];
 
 	return (
