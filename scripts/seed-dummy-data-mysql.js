@@ -892,8 +892,8 @@ async function main() {
 
 				await connection.query(
 					`INSERT INTO \`ClientSubmissionFeedback\`
-					(\`submissionId\`, \`portalAccessId\`, \`actionType\`, \`comment\`, \`statusApplied\`, \`clientNameSnapshot\`, \`clientEmailSnapshot\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
-					VALUES (?, ?, ?, ?, NULL, ?, ?, '127.0.0.1', 'Demo Seed', NOW(), NOW())`,
+					(\`submissionId\`, \`portalAccessId\`, \`actionType\`, \`comment\`, \`communicationScore\`, \`technicalFitScore\`, \`cultureFitScore\`, \`overallRecommendationScore\`, \`statusApplied\`, \`clientNameSnapshot\`, \`clientEmailSnapshot\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, '127.0.0.1', 'Demo Seed', NOW(), NOW())`,
 					[
 						jobSubmissions[0].id,
 						portalAccessId,
@@ -901,6 +901,10 @@ async function main() {
 						i % 2 === 0
 							? 'Please coordinate the next interview round with the hiring team.'
 							: 'Strong profile. We would like to review this candidate with the broader team.',
+						3 + (i % 3),
+						3 + ((i + 1) % 3),
+						2 + ((i + 2) % 4),
+						i % 2 === 0 ? 4 + (i % 2) : 3 + (i % 2),
 						`${portalContact.firstName} ${portalContact.lastName}`,
 						portalContact.email
 					]
@@ -915,12 +919,16 @@ async function main() {
 					);
 					await connection.query(
 						`INSERT INTO \`ClientSubmissionFeedback\`
-						(\`submissionId\`, \`portalAccessId\`, \`actionType\`, \`comment\`, \`statusApplied\`, \`clientNameSnapshot\`, \`clientEmailSnapshot\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
-						VALUES (?, ?, 'pass', ?, 'rejected', ?, ?, '127.0.0.1', 'Demo Seed', NOW(), NOW())`,
+						(\`submissionId\`, \`portalAccessId\`, \`actionType\`, \`comment\`, \`communicationScore\`, \`technicalFitScore\`, \`cultureFitScore\`, \`overallRecommendationScore\`, \`statusApplied\`, \`clientNameSnapshot\`, \`clientEmailSnapshot\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
+						VALUES (?, ?, 'pass', ?, ?, ?, ?, ?, 'rejected', ?, ?, '127.0.0.1', 'Demo Seed', NOW(), NOW())`,
 						[
 							jobSubmissions[1].id,
 							portalAccessId,
 							'Thank you. We are passing on this candidate for now.',
+							2,
+							2 + (i % 2),
+							2,
+							1,
 							`${portalContact.firstName} ${portalContact.lastName}`,
 							portalContact.email
 						]

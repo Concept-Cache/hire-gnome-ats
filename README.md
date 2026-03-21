@@ -445,8 +445,8 @@ Client review portal:
 - Internal users can copy, open, email, revoke, or restore the portal link from the job-order modal.
 - Portal email sends use a branded HTML invite that follows the selected admin theme, with a direct CTA, job title context, and a plain-text fallback.
 - Portal management shows lifecycle analytics for sent, opened, last viewed, acted on, and total client actions logged on job order detail and in the modal.
-- Clients can review submitted candidates, read the recruiter write-up, download only the candidate's labeled primary resume, leave comments, request interviews, or pass.
-- Client responses are written back to `Submission Detail > Client Feedback` and generate in-app plus email notifications for users who keep `Client Feedback Notifications` enabled in `Account Settings`.
+- Clients can review submitted candidates, read the recruiter write-up, download only the candidate's labeled primary resume, complete a simple scorecard (`Communication`, `Technical Fit`, `Culture Fit`, `Overall Recommendation`), leave comments, request interviews, or pass.
+- Client responses are written back to `Submission Detail > Client Feedback` with the structured scorecard and generate in-app plus email notifications for users who keep `Client Feedback Notifications` enabled in `Account Settings`.
 - If `POSTMARK_INBOUND_WEBHOOK_SECRET` is set, include it either as `?secret=...` on the webhook URL or as the `x-webhook-secret` header.
 
 ## Production Checklist

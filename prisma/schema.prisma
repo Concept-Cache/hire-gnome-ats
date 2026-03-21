@@ -770,6 +770,10 @@ model ClientSubmissionFeedback {
 	portalAccessId      Int
 	actionType          String
 	comment             String?  @db.Text
+	communicationScore  Int?
+	technicalFitScore   Int?
+	cultureFitScore     Int?
+	overallRecommendationScore Int?
 	statusApplied       String?
 	clientNameSnapshot  String?
 	clientEmailSnapshot String?

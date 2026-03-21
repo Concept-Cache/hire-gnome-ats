@@ -5,6 +5,7 @@ import { createNotificationsForUsers } from '@/lib/notifications';
 import { logCreate } from '@/lib/audit-log';
 import { sendEmailMessage } from '@/lib/email-delivery';
 import { isValidEmailAddress } from '@/lib/email-validation';
+import { CLIENT_FEEDBACK_SCORECARD_FIELDS, formatClientFeedbackScore, parseClientFeedbackScorecard } from '@/lib/client-feedback-scorecard';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { getSystemBranding } from '@/lib/system-settings';
 import { logError, logInfo, logWarn, requestLogContext } from '@/lib/logger';
@@ -28,6 +29,7 @@ function buildClientFeedbackEmail({
 	candidateName,
 	jobOrderTitle,
 	comment,
+	scorecard,
 	submissionId,
 	linkHref,
 	createdAt
@@ -39,9 +41,18 @@ function buildClientFeedbackEmail({
 	const safeCandidateName = String(candidateName || 'candidate').trim() || 'candidate';
 	const safeJobOrderTitle = String(jobOrderTitle || 'job order').trim() || 'job order';
 	const safeComment = String(comment || '').trim();
+	const normalizedScorecard = parseClientFeedbackScorecard(scorecard);
+	const scorecardLines = CLIENT_FEEDBACK_SCORECARD_FIELDS
+		.map((field) =>
+			normalizedScorecard[field.key]
+				? `${field.label}: ${formatClientFeedbackScore(normalizedScorecard[field.key], field.key)}`
+				: ''
+		)
+		.filter(Boolean);
 	const safeLinkHref = String(linkHref || '').trim();
 	const submittedAt = formatDateTimeAt(createdAt);
-	const subject = `${safeSiteName}: Client Feedback - ${safeActionLabel} for ${safeCandidateName}`;
+	const subjectActionLabel = safeActionLabel === 'Feedback' ? 'Feedback Updated' : safeActionLabel;
+	const subject = `${safeSiteName}: Client Feedback - ${subjectActionLabel} for ${safeCandidateName}`;
 	const lines = [
 		`Hi ${safeRecipientFirstName},`,
 		'',
@@ -54,6 +65,10 @@ function buildClientFeedbackEmail({
 	];
 	if (safeComment) {
 		lines.push(`Comment: ${safeComment}`);
+	}
+	if (scorecardLines.length) {
+		lines.push('', 'Scorecard:');
+		for (const line of scorecardLines) lines.push(`- ${line}`);
 	}
 	if (safeLinkHref) {
 		lines.push('', `Open Submission: ${safeLinkHref}`);
@@ -69,6 +84,13 @@ function buildClientFeedbackEmail({
 			<li><strong>Received:</strong> ${escapeHtml(submittedAt)}</li>
 			${safeComment ? `<li><strong>Comment:</strong> ${escapeHtml(safeComment)}</li>` : ''}
 		</ul>
+		${
+			scorecardLines.length
+				? `<p><strong>Scorecard</strong></p><ul>${scorecardLines
+						.map((line) => `<li>${escapeHtml(line)}</li>`)
+						.join('')}</ul>`
+				: ''
+		}
 		${safeLinkHref ? `<p><a href="${escapeHtml(safeLinkHref)}">Open Submission</a></p>` : ''}
 	`.trim();
 
@@ -115,6 +137,7 @@ async function postClient_review_tokenHandler(req, { params }) {
 		const submissionId = Number(body.submissionId);
 		const actionType = String(body.actionType || '').trim().toLowerCase();
 		const comment = String(body.comment || '');
+		const scorecard = parseClientFeedbackScorecard(body.scorecard);
 		if (!['comment', 'request_interview', 'pass'].includes(actionType)) {
 			return NextResponse.json({ error: 'Unsupported client feedback action.' }, { status: 400 });
 		}
@@ -127,14 +150,15 @@ async function postClient_review_tokenHandler(req, { params }) {
 			portalAccess,
 			submissionId,
 			actionType,
-			comment
+			comment,
+			scorecard
 		});
 
 		await logCreate({
 			actorUserId: null,
 			entityType: 'CLIENT_SUBMISSION_FEEDBACK',
 			entity: result.feedback,
-			summary: `${result.actionLabel} via client portal for submission #${result.submission.id}`
+			summary: `${result.actionLabel === 'Feedback' ? 'Feedback updated' : result.actionLabel} via client portal for submission #${result.submission.id}`
 		});
 
 		const notificationRecipients = await prisma.user.findMany({
@@ -157,7 +181,7 @@ async function postClient_review_tokenHandler(req, { params }) {
 		await createNotificationsForUsers({
 			userIds: inAppRecipientIds,
 			type: 'info',
-			title: `Client Feedback: ${result.actionLabel}`,
+			title: result.actionLabel === 'Feedback' ? 'Client Feedback Updated' : `Client Feedback: ${result.actionLabel}`,
 			message: `${portalAccess.contact?.firstName || 'Client'} ${portalAccess.contact?.lastName || ''}`.trim()
 				? `${`${portalAccess.contact?.firstName || 'Client'} ${portalAccess.contact?.lastName || ''}`.trim()} responded on ${result.submission.candidate?.firstName || 'candidate'} ${result.submission.candidate?.lastName || ''}.`
 				: 'A client responded through the review portal.',
@@ -200,6 +224,7 @@ async function postClient_review_tokenHandler(req, { params }) {
 					candidateName,
 					jobOrderTitle: result.submission.jobOrder?.title || '',
 					comment,
+					scorecard,
 					submissionId: result.submission.recordId || result.submission.id,
 					linkHref: submissionUrl,
 					createdAt: result.feedback.createdAt

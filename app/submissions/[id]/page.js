@@ -14,6 +14,12 @@ import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import useIsAdministrator from '@/app/hooks/use-is-administrator';
+import {
+	CLIENT_FEEDBACK_SCORECARD_FIELDS,
+	formatClientFeedbackScore,
+	hasAnyClientFeedbackScorecard,
+	parseClientFeedbackScorecard
+} from '@/lib/client-feedback-scorecard';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus, isSubmissionPlacementLocked } from '@/lib/submission-status';
@@ -63,7 +69,7 @@ function formatClientFeedbackLabel(value) {
 	if (normalized === 'request_interview') return 'Requested Interview';
 	if (normalized === 'need_more_info') return 'Needs More Info';
 	if (normalized === 'pass') return 'Passed';
-	if (normalized === 'comment') return 'Comment';
+	if (normalized === 'comment') return 'Feedback';
 	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : 'Client Update';
 }
 
@@ -612,6 +618,19 @@ export default function SubmissionDetailsPage() {
 									<strong>{formatClientFeedbackLabel(entry.actionType)}</strong>
 									{entry.statusApplied ? (
 										<p>Status Applied: {formatSubmissionStatusLabel(entry.statusApplied)}</p>
+									) : null}
+									{hasAnyClientFeedbackScorecard(entry) ? (
+										<div className="client-feedback-scorecard">
+											{CLIENT_FEEDBACK_SCORECARD_FIELDS.map((field) => {
+												const scorecard = parseClientFeedbackScorecard(entry);
+												return scorecard[field.key] ? (
+													<p key={field.key}>
+														<span>{field.label}</span>
+														<strong>{formatClientFeedbackScore(scorecard[field.key], field.key)}</strong>
+													</p>
+												) : null;
+											})}
+										</div>
 									) : null}
 									{entry.comment ? <p>{entry.comment}</p> : null}
 									<p className="simple-list-meta">

@@ -99,6 +99,10 @@ function buildJobOrderDetailInclude(entityScope) {
 							id: true,
 							actionType: true,
 							comment: true,
+							communicationScore: true,
+							technicalFitScore: true,
+							cultureFitScore: true,
+							overallRecommendationScore: true,
 							clientNameSnapshot: true,
 							createdAt: true
 						}

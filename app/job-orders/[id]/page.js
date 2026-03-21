@@ -109,7 +109,7 @@ function formatClientFeedbackLabel(value) {
 	const normalized = String(value || '').trim().toLowerCase();
 	if (normalized === 'request_interview') return 'Requested Interview';
 	if (normalized === 'pass') return 'Passed';
-	if (normalized === 'comment') return 'Comment';
+	if (normalized === 'comment') return 'Feedback';
 	if (normalized === 'need_more_info') return 'Needs More Info';
 	return normalized ? normalized.replaceAll('_', ' ').replace(/\b\w/g, (match) => match.toUpperCase()) : 'Client Update';
 }

@@ -75,7 +75,7 @@ Behavior:
 - Sending the link from the modal uses a branded email template that follows the selected theme, with a direct CTA and job-specific context
 - Job order detail also shows portal analytics for sent, opened, last viewed, acted on, and total client actions logged
 - The modal shows the same lifecycle analytics so recruiters can quickly confirm whether the link is being used
-- The external portal shows submitted candidates, recruiter write-ups, the candidate's labeled primary resume when available, and response actions
+- The external portal shows submitted candidates, recruiter write-ups, the candidate's labeled primary resume when available, structured scorecards, and response actions
 
 ## Best Practice
 1. Keep internal and public descriptions distinct.

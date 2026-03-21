@@ -64,9 +64,9 @@ Behavior:
 - Career-site `Web` responses start hidden from the client portal until a recruiter explicitly promotes them.
 - Recruiters can later hide a submission from the client portal again from the same actions menu.
 - Submission portal visibility controls and client feedback are hidden when the client portal is disabled globally.
-- Shows comments and action history submitted through the client review portal
+- Shows comments, scorecard ratings, and action history submitted through the client review portal
 - Includes the client name/email snapshot and timestamp for each entry
-- Captures actions like `Request Interview`, `Comment`, and `Pass`
+- Captures actions like `Request Interview`, `Feedback`, and `Pass`
 - `Pass` is confirmed in the portal and locks the submission against any further client actions
 - When a client uses `Pass`, the submission is also moved to the bottom of the job order's priority order
 - The portal only exposes the candidate's labeled primary resume; other candidate attachments stay internal
