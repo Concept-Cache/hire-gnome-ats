@@ -72,6 +72,7 @@ Behavior:
 - Portal access is scoped to that job order only
 - Link remains valid for the life of the job unless revoked
 - Internal users can copy, email, open, revoke, or restore the portal link from the modal
+- Sending the link from the modal uses a branded email template that follows the selected theme, with a direct CTA and job-specific context
 - Job order detail also shows portal analytics for sent, opened, last viewed, acted on, and total client actions logged
 - The modal shows the same lifecycle analytics so recruiters can quickly confirm whether the link is being used
 - The external portal shows submitted candidates, recruiter write-ups, the candidate's labeled primary resume when available, and response actions

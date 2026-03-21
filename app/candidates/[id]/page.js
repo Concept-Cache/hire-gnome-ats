@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { BookmarkPlus, BookmarkX, Download, FileText, LoaderCircle, MoreVertical, RefreshCcw, Sparkles, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, BookmarkX, Download, FileText, LoaderCircle, MoreVertical, RefreshCcw, Save, Sparkles, Trash2, Upload, UserPlus, X } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import SkillChipSelect from '@/app/components/skill-chip-select';
 import ListSortControls from '@/app/components/list-sort-controls';
@@ -1787,9 +1788,12 @@ export default function CandidateDetailsPage() {
 					/>
 
 					<div className="form-actions">
-						<button type="submit" disabled={saveState.saving || !canSaveCandidate}>
-							{saveState.saving ? 'Saving...' : 'Save Candidate'}
-						</button>
+						<SaveActionButton
+							saving={saveState.saving}
+							disabled={saveState.saving || !canSaveCandidate}
+							label="Save Candidate"
+							savingLabel="Saving Candidate..."
+						/>
 						<span className="form-actions-meta">
 							<span>Updated:</span>
 							<strong>{formatDate(candidate.updatedAt)}</strong>
@@ -1899,9 +1903,12 @@ export default function CandidateDetailsPage() {
 										required
 									/>
 								</FormField>
-								<button type="submit" disabled={noteState.saving}>
-									{noteState.saving ? 'Saving...' : 'Save Note'}
-								</button>
+								<SaveActionButton
+									saving={noteState.saving}
+									label="Save Note"
+									savingLabel="Saving Note..."
+									icon={Save}
+								/>
 							</form>
 							<h4 className="side-section-title">Saved Notes</h4>
 							<div className="workspace-scroll-area">
@@ -1995,9 +2002,12 @@ export default function CandidateDetailsPage() {
 										onChange={(e) => setActivityForm((f) => ({ ...f, description: e.target.value }))}
 									/>
 								</FormField>
-								<button type="submit" disabled={activityState.saving}>
-									{activityState.saving ? 'Saving...' : 'Save Activity'}
-								</button>
+								<SaveActionButton
+									saving={activityState.saving}
+									label="Save Activity"
+									savingLabel="Saving Activity..."
+									icon={Save}
+								/>
 							</form>
 							<h4 className="side-section-title">Activity Log</h4>
 							<div className="workspace-scroll-area">
@@ -2130,9 +2140,13 @@ export default function CandidateDetailsPage() {
 								{attachmentFile ? (
 									<p className="panel-subtext">Selected: {attachmentFile.name}</p>
 								) : null}
-								<button type="submit" disabled={attachmentState.uploading || !attachmentFile}>
-									{attachmentState.uploading ? 'Uploading...' : 'Upload File'}
-								</button>
+								<SaveActionButton
+									saving={attachmentState.uploading}
+									disabled={attachmentState.uploading || !attachmentFile}
+									label="Upload File"
+									savingLabel="Uploading File..."
+									icon={Upload}
+								/>
 							</form>
 							<h4 className="side-section-title">Uploaded Files</h4>
 							<div className="workspace-scroll-area">
@@ -2320,9 +2334,12 @@ export default function CandidateDetailsPage() {
 											}
 										/>
 									</FormField>
-									<button type="submit" disabled={educationState.saving}>
-										{educationState.saving ? 'Saving...' : 'Save Education'}
-									</button>
+									<SaveActionButton
+										saving={educationState.saving}
+										label="Save Education"
+										savingLabel="Saving Education..."
+										icon={Save}
+									/>
 								</form>
 								<h4 className="side-section-title">Education History</h4>
 								<div className="workspace-scroll-area">
@@ -2469,9 +2486,12 @@ export default function CandidateDetailsPage() {
 											}
 										/>
 									</FormField>
-									<button type="submit" disabled={workExperienceState.saving}>
-										{workExperienceState.saving ? 'Saving...' : 'Save Work Experience'}
-									</button>
+									<SaveActionButton
+										saving={workExperienceState.saving}
+										label="Save Work Experience"
+										savingLabel="Saving Work Experience..."
+										icon={Save}
+									/>
 								</form>
 								<h4 className="side-section-title">Work Experience</h4>
 								<div className="workspace-scroll-area">
@@ -2630,13 +2650,15 @@ export default function CandidateDetailsPage() {
 																		>
 																			<Sparkles aria-hidden="true" className="row-action-lucide" />
 																		</button>
-																		<button
+																		<SaveActionButton
 																			type="button"
 																			onClick={() => onCreateMatchedSubmission(match)}
+																			saving={isSubmitting}
 																			disabled={isSubmitting || jobMatchState.loading}
-																		>
-																			{isSubmitting ? 'Submitting...' : 'Add Submission'}
-																		</button>
+																			label="Add Submission"
+																			savingLabel="Adding Submission..."
+																			icon={UserPlus}
+																		/>
 																	</div>
 																</div>
 															</li>

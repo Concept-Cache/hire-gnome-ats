@@ -19,6 +19,7 @@ The Reports module gives teams a scoped operational view of hiring activity with
 - Compare owner performance across the users you are allowed to report on
 - Export the current report view to an Excel workbook
 - Click summary cards and pipeline counts to drill into the matching records in a modal
+- Click owner performance chips to drill into the matching owner-scoped records in a modal
 
 ## Access Scope
 
@@ -64,7 +65,7 @@ The Excel export is organized into a small set of sheets so the output stays rea
 Included sheets:
 
 - `Summary`
-	- report header metadata (`date range`, `division`, `owner`, `role`)
+	- report header metadata (`date range`, `division`, `owner`)
 	- summary-card counts
 - `Candidates`
 - `Job Orders`
@@ -159,6 +160,17 @@ Owner performance assigns activity to the most relevant owner for that workflow:
 - Placements prefer linked submission creator, then candidate/job order owner
 
 Unowned records appear under `Unassigned`.
+
+Each owner metric chip is clickable:
+
+- `Candidates`
+- `Jobs`
+- `Submissions`
+- `Interviews`
+- `Placements`
+- `Accepted`
+
+Clicking a chip opens the same report detail modal used elsewhere, filtered to that owner and metric.
 
 ## Notes
 

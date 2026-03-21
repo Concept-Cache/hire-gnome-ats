@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, GripVertical, MoreVertical, RefreshCcw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, GripVertical, MoreVertical, RefreshCcw, Sparkles, UserPlus } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import RichTextEditor from '@/app/components/rich-text-editor';
 import ListSortControls from '@/app/components/list-sort-controls';
@@ -1589,9 +1590,12 @@ export default function JobOrderDetailsPage() {
 					/>
 
 						<div className="form-actions">
-							<button type="submit" disabled={!canSaveJobOrder}>
-								{saveState.saving ? 'Saving...' : 'Save Job Order'}
-							</button>
+							<SaveActionButton
+								saving={saveState.saving}
+								disabled={!canSaveJobOrder}
+								label="Save Job Order"
+								savingLabel="Saving Job Order..."
+							/>
 							<span className="form-actions-meta">
 								<span>Updated:</span>
 								<strong>{formatDate(jobOrder.updatedAt)}</strong>
@@ -1693,12 +1697,13 @@ export default function JobOrderDetailsPage() {
 									/>
 								</FormField>
 								<div className="form-actions">
-									<button
-										type="submit"
+									<SaveActionButton
+										saving={submissionState.saving}
 										disabled={submissionState.saving || !submissionForm.candidateId}
-									>
-										{submissionState.saving ? 'Saving...' : 'Add Submission'}
-									</button>
+										label="Add Submission"
+										savingLabel="Adding Submission..."
+										icon={UserPlus}
+									/>
 								</div>
 							</form>
 							<h4 className="side-section-title">Current Submissions</h4>
@@ -2046,17 +2051,19 @@ export default function JobOrderDetailsPage() {
 																	>
 																		<Sparkles aria-hidden="true" className="row-action-lucide" />
 																	</button>
-																	<button
+																	<SaveActionButton
 																		type="button"
 																		onClick={() => onCreateMatchedSubmission(match)}
+																		saving={isSubmitting}
 																		disabled={
 																			isSubmitting ||
 																			matchState.loading ||
 																			submittedCandidateIds.has(String(match.candidateId))
 																		}
-																	>
-																		{isSubmitting ? 'Submitting...' : 'Add Submission'}
-																	</button>
+																		label="Add Submission"
+																		savingLabel="Adding Submission..."
+																		icon={UserPlus}
+																	/>
 																</div>
 															</div>
 														</li>

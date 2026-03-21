@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -352,9 +353,12 @@ export default function CustomFieldDetailsPage() {
 						</section>
 
 						<div className="form-actions">
-							<button type="submit" disabled={saveState.saving || deleting || !canSave}>
-								{saveState.saving ? 'Saving...' : 'Save Custom Field'}
-							</button>
+							<SaveActionButton
+								saving={saveState.saving}
+								disabled={saveState.saving || deleting || !canSave}
+								label="Save Custom Field"
+								savingLabel="Saving Custom Field..."
+							/>
 							<button
 								type="button"
 								className="btn-secondary"

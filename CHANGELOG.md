@@ -17,6 +17,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Added a global client-portal toggle in admin settings so teams that do not use external client review can disable the feature, hide passive portal UI, and keep the actions-menu entry as a guided prompt.
 - Split system settings into separate branding vs. platform cards so branding can always be saved, while integrations, SMTP, and object storage stay separately saveable and remain demo-locked.
 - Added configurable public careers hero headline/body copy in branding and tightened the public careers stat boxes so they no longer read overly wide.
+- Upgraded client-portal invite emails to a branded HTML template that follows the selected theme, with a clearer CTA, job context, and matching plain-text fallback.
 - Audit trail viewing is now restricted to administrators in both the detail-screen UI and the audit-log API.
 - Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
 - In demo mode, system settings now allow the full branding card to be saved while keeping integrations, SMTP, and object storage read-only.
@@ -25,6 +26,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Added live dashboard KPI cards for web-response review and client interview requests so the home screen surfaces new recruiting pressure sooner.
 - Added a stronger candidate snapshot header with AI summary snippet, last activity, and profile-completeness guidance so recruiters can assess submission readiness at a glance.
 - Extended candidate completeness into the list view and added soft submission warnings so recruiters can keep moving while still seeing when a profile needs cleanup.
+- Owner performance chips in operational reporting now open the same drill-through detail modal used by the rest of the report, filtered to that owner and metric.
 
 ## [1.5.0] - 2026-03-17
 

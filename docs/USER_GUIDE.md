@@ -201,6 +201,7 @@ Submission workflow:
 - Candidate suggestions use qualification scoring and typeahead safeguards.
 - Candidate matches support `Explain Match`, which opens a saved AI explanation for why a candidate fits, where the gaps are, and what to validate before submitting.
 - Use `Actions > Client Review Portal` to create, copy, email, open, revoke, or restore the persistent client-facing magic link for the assigned hiring contact, with portal analytics on job order detail and in the modal showing sent, opened, last viewed, and acted-on status.
+- Sending the portal link from the modal uses a branded email invite that follows the selected theme, with a direct portal CTA and job context for the client contact.
 - If the client portal is disabled in `Admin Area > System Settings`, passive portal UI is hidden and the actions-menu entry will explain that an administrator must enable it.
 
 ## Submissions
@@ -287,8 +288,9 @@ Common actions:
 2. Set a date range.
 3. If your role allows it, filter by division and/or owner.
 4. Review summary KPIs, current pipeline counts, daily trend, and owner performance.
-5. Use `Export Excel` to download the current report as a multi-sheet workbook with a `Summary` tab and one tab per entity (`Candidates`, `Job Orders`, `Submissions`, `Interviews`, `Placements`). Each entity tab mirrors the detail shown in the report modal and is sorted by status, then alphabetically.
-6. Click cards or pipeline counts to drill into the matching records in a modal.
+5. Click owner performance chips to open owner-scoped detail in the same drill-through modal used by the other report cards.
+6. Use `Export Excel` to download the current report as a multi-sheet workbook with a `Summary` tab and one tab per entity (`Candidates`, `Job Orders`, `Submissions`, `Interviews`, `Placements`). Each entity tab mirrors the detail shown in the report modal and is sorted by status, then alphabetically.
+7. Click cards or pipeline counts to drill into the matching records in a modal.
 
 Behavior notes:
 - Administrators can report across all divisions.

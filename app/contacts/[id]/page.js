@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, MoreVertical } from 'lucide-react';
+import { ArrowUpRight, MoreVertical, Save } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
@@ -607,11 +608,14 @@ export default function ContactDetailsPage() {
 							onDefinitionsChange={setCustomFieldDefinitions}
 						/>
 
-						<div className="form-actions">
-							<button type="submit" disabled={saveState.saving || !canSave}>
-								{saveState.saving ? 'Saving...' : 'Save Contact'}
-							</button>
-							<span className="form-actions-meta">
+					<div className="form-actions">
+						<SaveActionButton
+							saving={saveState.saving}
+							disabled={saveState.saving || !canSave}
+							label="Save Contact"
+							savingLabel="Saving Contact..."
+						/>
+						<span className="form-actions-meta">
 								<span>Updated:</span>
 								<strong>{formatDate(contact.updatedAt)}</strong>
 							</span>
@@ -655,9 +659,12 @@ export default function ContactDetailsPage() {
 										required
 									/>
 								</FormField>
-								<button type="submit" disabled={noteState.saving}>
-									{noteState.saving ? 'Saving...' : 'Save Note'}
-								</button>
+								<SaveActionButton
+									saving={noteState.saving}
+									label="Save Note"
+									savingLabel="Saving Note..."
+									icon={Save}
+								/>
 							</form>
 							<h4 className="side-section-title">Saved Notes</h4>
 							<div className="workspace-scroll-area">

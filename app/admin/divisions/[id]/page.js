@@ -10,6 +10,7 @@ import {
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
@@ -177,9 +178,12 @@ export default function DivisionDetailsPage() {
 								</FormField>
 							</section>
 							<div className="form-actions">
-								<button type="submit" disabled={saveState.saving}>
-									{saveState.saving ? 'Saving...' : 'Save Division'}
-								</button>
+								<SaveActionButton
+									saving={saveState.saving}
+									disabled={saveState.saving}
+									label="Save Division"
+									savingLabel="Saving Division..."
+								/>
 								<span className="form-actions-meta">
 									<span>Updated:</span>
 									<strong>{formatDate(division.updatedAt)}</strong>
