@@ -249,7 +249,6 @@ function appendSummarySheet(workbook, { report, selectedDivision, selectedOwner 
 	worksheet.addRow(['Operational Reporting Summary']);
 	worksheet.addRow([]);
 	worksheet.addRow(['Generated At', new Date()]);
-	worksheet.addRow(['Role', report.scope.role]);
 	worksheet.addRow(['Start Date', report.appliedFilters.startDate]);
 	worksheet.addRow(['End Date', report.appliedFilters.endDate]);
 	worksheet.addRow(['Division', selectedDivision?.name || 'All']);
@@ -265,7 +264,7 @@ function appendSummarySheet(workbook, { report, selectedDivision, selectedOwner 
 	worksheet.addRow(['Open Job Orders', report.summary.openJobOrders]);
 
 	styleHeaderRow(worksheet.getRow(1));
-	styleHeaderRow(worksheet.getRow(10));
+	styleHeaderRow(worksheet.getRow(9));
 	worksheet.getCell('B3').numFmt = EXCEL_DATE_TIME_FORMAT;
 	applyAutoColumnWidths(worksheet);
 }

@@ -8,6 +8,7 @@ import { USER_ROLE_OPTIONS } from '@/app/constants/access-control-options';
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
@@ -260,9 +261,12 @@ export default function UserDetailsPage() {
 							</section>
 
 							<div className="form-actions">
-								<button type="submit" disabled={saveState.saving}>
-									{saveState.saving ? 'Saving...' : 'Save User'}
-								</button>
+								<SaveActionButton
+									saving={saveState.saving}
+									disabled={saveState.saving}
+									label="Save User"
+									savingLabel="Saving User..."
+								/>
 								<span className="form-actions-meta">
 									<span>Updated:</span>
 									<strong>{formatDate(user.updatedAt)}</strong>

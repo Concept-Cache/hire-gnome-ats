@@ -8,6 +8,7 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
@@ -923,22 +924,6 @@ export default function PlacementDetailsPage() {
 							<div className="detail-form-grid-4">
 								{form.compensationType === 'hourly' ? (
 									<>
-										<FormField label="RT Bill Rate" required>
-											<input
-												type="text"
-												inputMode="decimal"
-												value={form.hourlyRtBillRate}
-												onChange={(e) =>
-													setForm((current) => ({
-														...current,
-														hourlyRtBillRate: formatCurrencyInput(
-															e.target.value,
-															current.currency || 'USD'
-														)
-													}))
-												}
-											/>
-										</FormField>
 										<FormField label="RT Pay Rate" required>
 											<input
 												type="text"
@@ -955,15 +940,15 @@ export default function PlacementDetailsPage() {
 												}
 											/>
 										</FormField>
-										<FormField label="OT Bill Rate" required>
+										<FormField label="RT Bill Rate" required>
 											<input
 												type="text"
 												inputMode="decimal"
-												value={form.hourlyOtBillRate}
+												value={form.hourlyRtBillRate}
 												onChange={(e) =>
 													setForm((current) => ({
 														...current,
-														hourlyOtBillRate: formatCurrencyInput(
+														hourlyRtBillRate: formatCurrencyInput(
 															e.target.value,
 															current.currency || 'USD'
 														)
@@ -987,19 +972,15 @@ export default function PlacementDetailsPage() {
 												}
 											/>
 										</FormField>
-									</>
-								) : null}
-								{form.compensationType === 'daily' ? (
-									<>
-										<FormField label="Daily Bill Rate" required>
+										<FormField label="OT Bill Rate" required>
 											<input
 												type="text"
 												inputMode="decimal"
-												value={form.dailyBillRate}
+												value={form.hourlyOtBillRate}
 												onChange={(e) =>
 													setForm((current) => ({
 														...current,
-														dailyBillRate: formatCurrencyInput(
+														hourlyOtBillRate: formatCurrencyInput(
 															e.target.value,
 															current.currency || 'USD'
 														)
@@ -1007,6 +988,10 @@ export default function PlacementDetailsPage() {
 												}
 											/>
 										</FormField>
+									</>
+								) : null}
+								{form.compensationType === 'daily' ? (
+									<>
 										<FormField label="Daily Pay Rate" required>
 											<input
 												type="text"
@@ -1016,6 +1001,22 @@ export default function PlacementDetailsPage() {
 													setForm((current) => ({
 														...current,
 														dailyPayRate: formatCurrencyInput(
+															e.target.value,
+															current.currency || 'USD'
+														)
+													}))
+												}
+											/>
+										</FormField>
+										<FormField label="Daily Bill Rate" required>
+											<input
+												type="text"
+												inputMode="decimal"
+												value={form.dailyBillRate}
+												onChange={(e) =>
+													setForm((current) => ({
+														...current,
+														dailyBillRate: formatCurrencyInput(
 															e.target.value,
 															current.currency || 'USD'
 														)
@@ -1098,21 +1099,27 @@ export default function PlacementDetailsPage() {
 					</fieldset>
 
 					<div className="form-actions">
-						<button
-							type="submit"
-							disabled={
-								saveState.saving ||
-								acceptedReadOnly ||
-								!form.candidateId ||
-								!form.jobOrderId ||
-								!form.offeredOn ||
-								!form.expectedJoinDate ||
-								!compensationComplete ||
-								!customFieldsComplete
-							}
-						>
-							{saveState.saving ? 'Saving...' : acceptedReadOnly ? 'Accepted (Read Only)' : 'Save Placement'}
-						</button>
+						{acceptedReadOnly ? (
+							<button type="button" disabled>
+								Accepted
+							</button>
+						) : (
+							<SaveActionButton
+								saving={saveState.saving}
+								disabled={
+									saveState.saving ||
+									acceptedReadOnly ||
+									!form.candidateId ||
+									!form.jobOrderId ||
+									!form.offeredOn ||
+									!form.expectedJoinDate ||
+									!compensationComplete ||
+									!customFieldsComplete
+								}
+								label="Save Placement"
+								savingLabel="Saving Placement..."
+							/>
+						)}
 						<span className="form-actions-meta">
 							<span>Updated:</span>
 							<strong>{formatDate(placement.updatedAt)}</strong>

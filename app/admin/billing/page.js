@@ -188,7 +188,16 @@ export default function AdminBillingPage() {
 									</ul>
 								</div>
 							) : (
-								<p className="panel-subtext">No seat sync events yet.</p>
+								<div className="empty-state-card">
+									<p className="empty-state-title">
+										{summary.eventStoreAvailable === false ? 'Sync history unavailable' : 'No sync history yet'}
+									</p>
+									<p className="panel-subtext">
+										{summary.eventStoreAvailable === false
+											? 'Billing sync history cannot be loaded until the billing event store is available.'
+											: 'No seat sync events have been recorded yet. Run Sync Seats Now to create the first entry.'}
+									</p>
+								</div>
 							)}
 						</article>
 					</>

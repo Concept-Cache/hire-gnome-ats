@@ -188,7 +188,6 @@ export default function ClientPortalModal({ open, onClose, jobOrderId, jobOrderT
 					) : (
 						<>
 							<div className="client-portal-modal-card">
-								<h4>Portal Contact:</h4>
 								<p>
 									<strong>{state.contact?.firstName || ''} {state.contact?.lastName || ''}</strong>
 								</p>

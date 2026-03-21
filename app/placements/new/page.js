@@ -297,19 +297,6 @@ function NewPlacementPageContent() {
 					<div className="form-grid-4">
 						{form.compensationType === 'hourly' ? (
 							<>
-								<FormField label="RT Bill Rate" required>
-									<input
-										type="text"
-										inputMode="decimal"
-										value={form.hourlyRtBillRate}
-										onChange={(e) =>
-											setForm((current) => ({
-												...current,
-												hourlyRtBillRate: formatCurrencyInput(e.target.value)
-											}))
-										}
-									/>
-								</FormField>
 								<FormField label="RT Pay Rate" required>
 									<input
 										type="text"
@@ -323,15 +310,15 @@ function NewPlacementPageContent() {
 										}
 									/>
 								</FormField>
-								<FormField label="OT Bill Rate" required>
+								<FormField label="RT Bill Rate" required>
 									<input
 										type="text"
 										inputMode="decimal"
-										value={form.hourlyOtBillRate}
+										value={form.hourlyRtBillRate}
 										onChange={(e) =>
 											setForm((current) => ({
 												...current,
-												hourlyOtBillRate: formatCurrencyInput(e.target.value)
+												hourlyRtBillRate: formatCurrencyInput(e.target.value)
 											}))
 										}
 									/>
@@ -349,23 +336,23 @@ function NewPlacementPageContent() {
 										}
 									/>
 								</FormField>
-							</>
-						) : null}
-						{form.compensationType === 'daily' ? (
-							<>
-								<FormField label="Daily Bill Rate" required>
+								<FormField label="OT Bill Rate" required>
 									<input
 										type="text"
 										inputMode="decimal"
-										value={form.dailyBillRate}
+										value={form.hourlyOtBillRate}
 										onChange={(e) =>
 											setForm((current) => ({
 												...current,
-												dailyBillRate: formatCurrencyInput(e.target.value)
+												hourlyOtBillRate: formatCurrencyInput(e.target.value)
 											}))
 										}
 									/>
 								</FormField>
+							</>
+						) : null}
+						{form.compensationType === 'daily' ? (
+							<>
 								<FormField label="Daily Pay Rate" required>
 									<input
 										type="text"
@@ -375,6 +362,19 @@ function NewPlacementPageContent() {
 											setForm((current) => ({
 												...current,
 												dailyPayRate: formatCurrencyInput(e.target.value)
+											}))
+										}
+									/>
+								</FormField>
+								<FormField label="Daily Bill Rate" required>
+									<input
+										type="text"
+										inputMode="decimal"
+										value={form.dailyBillRate}
+										onChange={(e) =>
+											setForm((current) => ({
+												...current,
+												dailyBillRate: formatCurrencyInput(e.target.value)
 											}))
 										}
 									/>

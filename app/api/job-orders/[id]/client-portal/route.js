@@ -5,8 +5,10 @@ import { AccessControlError, addScopeToWhere, getActingUser, getEntityScope } fr
 import { logCreate, logUpdate } from '@/lib/audit-log';
 import { sendEmailMessage } from '@/lib/email-delivery';
 import { isValidEmailAddress } from '@/lib/email-validation';
+import { getPublicAppBaseUrl } from '@/lib/site-url';
 import { getSystemBranding, getSystemSettingRecord } from '@/lib/system-settings';
 import { parseJsonBody, parseRouteId, ValidationError } from '@/lib/request-validation';
+import { normalizeThemeKey } from '@/lib/theme-options';
 
 import { withApiLogging } from '@/lib/api-logging';
 
@@ -29,17 +31,120 @@ function escapeHtml(value) {
 		.replace(/'/g, '&#39;');
 }
 
-function buildClientPortalInviteEmail({ siteName, jobOrderTitle, clientName, contactName, portalUrl }) {
+function getClientPortalEmailPalette(themeKey) {
+	switch (normalizeThemeKey(themeKey)) {
+		case 'emerald':
+			return {
+				shellBg: '#eef8f2',
+				cardBg: '#ffffff',
+				cardBorder: '#cfe4d9',
+				headerGradient: 'linear-gradient(135deg,#0f3f30 0%,#1b7455 56%,#28a56c 100%)',
+				headerInk: '#f2fbf6',
+				headerMuted: '#d6f0e3',
+				kickerInk: '#cdefdc',
+				bodyInk: '#184c39',
+				mutedInk: '#4e6f61',
+				linkInk: '#1b7d58',
+				ctaBg: '#188753',
+				ctaInk: '#ffffff',
+				infoBg: '#f2fbf6',
+				infoBorder: '#cfe4d9',
+				infoInk: '#245744'
+			};
+		case 'slate':
+			return {
+				shellBg: '#f1f4f8',
+				cardBg: '#ffffff',
+				cardBorder: '#d4dde8',
+				headerGradient: 'linear-gradient(135deg,#243244 0%,#3a4d66 56%,#536985 100%)',
+				headerInk: '#f4f7fb',
+				headerMuted: '#dbe4f1',
+				kickerInk: '#ccd8e9',
+				bodyInk: '#26384d',
+				mutedInk: '#596b82',
+				linkInk: '#42566f',
+				ctaBg: '#475569',
+				ctaInk: '#ffffff',
+				infoBg: '#f7f9fc',
+				infoBorder: '#d4dde8',
+				infoInk: '#33465d'
+			};
+		case 'sunset':
+			return {
+				shellBg: '#fff4ea',
+				cardBg: '#ffffff',
+				cardBorder: '#f0d1bc',
+				headerGradient: 'linear-gradient(135deg,#6f2d15 0%,#b14c1f 56%,#de7a1e 100%)',
+				headerInk: '#fff7f0',
+				headerMuted: '#ffe6d3',
+				kickerInk: '#ffe2c9',
+				bodyInk: '#6a3a21',
+				mutedInk: '#8a5d44',
+				linkInk: '#b14c1f',
+				ctaBg: '#ea580c',
+				ctaInk: '#ffffff',
+				infoBg: '#fff7f1',
+				infoBorder: '#f0d1bc',
+				infoInk: '#7a4527'
+			};
+		case 'high_contrast':
+			return {
+				shellBg: '#f0f0f0',
+				cardBg: '#ffffff',
+				cardBorder: '#7a7a7a',
+				headerGradient: 'linear-gradient(135deg,#111111 0%,#272727 56%,#3b3b3b 100%)',
+				headerInk: '#ffffff',
+				headerMuted: '#efefef',
+				kickerInk: '#ffffff',
+				bodyInk: '#111111',
+				mutedInk: '#3b3b3b',
+				linkInk: '#0047ff',
+				ctaBg: '#111111',
+				ctaInk: '#ffffff',
+				infoBg: '#f7f7f7',
+				infoBorder: '#7a7a7a',
+				infoInk: '#111111'
+			};
+		case 'classic_blue':
+		default:
+			return {
+				shellBg: '#f4f7fb',
+				cardBg: '#ffffff',
+				cardBorder: '#d6e2f2',
+				headerGradient: 'linear-gradient(135deg,#0b2f5f 0%,#15579d 56%,#1b8f5d 100%)',
+				headerInk: '#f4f9ff',
+				headerMuted: '#dce9ff',
+				kickerInk: '#c6dcfb',
+				bodyInk: '#173153',
+				mutedInk: '#5d769d',
+				linkInk: '#15579d',
+				ctaBg: '#15579d',
+				ctaInk: '#ffffff',
+				infoBg: '#f8fbff',
+				infoBorder: '#d6e2f2',
+				infoInk: '#2d466d'
+			};
+	}
+}
+
+function buildClientPortalInviteEmail({ siteName, logoUrl, themeKey, jobOrderTitle, clientName, contactName, portalUrl }) {
 	const safeSiteName = String(siteName || 'Hire Gnome ATS').trim() || 'Hire Gnome ATS';
 	const safeJobOrderTitle = String(jobOrderTitle || 'Job Order').trim() || 'Job Order';
 	const safeClientName = String(clientName || '').trim();
 	const safeContactName = String(contactName || 'there').trim() || 'there';
 	const safePortalUrl = String(portalUrl || '').trim();
+	const safeLogoUrl = String(logoUrl || '').trim();
+	const palette = getClientPortalEmailPalette(themeKey);
+	const reviewLabel = safeClientName
+		? `${safeJobOrderTitle} at ${safeClientName}`
+		: safeJobOrderTitle;
 	const subject = `${safeSiteName}: Review submitted candidates for ${safeJobOrderTitle}`;
 	const text = [
 		`Hi ${safeContactName},`,
 		'',
-		`You can review submitted candidates for ${safeJobOrderTitle}${safeClientName ? ` at ${safeClientName}` : ''} using the link below:`,
+		`${safeSiteName} shared a client review link for ${reviewLabel}.`,
+		'',
+		'Use this portal to review recruiter-submitted candidates, request interviews, leave comments, or pass on a submission.',
 		'',
 		safePortalUrl,
 		'',
@@ -48,13 +153,50 @@ function buildClientPortalInviteEmail({ siteName, jobOrderTitle, clientName, con
 		`Sent from ${safeSiteName}.`
 	].join('\n');
 	const html = `
-		<p>Hi ${escapeHtml(safeContactName)},</p>
-		<p>
-			You can review submitted candidates for <strong>${escapeHtml(safeJobOrderTitle)}</strong>${safeClientName ? ` at <strong>${escapeHtml(safeClientName)}</strong>` : ''} using the link below:
-		</p>
-		<p><a href="${escapeHtml(safePortalUrl)}">${escapeHtml(safePortalUrl)}</a></p>
-		<p>This link stays valid for the life of the job unless it is explicitly disabled.</p>
-		<p>Sent from ${escapeHtml(safeSiteName)}.</p>
+		<div style="margin:0;padding:24px 0;background:${palette.shellBg};font-family:'Segoe UI',Arial,sans-serif;color:${palette.bodyInk};">
+			<div style="max-width:640px;margin:0 auto;padding:0 16px;">
+				<div style="background:${palette.cardBg};border:1px solid ${palette.cardBorder};border-radius:18px;overflow:hidden;box-shadow:0 18px 38px rgba(16,36,72,0.12);">
+					<div style="padding:28px 32px;background:${palette.headerGradient};color:${palette.headerInk};">
+						${safeLogoUrl ? `<img src="${escapeHtml(safeLogoUrl)}" alt="${escapeHtml(safeSiteName)}" style="display:block;max-height:40px;max-width:180px;margin:0 0 18px;" />` : ''}
+						<p style="margin:0 0 10px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:${palette.kickerInk} !important;-webkit-text-fill-color:${palette.kickerInk};opacity:0.92;">
+							<span style="color:${palette.kickerInk} !important;-webkit-text-fill-color:${palette.kickerInk};">Client Review Portal</span>
+						</p>
+						<p style="margin:0;font-size:28px;font-weight:800;line-height:1.15;color:${palette.headerInk} !important;-webkit-text-fill-color:${palette.headerInk};">
+							<span style="color:${palette.headerInk} !important;-webkit-text-fill-color:${palette.headerInk};">Review submitted candidates for ${escapeHtml(safeJobOrderTitle)}</span>
+						</p>
+						${safeClientName ? `<p style="margin:12px 0 0;font-size:16px;line-height:1.5;color:${palette.headerMuted} !important;-webkit-text-fill-color:${palette.headerMuted};"><span style="color:${palette.headerMuted} !important;-webkit-text-fill-color:${palette.headerMuted};">For ${escapeHtml(safeClientName)}</span></p>` : ''}
+					</div>
+					<div style="padding:28px 32px;">
+						<p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hi ${escapeHtml(safeContactName)},</p>
+						<p style="margin:0 0 16px;font-size:16px;line-height:1.6;">
+							${escapeHtml(safeSiteName)} shared a review link so you can evaluate recruiter-submitted candidates for this role.
+						</p>
+						<div style="margin:0 0 20px;padding:16px 18px;border:1px solid ${palette.infoBorder};border-radius:14px;background:${palette.infoBg};">
+							<div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:${palette.mutedInk};margin-bottom:8px;">What you can do</div>
+							<ul style="margin:0;padding-left:18px;font-size:15px;line-height:1.6;color:${palette.infoInk};">
+								<li>Review the candidates submitted for this job</li>
+								<li>Open the shared resume</li>
+								<li>Request an interview, comment, or pass</li>
+							</ul>
+						</div>
+						<div style="margin:24px 0 22px;">
+							<a href="${escapeHtml(safePortalUrl)}" style="display:inline-block;padding:14px 22px;border-radius:12px;background:${palette.ctaBg};color:${palette.ctaInk};text-decoration:none;font-size:15px;font-weight:700;">
+								Open Client Review Portal
+							</a>
+						</div>
+						<p style="margin:0 0 10px;font-size:14px;line-height:1.6;color:${palette.mutedInk};">
+							If the button above does not work, copy and paste this link into your browser:
+						</p>
+						<p style="margin:0 0 18px;font-size:14px;line-height:1.6;word-break:break-word;">
+							<a href="${escapeHtml(safePortalUrl)}" style="color:${palette.linkInk};text-decoration:underline;">${escapeHtml(safePortalUrl)}</a>
+						</p>
+						<p style="margin:0;font-size:13px;line-height:1.6;color:${palette.mutedInk};">
+							This link stays valid for the life of the job unless it is explicitly disabled.
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
 	`.trim();
 
 	return { subject, text, html };
@@ -274,9 +416,12 @@ async function patchJob_orders_id_client_portalHandler(req, { params }) {
 
 			const accessSummary = buildClientPortalInternalSummary({ req, portalAccess: existing });
 			const branding = await getSystemBranding();
+			const baseUrl = getPublicAppBaseUrl();
 			const contactName = `${existing.contact?.firstName || ''} ${existing.contact?.lastName || ''}`.trim() || 'there';
 			const email = buildClientPortalInviteEmail({
 				siteName: branding.siteName,
+				logoUrl: branding.logoUrl ? `${baseUrl}${branding.logoUrl}` : '',
+				themeKey: branding.themeKey,
 				jobOrderTitle: jobOrder.title,
 				clientName: jobOrder.client?.name || '',
 				contactName,

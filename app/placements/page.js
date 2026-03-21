@@ -29,6 +29,28 @@ function formatCurrency(currency, value) {
 	}
 }
 
+function formatAnnualCurrency(currency, value) {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return '-';
+
+	const currencyCode =
+		typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'USD';
+
+	if (Math.abs(parsed) >= 1000 && Math.abs(parsed) < 1000000) {
+		const thousands = parsed / 1000;
+		const rounded = Number.isInteger(thousands) ? String(thousands) : thousands.toFixed(1).replace(/\.0$/, '');
+		return `${currencyCode === 'USD' ? '$' : `${currencyCode} `}${rounded}k`;
+	}
+
+	if (Math.abs(parsed) >= 1000000) {
+		const millions = parsed / 1000000;
+		const rounded = Number.isInteger(millions) ? String(millions) : millions.toFixed(1).replace(/\.0$/, '');
+		return `${currencyCode === 'USD' ? '$' : `${currencyCode} `}${rounded}m`;
+	}
+
+	return formatCurrency(currencyCode, parsed);
+}
+
 function formatPlacementType(value) {
 	if (value === 'perm') return 'Perm';
 	if (value === 'temp') return 'Temp';
@@ -38,17 +60,29 @@ function formatPlacementType(value) {
 function formatCompensation(row) {
 	if (row.compensationType === 'hourly') {
 		const hourlyPay = row.hourlyRtPayRate ?? row.regularRate ?? row.amount;
-		return `Hourly Pay ${formatCurrency(row.currency, hourlyPay)}`;
+		const hourlyBill = row.hourlyRtBillRate ?? null;
+		if (hourlyPay != null && hourlyBill != null) {
+			return `${formatCurrency(row.currency, hourlyPay)} Pay / ${formatCurrency(row.currency, hourlyBill)} Bill`;
+		}
+		if (hourlyPay != null) return `${formatCurrency(row.currency, hourlyPay)} Pay`;
+		if (hourlyBill != null) return `${formatCurrency(row.currency, hourlyBill)} Bill`;
+		return '-';
 	}
 
 	if (row.compensationType === 'daily') {
 		const dailyPay = row.dailyPayRate ?? row.dailyRate ?? row.amount;
-		return `Daily Pay ${formatCurrency(row.currency, dailyPay)}`;
+		const dailyBill = row.dailyBillRate ?? null;
+		if (dailyPay != null && dailyBill != null) {
+			return `${formatCurrency(row.currency, dailyPay)} Pay / ${formatCurrency(row.currency, dailyBill)} Bill`;
+		}
+		if (dailyPay != null) return `${formatCurrency(row.currency, dailyPay)} Pay`;
+		if (dailyBill != null) return `${formatCurrency(row.currency, dailyBill)} Bill`;
+		return '-';
 	}
 
 	if (row.compensationType === 'salary') {
 		const baseSalary = row.yearlyCompensation ?? row.annualSalary ?? row.amount;
-		return `Base Salary ${formatCurrency(row.currency, baseSalary)}`;
+		return baseSalary == null ? '-' : `${formatAnnualCurrency(row.currency, baseSalary)} Annual`;
 	}
 
 	return row.amount == null ? '-' : formatCurrency(row.currency, row.amount);

@@ -7,6 +7,7 @@ import { ArrowUpRight, BriefcaseBusiness, Copy, LoaderCircle, Lock, MoreVertical
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -789,12 +790,12 @@ export default function SubmissionDetailsPage() {
 					</section>
 
 					<div className="form-actions">
-						<button
-							type="submit"
+						<SaveActionButton
+							saving={saveState.saving}
 							disabled={saveState.saving || isConvertedToPlacement || !customFieldsComplete}
-						>
-							{saveState.saving ? 'Saving...' : 'Save Submission'}
-						</button>
+							label="Save Submission"
+							savingLabel="Saving Submission..."
+						/>
 						<p className="form-actions-meta">
 							<span>Updated:</span>
 							<strong>{formatDate(submission.updatedAt)}</strong>

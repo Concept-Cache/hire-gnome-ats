@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import EmailChipInput from '@/app/components/email-chip-input';
 import LoadingIndicator from '@/app/components/loading-indicator';
+import SaveActionButton from '@/app/components/save-action-button';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
@@ -543,7 +544,7 @@ export default function InterviewDetailsPage() {
 						<strong>
 							{interview.candidate?.id ? (
 								<Link href={`/candidates/${interview.candidate.id}`}>
-									{interview.candidate?.firstName || '-'} {interview.candidate?.lastName || ''}
+									{interview.candidate?.firstName || '-'} {interview.candidate?.lastName || ''} <ArrowUpRight aria-hidden="true" className="snapshot-link-icon" />
 								</Link>
 							) : (
 								`${interview.candidate?.firstName || '-'} ${interview.candidate?.lastName || ''}`
@@ -554,7 +555,7 @@ export default function InterviewDetailsPage() {
 						<span>Client</span>
 						<strong>
 							{interview.jobOrder?.client?.id ? (
-								<Link href={`/clients/${interview.jobOrder.client.id}`}>{interview.jobOrder?.client?.name || '-'}</Link>
+								<Link href={`/clients/${interview.jobOrder.client.id}`}>{interview.jobOrder?.client?.name || '-'} <ArrowUpRight aria-hidden="true" className="snapshot-link-icon" /></Link>
 							) : (
 								interview.jobOrder?.client?.name || '-'
 							)}
@@ -564,7 +565,7 @@ export default function InterviewDetailsPage() {
 						<span>Job Order</span>
 						<strong>
 							{interview.jobOrder?.id ? (
-								<Link href={`/job-orders/${interview.jobOrder.id}`}>{interview.jobOrder?.title || '-'}</Link>
+								<Link href={`/job-orders/${interview.jobOrder.id}`}>{interview.jobOrder?.title || '-'} <ArrowUpRight aria-hidden="true" className="snapshot-link-icon" /></Link>
 							) : (
 								interview.jobOrder?.title || '-'
 							)}
@@ -848,9 +849,12 @@ export default function InterviewDetailsPage() {
 					</section>
 
 					<div className="form-actions">
-						<button type="submit" disabled={saveState.saving || cancelState.canceling || !canSave}>
-							{saveState.saving ? 'Saving...' : 'Save Interview'}
-						</button>
+						<SaveActionButton
+							saving={saveState.saving}
+							disabled={saveState.saving || cancelState.canceling || !canSave}
+							label="Save Interview"
+							savingLabel="Saving Interview..."
+						/>
 						<span className="form-actions-meta">
 							<span>Updated:</span>
 							<strong>{formatDate(interview.updatedAt)}</strong>
