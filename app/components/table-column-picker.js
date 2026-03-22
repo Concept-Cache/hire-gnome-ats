@@ -264,6 +264,7 @@ export default function TableColumnPicker({ tableKey = '', columns = [] }) {
 				title="Columns"
 			>
 				<Columns3 aria-hidden="true" />
+				<span>Columns</span>
 			</button>
 			{menuOpen ? (
 				<div className="table-columns-menu">

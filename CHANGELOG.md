@@ -31,6 +31,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Expanded the list-view column chooser so core module lists expose more hidden-by-default optional columns without changing the default layouts users already know.
 - List-view column preferences now persist per user account instead of only in the browser, so customized column layouts carry across devices.
 - List-view column choosers now support drag-and-drop column ordering, with the custom order saved per user while untouched lists still keep the default order.
+- Added per-user saved views across the main pipeline lists so recruiters can save named filter and column-layout sets, apply them later, and set personal default views across devices; submissions now support explicit origin filtering and job orders can be filtered by client-feedback presence for more useful view definitions.
 - Split production scripts so app-only builds and deploy-time migrate+build runs are explicit, keeping server deploys automatic while preventing CI build jobs from requiring a database.
 
 ## [1.5.0] - 2026-03-17

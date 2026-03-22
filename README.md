@@ -70,6 +70,7 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Global search with cross-entity results
 - In-app notifications, unsaved-change navigation guard, archive/restore flows
 - Per-list column chooser with per-user persisted visibility/order preferences, hidden-by-default optional columns, drag-and-drop ordering, and cross-device continuity
+- Per-list saved views with named filter/column layouts and personal defaults that persist per user across devices
 - Mobile-aware list/detail layouts
 
 ## User Documentation

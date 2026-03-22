@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import KanbanBoard from '@/app/components/kanban-board';
@@ -48,6 +49,7 @@ export default function JobOrdersPage() {
 	const [query, setQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
 	const [clientFilter, setClientFilter] = useState('all');
+	const [feedbackFilter, setFeedbackFilter] = useState('all');
 	const [viewMode, setViewMode] = useState('list');
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
 	const { archivedIdSet } = useArchivedEntities('JOB_ORDER');
@@ -73,9 +75,12 @@ export default function JobOrdersPage() {
 					.includes(q);
 			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
 			const matchesClient = clientFilter === 'all' || row.client === clientFilter;
-			return matchesText && matchesStatus && matchesClient;
+			const matchesFeedback =
+				feedbackFilter === 'all' ||
+				(feedbackFilter === 'with_feedback' ? Number(row.clientFeedbackCount || 0) > 0 : Number(row.clientFeedbackCount || 0) === 0);
+			return matchesText && matchesStatus && matchesClient && matchesFeedback;
 		});
-	}, [activeRows, query, statusFilter, clientFilter]);
+	}, [activeRows, clientFilter, feedbackFilter, query, statusFilter]);
 
 	const kanbanRows = useMemo(() => {
 		return [...filteredRows].sort((a, b) => {
@@ -145,6 +150,15 @@ export default function JobOrdersPage() {
 
 	function onOpen(row) {
 		router.push(`/job-orders/${row.id}`);
+	}
+
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setStatusFilter(String(nextState.statusFilter || 'all'));
+		setClientFilter(String(nextState.clientFilter || 'all'));
+		setFeedbackFilter(String(nextState.feedbackFilter || 'all'));
+		const nextViewMode = String(nextState.viewMode || 'list');
+		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
 	}
 
 	async function onMoveJobOrder(rowId, nextStatus) {
@@ -229,6 +243,7 @@ export default function JobOrdersPage() {
 			key: 'submissionCount',
 			label: 'Submissions'
 		},
+		{ key: 'clientFeedbackCount', label: 'Client Feedback', defaultVisible: false },
 		{ key: 'owner', label: 'Owner' },
 		{ key: 'contact', label: 'Contact', defaultVisible: false },
 		{ key: 'locationLabel', label: 'Location', defaultVisible: false },
@@ -289,7 +304,7 @@ export default function JobOrdersPage() {
 						</button>
 					</div>
 				</div>
-				<div className={`list-controls list-controls-three${viewMode === 'list' ? ' list-controls-with-columns' : ''}`}>
+				<div className={`list-controls list-controls-four${viewMode === 'list' ? ' list-controls-with-columns' : ''}`}>
 					<input
 						placeholder="Search title, client, contact, location, status"
 						value={query}
@@ -311,7 +326,29 @@ export default function JobOrdersPage() {
 							</option>
 						))}
 					</select>
-					{viewMode === 'list' ? <TableColumnPicker tableKey="job-orders" columns={columns} /> : null}
+					<select value={feedbackFilter} onChange={(e) => setFeedbackFilter(e.target.value)}>
+						<option value="all">All Feedback</option>
+						<option value="with_feedback">With Client Feedback</option>
+						<option value="no_feedback">No Client Feedback</option>
+					</select>
+					{viewMode === 'list' ? (
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="job-orders"
+								columns={columns}
+								defaultState={{
+									query: '',
+									statusFilter: 'all',
+									clientFilter: 'all',
+									feedbackFilter: 'all',
+									viewMode: 'list'
+								}}
+								currentState={{ query, statusFilter, clientFilter, feedbackFilter, viewMode }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="job-orders" columns={columns} />
+						</div>
+					) : null}
 				</div>
 				{viewMode === 'list' ? (
 					<EntityTable

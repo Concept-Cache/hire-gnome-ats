@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
@@ -92,6 +93,12 @@ export default function ContactsPage() {
 		router.push(`/contacts/${row.id}`);
 	}
 
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setClientFilter(String(nextState.clientFilter || 'all'));
+		setOwnerFilter(String(nextState.ownerFilter || 'all'));
+	}
+
 	const columns = [
 		{ key: 'fullName', label: 'Name' },
 		{ key: 'title', label: 'Title' },
@@ -159,7 +166,16 @@ export default function ContactsPage() {
 							</option>
 							))}
 						</select>
-						<TableColumnPicker tableKey="contacts" columns={columns} />
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="contacts"
+								columns={columns}
+								defaultState={{ query: '', clientFilter: 'all', ownerFilter: 'all' }}
+								currentState={{ query, clientFilter, ownerFilter }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="contacts" columns={columns} />
+						</div>
 					</div>
 					<EntityTable
 						tableKey="contacts"

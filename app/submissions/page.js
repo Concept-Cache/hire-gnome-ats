@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
@@ -24,6 +25,7 @@ export default function SubmissionsPage() {
 	const [query, setQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
 	const [submitterFilter, setSubmitterFilter] = useState('all');
+	const [originFilter, setOriginFilter] = useState('all');
 	const { archivedIdSet } = useArchivedEntities('SUBMISSION');
 
 	const activeRows = useMemo(
@@ -56,9 +58,10 @@ export default function SubmissionsPage() {
 					.includes(q);
 			const matchesStatus = statusFilter === 'all' || row.effectiveStatus === statusFilter;
 			const matchesSubmitter = submitterFilter === 'all' || row.submittedBy === submitterFilter;
-			return matchesQuery && matchesStatus && matchesSubmitter;
+			const matchesOrigin = originFilter === 'all' || String(row.originLabel || '').toLowerCase() === originFilter;
+			return matchesQuery && matchesStatus && matchesSubmitter && matchesOrigin;
 		});
-	}, [activeRows, query, statusFilter, submitterFilter]);
+	}, [activeRows, originFilter, query, statusFilter, submitterFilter]);
 
 	async function load() {
 		setLoading(true);
@@ -98,6 +101,13 @@ export default function SubmissionsPage() {
 
 	function onOpen(row) {
 		router.push(`/submissions/${row.id}`);
+	}
+
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setStatusFilter(String(nextState.statusFilter || 'all'));
+		setSubmitterFilter(String(nextState.submitterFilter || 'all'));
+		setOriginFilter(String(nextState.originFilter || 'all'));
 	}
 
 	const columns = [
@@ -184,7 +194,7 @@ export default function SubmissionsPage() {
 
 			<article className="panel">
 				<h3>Submission List</h3>
-					<div className="list-controls list-controls-three list-controls-with-columns">
+					<div className="list-controls list-controls-four list-controls-with-columns">
 					<input
 						placeholder="Search candidate, job order, client, status, origin, submitter"
 						value={query}
@@ -206,7 +216,21 @@ export default function SubmissionsPage() {
 							</option>
 							))}
 						</select>
-						<TableColumnPicker tableKey="submissions" columns={columns} />
+						<select value={originFilter} onChange={(e) => setOriginFilter(e.target.value)}>
+							<option value="all">All Origins</option>
+							<option value="recruiter">Recruiter</option>
+							<option value="web">Web</option>
+						</select>
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="submissions"
+								columns={columns}
+								defaultState={{ query: '', statusFilter: 'all', submitterFilter: 'all', originFilter: 'all' }}
+								currentState={{ query, statusFilter, submitterFilter, originFilter }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="submissions" columns={columns} />
+						</div>
 					</div>
 					<EntityTable
 						tableKey="submissions"
