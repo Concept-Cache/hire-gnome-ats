@@ -135,6 +135,13 @@ export default function CandidatesPage() {
 			const data = await res.json();
 			setRows(
 				data.map((candidate) => {
+					const structuredSkillNames = Array.isArray(candidate.candidateSkills)
+						? candidate.candidateSkills
+								.map((candidateSkill) => candidateSkill?.skill?.name)
+								.filter(Boolean)
+						: [];
+					const freeformSkillSet = String(candidate.skillSet || '').trim();
+					const skillsLabel = [...new Set([...structuredSkillNames, ...(freeformSkillSet ? [freeformSkillSet] : [])])].join(' • ');
 					const lastActivityAt = candidate.lastActivityAt || candidate.updatedAt || candidate.createdAt || null;
 					const completeness = getCandidateCompleteness({
 						candidate,
@@ -175,6 +182,7 @@ export default function CandidatesPage() {
 						emailLabel: candidate.email || '-',
 						mobileLabel: candidate.mobile || candidate.phone || '-',
 						sourceLabel: candidate.source || '-',
+						skillsLabel,
 						locationLabel: formatLocation(candidate.city, candidate.state),
 						divisionName: candidate.division?.name || '-',
 						lastActivityAt,

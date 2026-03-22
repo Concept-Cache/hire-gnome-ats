@@ -38,6 +38,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Split production scripts so app-only builds and deploy-time migrate+build runs are explicit, keeping server deploys automatic while preventing CI build jobs from requiring a database.
 - Added a real advanced-search builder to the job-order list so recruiters can combine structured criteria like date ranges, submissions thresholds, owner/client filters, and career-site state without overloading the global search bar.
 - Applied the same advanced-search pattern to the candidates list so recruiters can combine structured filters like owner, source, completeness, counts, and last-activity dates while keeping the basic search box simple.
+- Candidate advanced search now includes a real `Skills` filter that matches structured candidate skills and the freeform skill-set field.
 - Applied the same advanced-search pattern to the clients list so recruiters can combine structured filters like owner, status, note counts, job-order counts, and last-activity dates while keeping the basic search box simple.
 - Applied the same advanced-search pattern to the contacts list so recruiters can combine structured filters like client, owner, status, note counts, job-order counts, and last-activity dates while keeping the basic search box simple.
 - Applied the same advanced-search pattern to the submissions, interviews, and placements lists so recruiters can build structured list filters there as well, while keeping the basic search box simple.
