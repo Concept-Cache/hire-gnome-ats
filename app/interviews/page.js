@@ -18,6 +18,7 @@ import {
 	summarizeInterviewAdvancedCriterion
 } from '@/lib/interview-advanced-search';
 import { normalizeInterviewType } from '@/app/constants/interview-type-options';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 function formatDateTime(value) {
 	return formatDateTimeAt(value);
@@ -30,6 +31,7 @@ export default function InterviewsPage() {
 	const [query, setQuery] = useState('');
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const { archivedIdSet } = useArchivedEntities('INTERVIEW');
 
 	const activeRows = useMemo(
@@ -123,6 +125,7 @@ export default function InterviewsPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeInterviewAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 	}
 
 	function removeAdvancedCriterion(indexToRemove) {
@@ -167,6 +170,8 @@ export default function InterviewsPage() {
 		{ key: 'interviewerLabel', label: 'Interviewer', defaultVisible: false },
 		{ key: 'locationLabel', label: 'Location', defaultVisible: false }
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -236,8 +241,8 @@ export default function InterviewsPage() {
 							<SavedListViews
 								listKey="interviews"
 								columns={columns}
-								defaultState={{ query: '', advancedCriteria: [] }}
-								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
+								defaultState={{ query: '', advancedCriteria: [], sortState: defaultSortState }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, sortState: effectiveSortState }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="interviews" columns={columns} />
@@ -249,6 +254,8 @@ export default function InterviewsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading interviews"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>

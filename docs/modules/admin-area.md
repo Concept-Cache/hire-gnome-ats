@@ -33,6 +33,7 @@ When demo mode is enabled:
 - integrations, SMTP/email delivery, and object storage stay read-only
 
 Layout:
+- `Branding`, `Platform Settings`, and `Diagnostics` are split into separate tabs to reduce crowding
 - `Branding` uses its own save action
 - `Platform Settings` groups integrations, email delivery, and object storage under a separate save action
 

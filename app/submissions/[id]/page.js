@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowUpRight, BriefcaseBusiness, Copy, LoaderCircle, Lock, MoreVertical, Sparkles, UserRound } from 'lucide-react';
 import FormField from '@/app/components/form-field';
@@ -9,6 +9,7 @@ import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/comp
 import LoadingIndicator from '@/app/components/loading-indicator';
 import SaveActionButton from '@/app/components/save-action-button';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import ActivityTimeline from '@/app/components/activity-timeline';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
@@ -23,6 +24,7 @@ import {
 import { formatDateTimeAt } from '@/lib/date-format';
 import { submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus, isSubmissionPlacementLocked } from '@/lib/submission-status';
+import { buildSubmissionTimeline } from '@/lib/activity-timeline';
 
 const initialForm = {
 	candidateId: '',
@@ -81,6 +83,7 @@ export default function SubmissionDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
 	const actionsMenuRef = useRef(null);
+	const detailsPanelRef = useRef(null);
 	const [submission, setSubmission] = useState(null);
 	const [aiAvailable, setAiAvailable] = useState(false);
 	const [clientPortalEnabled, setClientPortalEnabled] = useState(true);
@@ -92,6 +95,8 @@ export default function SubmissionDetailsPage() {
 	const [writeUpState, setWriteUpState] = useState({ generating: false, error: '' });
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
+	const [workspaceTab, setWorkspaceTab] = useState('timeline');
+	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
@@ -105,6 +110,9 @@ export default function SubmissionDetailsPage() {
 		customFieldDefinitions,
 		form.customFields
 	);
+	const submissionTimelineItems = useMemo(() => buildSubmissionTimeline(submission), [submission]);
+	const workspacePanelStyle =
+		detailsPanelHeight > 0 ? { height: `${detailsPanelHeight}px`, maxHeight: `${detailsPanelHeight}px` } : undefined;
 
 	async function load() {
 		setLoading(true);
@@ -160,6 +168,20 @@ export default function SubmissionDetailsPage() {
 			document.removeEventListener('keydown', onKeyDown);
 		};
 	}, []);
+
+	useEffect(() => {
+		const panel = detailsPanelRef.current;
+		if (!panel || typeof ResizeObserver === 'undefined') return;
+
+		const updateHeight = () => {
+			setDetailsPanelHeight(panel.getBoundingClientRect().height);
+		};
+		updateHeight();
+
+		const observer = new ResizeObserver(updateHeight);
+		observer.observe(panel);
+		return () => observer.disconnect();
+	}, [submission, form, saveState.saving, writeUpState.generating, workspaceTab, clientPortalEnabled]);
 
 	useEffect(() => {
 		if (saveState.error) {
@@ -605,50 +627,8 @@ export default function SubmissionDetailsPage() {
 					</p>
 				</div>
 			</article>
-
-			{clientPortalEnabled ? (
-			<article className="panel">
-				<h3>Client Feedback</h3>
-				<p className="panel-subtext">Responses submitted through the client review portal appear here.</p>
-				{Array.isArray(submission.clientFeedback) && submission.clientFeedback.length > 0 ? (
-					<ul className="simple-list">
-						{submission.clientFeedback.map((entry) => (
-							<li key={entry.id}>
-								<div>
-									<strong>{formatClientFeedbackLabel(entry.actionType)}</strong>
-									{entry.statusApplied ? (
-										<p>Status Applied: {formatSubmissionStatusLabel(entry.statusApplied)}</p>
-									) : null}
-									{hasAnyClientFeedbackScorecard(entry) ? (
-										<div className="client-feedback-scorecard">
-											{CLIENT_FEEDBACK_SCORECARD_FIELDS.map((field) => {
-												const scorecard = parseClientFeedbackScorecard(entry);
-												return scorecard[field.key] ? (
-													<p key={field.key}>
-														<span>{field.label}</span>
-														<strong>{formatClientFeedbackScore(scorecard[field.key], field.key)}</strong>
-													</p>
-												) : null;
-											})}
-										</div>
-									) : null}
-									{entry.comment ? <p>{entry.comment}</p> : null}
-									<p className="simple-list-meta">
-										By {entry.clientNameSnapshot || 'Client Contact'}
-										{entry.clientEmailSnapshot ? ` <${entry.clientEmailSnapshot}>` : ''}
-										{' '}@ <span className="meta-emphasis-time">{formatDate(entry.createdAt)}</span>
-									</p>
-								</div>
-							</li>
-						))}
-					</ul>
-				) : (
-					<p className="panel-subtext">No client feedback yet.</p>
-				)}
-			</article>
-			) : null}
-
-			<article className="panel panel-spacious">
+			<div className="detail-layout">
+			<article className="panel panel-spacious" ref={detailsPanelRef}>
 				<h3>Submission Details</h3>
 				<p className="panel-subtext">Edit submission details and save updates.</p>
 				{isConvertedToPlacement ? (
@@ -657,7 +637,7 @@ export default function SubmissionDetailsPage() {
 				<form onSubmit={onSave} className="detail-form">
 					<section className="form-section">
 						<h4>Assignment</h4>
-						<div className="detail-form-grid-5">
+						<div className="detail-form-grid-3">
 							<FormField label="Candidate" required>
 								<div className="locked-field">
 									<input
@@ -822,6 +802,90 @@ export default function SubmissionDetailsPage() {
 					</div>
 				</form>
 			</article>
+			<article className="panel workspace-panel workspace-panel-lock-height" style={workspacePanelStyle}>
+				<h3>Submission Workspace</h3>
+				<div
+					className={clientPortalEnabled ? 'side-tabs side-tabs-two side-tabs-warm side-tabs-counted' : 'side-tabs side-tabs-two side-tabs-warm'}
+					role="tablist"
+					aria-label="Submission workspace tabs"
+				>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={workspaceTab === 'timeline'}
+						className={workspaceTab === 'timeline' ? 'side-tab active' : 'side-tab'}
+						onClick={() => setWorkspaceTab('timeline')}
+					>
+						<span>Timeline</span>
+						{clientPortalEnabled ? (
+							<span className="side-tab-count" aria-hidden="true">{submissionTimelineItems.length}</span>
+						) : null}
+					</button>
+					{clientPortalEnabled ? (
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'client-feedback'}
+							className={workspaceTab === 'client-feedback' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('client-feedback')}
+						>
+							<span>Client Feedback</span>
+							<span className="side-tab-count" aria-hidden="true">{submission.clientFeedback?.length ?? 0}</span>
+						</button>
+					) : null}
+				</div>
+				{workspaceTab === 'timeline' ? (
+					<div className="side-tab-content side-tab-content-scroll">
+						<p className="panel-subtext">Unified submission activity across recruiter actions, client feedback, write-up generation, and placement conversion.</p>
+						<div className="workspace-scroll-area">
+							<ActivityTimeline items={submissionTimelineItems} emptyText="No submission timeline events yet." />
+						</div>
+					</div>
+				) : null}
+				{clientPortalEnabled && workspaceTab === 'client-feedback' ? (
+					<div className="side-tab-content side-tab-content-scroll">
+						<p className="panel-subtext">Responses submitted through the client review portal appear here.</p>
+						<div className="workspace-scroll-area">
+							{Array.isArray(submission.clientFeedback) && submission.clientFeedback.length > 0 ? (
+								<ul className="simple-list">
+									{submission.clientFeedback.map((entry) => (
+										<li key={entry.id}>
+											<div>
+												<strong>{formatClientFeedbackLabel(entry.actionType)}</strong>
+												{entry.statusApplied ? (
+													<p>Status Applied: {formatSubmissionStatusLabel(entry.statusApplied)}</p>
+												) : null}
+												{hasAnyClientFeedbackScorecard(entry) ? (
+													<div className="client-feedback-scorecard">
+														{CLIENT_FEEDBACK_SCORECARD_FIELDS.map((field) => {
+															const scorecard = parseClientFeedbackScorecard(entry);
+															return scorecard[field.key] ? (
+																<p key={field.key}>
+																	<span>{field.label}</span>
+																	<strong>{formatClientFeedbackScore(scorecard[field.key], field.key)}</strong>
+																</p>
+															) : null;
+														})}
+													</div>
+												) : null}
+												{entry.comment ? <p>{entry.comment}</p> : null}
+												<p className="simple-list-meta">
+													By {entry.clientNameSnapshot || 'Client Contact'}
+													{entry.clientEmailSnapshot ? ` <${entry.clientEmailSnapshot}>` : ''}
+													{' '}@ <span className="meta-emphasis-time">{formatDate(entry.createdAt)}</span>
+												</p>
+											</div>
+										</li>
+									))}
+								</ul>
+							) : (
+								<p className="panel-subtext">No client feedback yet.</p>
+							)}
+						</div>
+					</div>
+				) : null}
+			</article>
+			</div>
 			{isAdmin ? <AuditTrailPanel entityType="SUBMISSION" entityId={id} visible={showAuditTrail} /> : null}
 		</section>
 	);

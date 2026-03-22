@@ -19,6 +19,7 @@ import {
 } from '@/lib/submission-advanced-search';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 function formatDate(value) {
 	return formatDateTimeAt(value);
@@ -31,6 +32,7 @@ export default function SubmissionsPage() {
 	const [query, setQuery] = useState('');
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const { archivedIdSet } = useArchivedEntities('SUBMISSION');
 
 	const activeRows = useMemo(
@@ -122,6 +124,7 @@ export default function SubmissionsPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeSubmissionAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 	}
 
 	function removeAdvancedCriterion(indexToRemove) {
@@ -191,6 +194,8 @@ export default function SubmissionsPage() {
 		},
 		{ key: 'recordId', label: 'Record ID', defaultVisible: false }
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -260,8 +265,8 @@ export default function SubmissionsPage() {
 							<SavedListViews
 								listKey="submissions"
 								columns={columns}
-								defaultState={{ query: '', advancedCriteria: [] }}
-								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
+								defaultState={{ query: '', advancedCriteria: [], sortState: defaultSortState }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, sortState: effectiveSortState }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="submissions" columns={columns} />
@@ -273,6 +278,8 @@ export default function SubmissionsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading submissions"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>

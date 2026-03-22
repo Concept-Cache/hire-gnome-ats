@@ -86,6 +86,54 @@ function daysFromToday(offset, hour = 10) {
 	return d;
 }
 
+function addHours(date, hours) {
+	return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function addMinutes(date, minutes) {
+	return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function irregularPastOffset(index, windowSize, salt = 0) {
+	const bucketCount = Math.max(1, Number(windowSize) || 1);
+	const multipliers = [3, 5, 9, 11, 13];
+	const multiplier = multipliers[Math.abs(Number(salt) || 0) % multipliers.length];
+	return ((index * multiplier) + Math.floor(index / 2) + salt) % bucketCount;
+}
+
+function buildSeedTimestamp(index, {
+	windowSize = 14,
+	salt = 0,
+	baseHour = 9,
+	hourSpan = 8,
+	minuteStep = 7
+} = {}) {
+	const offset = irregularPastOffset(index, windowSize, salt);
+	const hour = baseHour + ((index * 3 + salt) % Math.max(1, hourSpan));
+	const minute = ((index * minuteStep) + salt * 13) % 60;
+	const d = new Date();
+	d.setHours(hour, minute, 0, 0);
+	d.setDate(d.getDate() - offset);
+	return d;
+}
+
+function latestDate(...values) {
+	return values
+		.map((value) => (value instanceof Date ? value : value ? new Date(value) : null))
+		.filter((value) => value && !Number.isNaN(value.getTime()))
+		.reduce((latest, value) => (!latest || value > latest ? value : latest), null);
+}
+
+function ensureNotBefore(value, floor, minuteOffset = 5) {
+	const target = value instanceof Date ? value : new Date(value);
+	const minimum = floor instanceof Date ? floor : floor ? new Date(floor) : null;
+	if (!minimum || Number.isNaN(minimum.getTime())) return target;
+	if (!target || Number.isNaN(target.getTime()) || target < minimum) {
+		return addMinutes(minimum, minuteOffset);
+	}
+	return target;
+}
+
 function cleanStorageSegment(value) {
 	return String(value || '')
 		.trim()
@@ -587,6 +635,14 @@ async function main() {
 			const division = divisions[i % divisions.length];
 			const divisionUsers = usersByDivision.get(division.id);
 			const owner = divisionUsers[(i + 1) % divisionUsers.length];
+			const createdAt = buildSeedTimestamp(i, {
+				windowSize: 14,
+				salt: 3,
+				baseHour: 8,
+				hourSpan: 9,
+				minuteStep: 11
+			});
+			const updatedAt = addHours(createdAt, 4 + ((i * 5) % 36));
 			const profileVariant = buildCandidateProfileVariant(i);
 			const candidateSeed = {
 				firstName: `Candidate${i + 1}`,
@@ -605,7 +661,7 @@ async function main() {
 			const [result] = await connection.query(
 				`INSERT INTO \`Candidate\`
 				(\`firstName\`, \`lastName\`, \`email\`, \`phone\`, \`mobile\`, \`status\`, \`source\`, \`ownerId\`, \`divisionId\`, \`currentJobTitle\`, \`currentEmployer\`, \`city\`, \`state\`, \`zipCode\`, \`website\`, \`linkedinUrl\`, \`summary\`, \`createdAt\`, \`updatedAt\`)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				[
 					candidateSeed.firstName,
 					candidateSeed.lastName,
@@ -623,11 +679,13 @@ async function main() {
 					i % 2 === 0 ? '78701' : '80202',
 					profileVariant.includeWebsite ? `https://candidate${i + 1}.portfolio.example` : null,
 					profileVariant.includeLinkedin ? `https://linkedin.com/in/candidate-demo-${i + 1}` : null,
-					candidateSeed.summary
+					candidateSeed.summary,
+					createdAt,
+					updatedAt
 				]
 			);
 			const candidateId = result.insertId;
-			candidates.push({ id: candidateId, divisionId: division.id });
+			candidates.push({ id: candidateId, divisionId: division.id, createdAt });
 
 			for (const skill of [skills[i % skills.length], skills[(i + 3) % skills.length], skills[(i + 5) % skills.length], skills[(i + 7) % skills.length]].slice(0, profileVariant.skillCount)) {
 				await connection.query(
@@ -681,12 +739,12 @@ async function main() {
 			}
 
 			await connection.query(
-				'INSERT INTO `CandidateNote` (`content`, `candidateId`, `createdByUserId`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, NOW(), NOW())',
-				['Intro call completed. Ready for submission.', candidateId, owner.id]
+				'INSERT INTO `CandidateNote` (`content`, `candidateId`, `createdByUserId`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?)',
+				['Intro call completed. Ready for submission.', candidateId, owner.id, addHours(createdAt, 3), addHours(createdAt, 3)]
 			);
 			await connection.query(
-				'INSERT INTO `CandidateActivity` (`type`, `subject`, `description`, `dueAt`, `status`, `candidateId`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
-				['call', 'Screening Call', 'Initial screening completed.', daysFromToday((i % 6) + 1), 'open', candidateId]
+				'INSERT INTO `CandidateActivity` (`type`, `subject`, `description`, `dueAt`, `status`, `candidateId`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+				['call', 'Screening Call', 'Initial screening completed.', daysFromToday((i % 6) + 1), 'open', candidateId, addHours(createdAt, 4), addHours(createdAt, 4)]
 			);
 
 			if (profileVariant.includeResume) {
@@ -700,8 +758,8 @@ async function main() {
 				await connection.query(
 					`INSERT INTO \`CandidateAttachment\`
 					(\`fileName\`, \`isResume\`, \`contentType\`, \`sizeBytes\`, \`storageProvider\`, \`storageBucket\`, \`storageKey\`, \`candidateId\`, \`uploadedByUserId\`, \`createdAt\`, \`updatedAt\`)
-					VALUES (?, 1, 'application/pdf', ?, 'local', 'local', ?, ?, ?, NOW(), NOW())`,
-					[resumeFileName, resumeBuffer.length, resumeStorageKey, candidateId, owner.id]
+					VALUES (?, 1, 'application/pdf', ?, 'local', 'local', ?, ?, ?, ?, ?)`,
+					[resumeFileName, resumeBuffer.length, resumeStorageKey, candidateId, owner.id, addMinutes(createdAt, 25), addMinutes(createdAt, 25)]
 				);
 				candidateAttachmentCount += 1;
 			}
@@ -721,10 +779,20 @@ async function main() {
 			const salaryMax = 120000 + i * 2500;
 			const publishToCareerSite = i % 2 === 0 ? 1 : 0;
 			const location = `${market.city}, ${market.state}`;
+			const openedAt = buildSeedTimestamp(i, {
+				windowSize: 16,
+				salt: 7,
+				baseHour: 8,
+				hourSpan: 8,
+				minuteStep: 9
+			});
+			const createdAt = addHours(openedAt, -(6 + (i % 18)));
+			const updatedAt = addHours(openedAt, 6 + ((i * 3) % 48));
+			const publishedAt = publishToCareerSite ? addHours(openedAt, 2 + (i % 5)) : null;
 			const [result] = await connection.query(
 				`INSERT INTO \`JobOrder\`
 				(\`title\`, \`description\`, \`publicDescription\`, \`location\`, \`city\`, \`state\`, \`zipCode\`, \`status\`, \`employmentType\`, \`openings\`, \`salaryMin\`, \`salaryMax\`, \`publishToCareerSite\`, \`publishedAt\`, \`ownerId\`, \`divisionId\`, \`clientId\`, \`contactId\`, \`openedAt\`, \`createdAt\`, \`updatedAt\`)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				[
 					baseTitle,
 					`Internal details for ${baseTitle} supporting ${client.name}. Prioritize candidates with strong communication, dependable execution, and relevant domain exposure.`,
@@ -749,18 +817,22 @@ async function main() {
 					salaryMin,
 					salaryMax,
 					publishToCareerSite,
-					publishToCareerSite ? daysFromToday(-1) : null,
+					publishedAt,
 					owner.id,
 					client.divisionId,
 					client.id,
-					contact?.id || null
+					contact?.id || null,
+					openedAt,
+					createdAt,
+					updatedAt
 				]
 			);
 			jobOrders.push({
 				id: result.insertId,
 				divisionId: client.divisionId,
 				ownerId: owner.id,
-				contactId: contact?.id || null
+				contactId: contact?.id || null,
+				openedAt
 			});
 		}
 
@@ -786,11 +858,24 @@ async function main() {
 
 			for (let j = 0; j < picks.length; j += 1) {
 				const candidate = picks[j];
+				const rawSubmissionCreatedAt = buildSeedTimestamp((i * 5) + (j * 11), {
+					windowSize: 14,
+					salt: 17,
+					baseHour: 8,
+					hourSpan: 9,
+					minuteStep: 5
+				});
+				const submissionCreatedAt = ensureNotBefore(
+					rawSubmissionCreatedAt,
+					latestDate(addHours(candidate.createdAt, 2), addHours(job.openedAt, 3)),
+					15
+				);
+				const submissionUpdatedAt = addHours(submissionCreatedAt, 2 + ((i + j) % 30));
 				const [submissionResult] = await connection.query(
 					`INSERT INTO \`Submission\`
 					(\`submissionPriority\`, \`status\`, \`isClientVisible\`, \`notes\`, \`createdByUserId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
-					VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-					[j + 1, pick(SUBMISSION_STATUSES, i + j), true, 'Demo submission.', creator.id, candidate.id, job.id]
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					[j + 1, pick(SUBMISSION_STATUSES, i + j), true, 'Demo submission.', creator.id, candidate.id, job.id, submissionCreatedAt, submissionUpdatedAt]
 				);
 				const submissionId = submissionResult.insertId;
 				submissionCount += 1;
@@ -801,12 +886,24 @@ async function main() {
 				});
 
 				if ((i + j) % 2 === 0) {
-					const startsAt = daysFromToday((i + j) % 8, 9);
+					const interviewCreatedAt = ensureNotBefore(
+						buildSeedTimestamp((i * 7) + (j * 13), {
+							windowSize: 14,
+							salt: 23,
+							baseHour: 8,
+							hourSpan: 8,
+							minuteStep: 17
+						}),
+						addHours(submissionCreatedAt, 12),
+						30
+					);
+					const startsAt = addHours(interviewCreatedAt, 18 + ((i + j) % 48));
 					const endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
+					const interviewUpdatedAt = addHours(interviewCreatedAt, 1 + ((i + j) % 10));
 					await connection.query(
 						`INSERT INTO \`Interview\`
 						(\`interviewMode\`, \`status\`, \`subject\`, \`interviewer\`, \`interviewerEmail\`, \`startsAt\`, \`endsAt\`, \`location\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
-						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 						[
 							pick(INTERVIEW_TYPES, i + j),
 							pick(INTERVIEW_STATUSES, i + j),
@@ -817,7 +914,9 @@ async function main() {
 							endsAt,
 							(i + j) % 3 === 0 ? 'Video' : 'Client HQ',
 							candidate.id,
-							job.id
+							job.id,
+							interviewCreatedAt,
+							interviewUpdatedAt
 						]
 					);
 					interviewCount += 1;
@@ -825,10 +924,22 @@ async function main() {
 
 				if ((i + j) % 3 === 0) {
 					const isTemp = (i + j) % 2 === 0;
+					const placementCreatedAt = ensureNotBefore(
+						buildSeedTimestamp((i * 9) + (j * 5), {
+							windowSize: 14,
+							salt: 31,
+							baseHour: 9,
+							hourSpan: 7,
+							minuteStep: 19
+						}),
+						addHours(submissionCreatedAt, 24),
+						45
+					);
+					const placementUpdatedAt = addHours(placementCreatedAt, 8 + ((i + j) % 24));
 					await connection.query(
 						`INSERT INTO \`Offer\`
 						(\`status\`, \`version\`, \`placementType\`, \`compensationType\`, \`currency\`, \`hourlyRtBillRate\`, \`hourlyRtPayRate\`, \`hourlyOtBillRate\`, \`hourlyOtPayRate\`, \`yearlyCompensation\`, \`offeredOn\`, \`expectedJoinDate\`, \`notes\`, \`submissionId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
-						VALUES (?, 1, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+						VALUES (?, 1, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 						[
 							'accepted',
 							isTemp ? 'temp' : 'perm',
@@ -838,12 +949,14 @@ async function main() {
 							isTemp ? 125 : null,
 							isTemp ? 95 : null,
 							isTemp ? null : 145000,
-							daysFromToday(-2),
+							addHours(placementCreatedAt, 4 + ((i + j) % 12)),
 							daysFromToday(14),
 							'Demo placement from submission.',
 							submissionId,
 							candidate.id,
-							job.id
+							job.id,
+							placementCreatedAt,
+							placementUpdatedAt
 						]
 					);
 					await connection.query(

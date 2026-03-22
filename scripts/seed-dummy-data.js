@@ -434,6 +434,23 @@ function addMinutes(date, minutes) {
 	return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
+function latestDate(...values) {
+	return values
+		.map((value) => (value instanceof Date ? value : value ? new Date(value) : null))
+		.filter((value) => value && !Number.isNaN(value.getTime()))
+		.reduce((latest, value) => (!latest || value > latest ? value : latest), null);
+}
+
+function ensureNotBefore(value, floor, minuteOffset = 5) {
+	const target = value instanceof Date ? value : new Date(value);
+	const minimum = floor instanceof Date ? floor : floor ? new Date(floor) : null;
+	if (!minimum || Number.isNaN(minimum.getTime())) return target;
+	if (!target || Number.isNaN(target.getTime()) || target < minimum) {
+		return addMinutes(minimum, minuteOffset);
+	}
+	return target;
+}
+
 function cleanStorageSegment(value) {
 	return String(value || '')
 		.trim()
@@ -1217,6 +1234,7 @@ async function main() {
 			hourSpan: 8,
 			minuteStep: 9
 		});
+		const createdAt = addHours(openedAt, -(6 + (i % 18)));
 		const publishedAt = publishToCareerSite ? addHours(openedAt, 2 + (i % 5)) : null;
 		const updatedAt = addHours(openedAt, 6 + ((i * 3) % 48));
 
@@ -1247,6 +1265,7 @@ async function main() {
 				publishToCareerSite,
 				publishedAt,
 				openedAt,
+				createdAt,
 				ownerId: owner?.id ?? null,
 				divisionId: client.divisionId,
 				clientId: client.id,
@@ -1280,13 +1299,18 @@ async function main() {
 
 		for (let j = 0; j < candidatesForJob.length; j += 1) {
 			const candidate = candidatesForJob[j];
-			const submissionCreatedAt = buildSeedTimestamp((i * 5) + (j * 11), {
+			const rawSubmissionCreatedAt = buildSeedTimestamp((i * 5) + (j * 11), {
 				windowSize: 14,
 				salt: 17,
 				baseHour: 8,
 				hourSpan: 9,
 				minuteStep: 5
 			});
+			const submissionCreatedAt = ensureNotBefore(
+				rawSubmissionCreatedAt,
+				latestDate(addHours(candidate.createdAt, 2), addHours(jobOrder.openedAt, 3)),
+				15
+			);
 			const submissionUpdatedAt = addHours(submissionCreatedAt, 2 + ((i + j) % 30));
 				const submission = await prisma.submission.create({
 					data: {
@@ -1312,13 +1336,18 @@ async function main() {
 			});
 
 			if ((i + j) % 2 === 0) {
-				const interviewCreatedAt = buildSeedTimestamp((i * 7) + (j * 13), {
+				const rawInterviewCreatedAt = buildSeedTimestamp((i * 7) + (j * 13), {
 					windowSize: 14,
 					salt: 23,
 					baseHour: 8,
 					hourSpan: 8,
 					minuteStep: 17
 				});
+				const interviewCreatedAt = ensureNotBefore(
+					rawInterviewCreatedAt,
+					addHours(submissionCreatedAt, 12),
+					30
+				);
 				const startsAt = addHours(interviewCreatedAt, 18 + ((i + j) % 48));
 				const interviewUpdatedAt = addHours(interviewCreatedAt, 1 + ((i + j) % 10));
 				await prisma.interview.create({
@@ -1342,13 +1371,18 @@ async function main() {
 
 			if ((i + j) % 4 === 0) {
 				const isTempPlacement = (i + j) % 2 === 0;
-				const placementCreatedAt = buildSeedTimestamp((i * 9) + (j * 5), {
+				const rawPlacementCreatedAt = buildSeedTimestamp((i * 9) + (j * 5), {
 					windowSize: 14,
 					salt: 31,
 					baseHour: 9,
 					hourSpan: 7,
 					minuteStep: 19
 				});
+				const placementCreatedAt = ensureNotBefore(
+					rawPlacementCreatedAt,
+					addHours(submissionCreatedAt, 24),
+					45
+				);
 				const offeredOn = addHours(placementCreatedAt, 4 + ((i + j) % 12));
 				const expectedJoinDate = dateDaysFromToday(10 + irregularPastOffset(i + j, 9, 4), 9, 0);
 				const placementUpdatedAt = buildAcceptedTimestamp(placementCreatedAt, (i * 11) + (j * 7), 41);

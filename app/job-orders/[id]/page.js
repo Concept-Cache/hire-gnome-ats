@@ -13,6 +13,7 @@ import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/comp
 import RichTextEditor from '@/app/components/rich-text-editor';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import ActivityTimeline from '@/app/components/activity-timeline';
 import MatchExplanationModal from '@/app/components/match-explanation-modal';
 import ClientPortalModal from '@/app/components/client-portal-modal';
 import { useToast } from '@/app/components/toast-provider';
@@ -35,6 +36,7 @@ import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
 import { toBooleanFlag } from '@/lib/boolean-flag';
+import { buildJobOrderTimeline } from '@/lib/activity-timeline';
 
 const JOB_ORDER_CURRENCIES = ['USD', 'CAD'];
 
@@ -202,7 +204,7 @@ export default function JobOrderDetailsPage() {
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
 	const [closeState, setCloseState] = useState({ closing: false, error: '' });
 	const [enhanceState, setEnhanceState] = useState({ enhancing: false, error: '', success: '' });
-	const [workspaceTab, setWorkspaceTab] = useState('submissions');
+	const [workspaceTab, setWorkspaceTab] = useState('timeline');
 	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [submissionSort, setSubmissionSort] = useState({ field: 'submissionPriority', direction: 'asc' });
@@ -301,6 +303,10 @@ export default function JobOrderDetailsPage() {
 		submissionSort.direction === 'asc' &&
 		!submissionState.saving &&
 		!submissionOrderState.saving;
+	const jobOrderTimelineItems = useMemo(
+		() => buildJobOrderTimeline(jobOrder, portalAccess),
+		[jobOrder, portalAccess]
+	);
 
 	const sortedInterviews = useMemo(
 		() =>
@@ -1607,10 +1613,20 @@ export default function JobOrderDetailsPage() {
 				<article className="panel workspace-panel workspace-panel-lock-height" style={workspacePanelStyle}>
 					<h3>Job Order Workspace</h3>
 					<div
-						className="side-tabs side-tabs-four side-tabs-warm side-tabs-counted"
+						className="side-tabs side-tabs-warm side-tabs-counted"
 						role="tablist"
 						aria-label="Job order workspace tabs"
 					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'timeline'}
+							className={workspaceTab === 'timeline' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('timeline')}
+						>
+							<span>Timeline</span>
+							<span className="side-tab-count" aria-hidden="true">{jobOrderTimelineItems.length}</span>
+						</button>
 						<button
 							type="button"
 							role="tab"
@@ -2080,6 +2096,15 @@ export default function JobOrderDetailsPage() {
 									{matchState.totalCandidatesEvaluated === 1 ? '' : 's'}.
 								</p>
 							) : null}
+						</div>
+					) : null}
+					{workspaceTab === 'timeline' ? (
+						<div className="side-tab-content side-tab-content-with-scroll">
+							<h4 className="side-section-title">Timeline</h4>
+							<p className="panel-subtext">Unified job-order activity across submissions, interviews, placements, client feedback, and portal lifecycle events.</p>
+							<div className="workspace-scroll-area">
+								<ActivityTimeline items={jobOrderTimelineItems} emptyText="No job-order timeline events yet." />
+							</div>
 						</div>
 					) : null}
 				</article>

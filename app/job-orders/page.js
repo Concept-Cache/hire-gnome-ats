@@ -21,6 +21,7 @@ import {
 } from '@/lib/job-order-advanced-search';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { JOB_ORDER_STATUS_OPTIONS } from '@/lib/job-order-options';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 const VIEW_MODE_STORAGE_KEY = 'job-orders-list-view-mode';
 
@@ -56,6 +57,7 @@ export default function JobOrdersPage() {
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const [viewMode, setViewMode] = useState('list');
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
 	const { archivedIdSet } = useArchivedEntities('JOB_ORDER');
 
@@ -177,6 +179,7 @@ export default function JobOrdersPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeJobOrderAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 		const nextViewMode = String(nextState.viewMode || 'list');
 		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
 	}
@@ -283,6 +286,8 @@ export default function JobOrdersPage() {
 			getSortValue: (row) => row.lastActivityAt || ''
 		}
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -381,11 +386,13 @@ export default function JobOrdersPage() {
 								defaultState={{
 									query: '',
 									advancedCriteria: [],
+									sortState: defaultSortState,
 									viewMode: 'list'
 								}}
 								currentState={{
 									query,
 									advancedCriteria: normalizedAdvancedCriteria,
+									sortState: effectiveSortState,
 									viewMode
 								}}
 								onApplyState={applySavedViewState}
@@ -402,6 +409,8 @@ export default function JobOrdersPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading job orders"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 						rowActions={[{ label: 'Open', onClick: onOpen }]}
 					/>
 				) : (

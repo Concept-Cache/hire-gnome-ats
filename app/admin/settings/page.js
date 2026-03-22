@@ -63,6 +63,7 @@ function toInboundEventStatusClassName(status) {
 
 export default function AdminSettingsPage() {
 	const toast = useToast();
+	const [activeTab, setActiveTab] = useState('branding');
 	const [loading, setLoading] = useState(true);
 	const [brandingSaving, setBrandingSaving] = useState(false);
 	const [platformSaving, setPlatformSaving] = useState(false);
@@ -533,6 +534,37 @@ export default function AdminSettingsPage() {
 
 				{!loading ? (
 						<>
+							<div className="admin-settings-tabs" role="tablist" aria-label="System settings sections">
+								<button
+									type="button"
+									role="tab"
+									aria-selected={activeTab === 'branding'}
+									className={`admin-settings-tab ${activeTab === 'branding' ? 'is-active' : ''}`}
+									onClick={() => setActiveTab('branding')}
+								>
+									Branding
+								</button>
+								<button
+									type="button"
+									role="tab"
+									aria-selected={activeTab === 'platform'}
+									className={`admin-settings-tab ${activeTab === 'platform' ? 'is-active' : ''}`}
+									onClick={() => setActiveTab('platform')}
+								>
+									Platform Settings
+								</button>
+								<button
+									type="button"
+									role="tab"
+									aria-selected={activeTab === 'diagnostics'}
+									className={`admin-settings-tab ${activeTab === 'diagnostics' ? 'is-active' : ''}`}
+									onClick={() => setActiveTab('diagnostics')}
+								>
+									Diagnostics
+								</button>
+							</div>
+
+							{activeTab === 'branding' ? (
 							<article className="panel panel-spacious panel-narrow">
 								<form onSubmit={onSaveBranding} className="detail-form">
 									<section className="form-section">
@@ -664,7 +696,9 @@ export default function AdminSettingsPage() {
 							</div>
 							</form>
 						</article>
+							) : null}
 
+						{activeTab === 'platform' ? (
 						<article className="panel panel-spacious panel-narrow">
 							<form onSubmit={onSavePlatformSettings} className="detail-form">
 							<section className="form-section">
@@ -905,7 +939,9 @@ export default function AdminSettingsPage() {
 							</div>
 							</form>
 						</article>
+						) : null}
 
+						{activeTab === 'diagnostics' ? (
 						<article className="panel panel-spacious panel-narrow">
 							<section className="form-section">
 								<h4>System Diagnostics</h4>
@@ -999,6 +1035,7 @@ export default function AdminSettingsPage() {
 								) : null}
 							</section>
 						</article>
+						) : null}
 					</>
 				) : null}
 			</section>

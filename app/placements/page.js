@@ -17,6 +17,7 @@ import {
 	summarizePlacementAdvancedCriterion
 } from '@/lib/placement-advanced-search';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 function formatDateTime(value) {
 	return formatDateTimeAt(value);
@@ -107,6 +108,7 @@ export default function PlacementsPage() {
 	const [query, setQuery] = useState('');
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const { archivedIdSet } = useArchivedEntities('PLACEMENT');
 
 	const activeRows = useMemo(
@@ -207,6 +209,7 @@ export default function PlacementsPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizePlacementAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 	}
 
 	function removeAdvancedCriterion(indexToRemove) {
@@ -252,6 +255,8 @@ export default function PlacementsPage() {
 		{ key: 'expectedJoinDateLabel', label: 'Expected Join', defaultVisible: false, getSortValue: (row) => row.expectedJoinDate || '' },
 		{ key: 'endDateLabel', label: 'End Date', defaultVisible: false, getSortValue: (row) => row.endDate || '' }
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -321,8 +326,8 @@ export default function PlacementsPage() {
 							<SavedListViews
 								listKey="placements"
 								columns={columns}
-								defaultState={{ query: '', advancedCriteria: [] }}
-								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
+								defaultState={{ query: '', advancedCriteria: [], sortState: defaultSortState }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, sortState: effectiveSortState }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="placements" columns={columns} />
@@ -334,6 +339,8 @@ export default function PlacementsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading placements"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>

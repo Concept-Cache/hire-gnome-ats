@@ -22,16 +22,19 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Audit trail viewing is now restricted to administrators in both the detail-screen UI and the audit-log API.
 - Added explicit submission-level client portal visibility so web responses stay differentiated and hidden by default until a recruiter promotes them for client review.
 - In demo mode, system settings now allow the full branding card to be saved while keeping integrations, SMTP, and object storage read-only.
+- Reorganized admin system settings into separate `Branding`, `Platform Settings`, and `Diagnostics` tabs so the page stays usable as more controls are added.
 - Added a print-friendly submission packet from submission detail that compiles the write-up, primary resume, candidate snapshot, match explanation, and interview prep for internal review or PDF export.
 - Upgraded the dashboard `Needs Attention` queue with smarter workflow alerts for web responses, client portal engagement, unscheduled interview requests, and other stale follow-up states.
 - Added live dashboard KPI cards for web-response review and client interview requests so the home screen surfaces new recruiting pressure sooner.
 - Added a stronger candidate snapshot header with AI summary snippet, last activity, and profile-completeness guidance so recruiters can assess submission readiness at a glance.
+- Added unified timeline panels on candidate, job order, and submission detail so recruiters can review recent workflow activity in one chronological feed instead of jumping between separate sections.
 - Extended candidate completeness into the list view and added soft submission warnings so recruiters can keep moving while still seeing when a profile needs cleanup.
 - Owner performance chips in operational reporting now open the same drill-through detail modal used by the rest of the report, filtered to that owner and metric.
 - Expanded the list-view column chooser so core module lists expose more hidden-by-default optional columns without changing the default layouts users already know.
 - List-view column preferences now persist per user account instead of only in the browser, so customized column layouts carry across devices.
 - List-view column choosers now support drag-and-drop column ordering, with the custom order saved per user while untouched lists still keep the default order.
 - Added per-user saved views across the main pipeline lists so recruiters can save named filter and column-layout sets, apply them later, and set personal default views across devices; submissions now support explicit origin filtering and job orders can be filtered by client-feedback presence for more useful view definitions.
+- Main list tables now sort ascending by the first column by default, and saved views now preserve explicit sort order alongside filters and column layout.
 - Split production scripts so app-only builds and deploy-time migrate+build runs are explicit, keeping server deploys automatic while preventing CI build jobs from requiring a database.
 - Added a real advanced-search builder to the job-order list so recruiters can combine structured criteria like date ranges, submissions thresholds, owner/client filters, and career-site state without overloading the global search bar.
 - Applied the same advanced-search pattern to the candidates list so recruiters can combine structured filters like owner, source, completeness, counts, and last-activity dates while keeping the basic search box simple.

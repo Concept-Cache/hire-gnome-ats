@@ -21,6 +21,7 @@ import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { CANDIDATE_STATUS_OPTIONS } from '@/lib/candidate-status';
 import { getCandidateCompleteness } from '@/lib/candidate-completeness';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 const VIEW_MODE_STORAGE_KEY = 'candidates-list-view-mode';
 
@@ -54,6 +55,7 @@ export default function CandidatesPage() {
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const [viewMode, setViewMode] = useState('list');
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
 	const { archivedIdSet } = useArchivedEntities('CANDIDATE');
 
@@ -214,6 +216,7 @@ export default function CandidatesPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeCandidateAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 		const nextViewMode = String(nextState.viewMode || 'list');
 		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
 	}
@@ -326,6 +329,8 @@ export default function CandidatesPage() {
 			getSortValue: (row) => row.lastActivityAt || ''
 		}
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -421,8 +426,8 @@ export default function CandidatesPage() {
 								<SavedListViews
 									listKey="candidates"
 									columns={columns}
-									defaultState={{ query: '', advancedCriteria: [], viewMode: 'list' }}
-									currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, viewMode }}
+									defaultState={{ query: '', advancedCriteria: [], sortState: defaultSortState, viewMode: 'list' }}
+									currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, sortState: effectiveSortState, viewMode }}
 									onApplyState={applySavedViewState}
 								/>
 								<TableColumnPicker tableKey="candidates" columns={columns} />
@@ -437,6 +442,8 @@ export default function CandidatesPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading candidates"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 						rowActions={[{ label: 'Open', onClick: onOpen }]}
 					/>
 				) : (
