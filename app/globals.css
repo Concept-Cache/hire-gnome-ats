@@ -4117,12 +4117,22 @@ button:disabled {
 	align-items: end;
 }
 
+.list-controls-four {
+	grid-template-columns: minmax(20rem, 2.3fr) minmax(8rem, 0.68fr) minmax(8rem, 0.68fr) minmax(8rem, 0.68fr);
+	align-items: end;
+}
+
 .list-controls-with-columns.list-controls-three {
 	grid-template-columns: minmax(20rem, 2.4fr) minmax(8rem, 0.7fr) minmax(8rem, 0.7fr) auto;
 }
 
+.list-controls-with-columns.list-controls-four {
+	grid-template-columns: minmax(20rem, 2.3fr) minmax(8rem, 0.68fr) minmax(8rem, 0.68fr) minmax(8rem, 0.68fr) auto;
+}
+
 .list-controls-two select,
-.list-controls-three select {
+.list-controls-three select,
+.list-controls-four select {
 	width: min(100%, 11.5rem);
 	justify-self: end;
 }
@@ -4131,7 +4141,16 @@ button:disabled {
 	position: relative;
 	justify-self: end;
 	align-self: center;
-	margin-left: 0.38rem;
+	margin-left: 0;
+}
+
+.list-controls-toolbar-group {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	justify-self: end;
+	gap: 0.48rem;
+	margin-left: 0.72rem;
 }
 
 .panel-header-row {
@@ -4144,6 +4163,53 @@ button:disabled {
 
 .panel-header-row h3 {
 	margin: 0;
+}
+
+.saved-list-views {
+	position: relative;
+}
+
+.saved-list-views-menu {
+	position: absolute;
+	top: calc(100% + 0.35rem);
+	right: 0;
+	min-width: 14.5rem;
+	width: min(16rem, calc(100vw - 2rem));
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	padding: 0.32rem;
+	background: #fff;
+	box-shadow: 0 10px 20px rgba(17, 35, 72, 0.12);
+	z-index: 910;
+	display: grid;
+	gap: 0.08rem;
+}
+
+.saved-list-views-menu-label {
+	padding: 0.26rem 0.42rem 0.34rem;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.saved-list-views-menu-note {
+	padding: 0.05rem 0.42rem 0.32rem;
+	font-size: 0.72rem;
+	line-height: 1.35;
+	color: var(--muted);
+}
+
+.saved-list-views-menu .actions-menu-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.saved-list-views-menu .actions-menu-item.is-selected {
+	background: var(--ui-secondary-hover-bg);
+	color: var(--ui-secondary-hover-ink);
 }
 
 .view-toggle {
@@ -7903,6 +7969,7 @@ small {
 	.form-grid-4,
 	.list-controls-two,
 	.list-controls-three,
+	.list-controls-four,
 	.detail-form-grid-2,
 	.detail-form-grid-3,
 	.detail-form-grid-4,
@@ -7926,6 +7993,7 @@ small {
 
 	.list-controls-with-columns.list-controls-two,
 	.list-controls-with-columns.list-controls-three,
+	.list-controls-with-columns.list-controls-four,
 	.list-controls-with-columns.interview-list-controls {
 		grid-template-columns: 1fr;
 	}
@@ -7942,6 +8010,11 @@ small {
 	.view-toggle-button {
 		flex: 1 1 0;
 		justify-content: center;
+	}
+
+	.list-controls-toolbar-group {
+		width: 100%;
+		justify-content: flex-end;
 	}
 
 	.kanban-column {

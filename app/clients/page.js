@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { CLIENT_STATUS_OPTIONS, normalizeClientStatusValue } from '@/lib/client-status-options';
@@ -80,6 +81,12 @@ export default function ClientsPage() {
 		router.push(`/clients/${row.id}`);
 	}
 
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setStatusFilter(String(nextState.statusFilter || 'all'));
+		setOwnerFilter(String(nextState.ownerFilter || 'all'));
+	}
+
 	const columns = [
 		{ key: 'name', label: 'Name' },
 		{ key: 'industry', label: 'Industry' },
@@ -129,7 +136,16 @@ export default function ClientsPage() {
 							</option>
 							))}
 						</select>
-						<TableColumnPicker tableKey="clients" columns={columns} />
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="clients"
+								columns={columns}
+								defaultState={{ query: '', statusFilter: 'all', ownerFilter: 'all' }}
+								currentState={{ query, statusFilter, ownerFilter }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="clients" columns={columns} />
+						</div>
 					</div>
 					<EntityTable
 						tableKey="clients"

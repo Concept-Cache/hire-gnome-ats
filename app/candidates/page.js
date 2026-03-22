@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import KanbanBoard from '@/app/components/kanban-board';
 import { useToast } from '@/app/components/toast-provider';
@@ -179,6 +180,14 @@ export default function CandidatesPage() {
 		router.push(`/candidates/${row.id}`);
 	}
 
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setStatusFilter(String(nextState.statusFilter || 'all'));
+		setOwnerFilter(String(nextState.ownerFilter || 'all'));
+		const nextViewMode = String(nextState.viewMode || 'list');
+		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
+	}
+
 	async function onMoveCandidate(rowId, nextStatus) {
 		const target = rows.find((row) => String(row.id) === String(rowId));
 		if (!target) return;
@@ -350,7 +359,18 @@ export default function CandidatesPage() {
 							</option>
 						))}
 					</select>
-					{viewMode === 'list' ? <TableColumnPicker tableKey="candidates" columns={columns} /> : null}
+					{viewMode === 'list' ? (
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="candidates"
+								columns={columns}
+								defaultState={{ query: '', statusFilter: 'all', ownerFilter: 'all', viewMode: 'list' }}
+								currentState={{ query, statusFilter, ownerFilter, viewMode }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="candidates" columns={columns} />
+						</div>
+					) : null}
 				</div>
 				{viewMode === 'list' ? (
 					<EntityTable

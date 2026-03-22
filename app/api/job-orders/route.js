@@ -70,6 +70,18 @@ const jobOrderListInclude = {
 			submissions: true
 		}
 	},
+	clientPortalAccesses: {
+		select: {
+			lastViewedAt: true,
+			lastActionAt: true,
+			lastEmailedAt: true,
+			_count: {
+				select: {
+					feedbackEntries: true
+				}
+			}
+		}
+	},
 	submissions: {
 		select: { createdAt: true, updatedAt: true },
 		orderBy: { updatedAt: 'desc' },
@@ -133,10 +145,17 @@ async function getJob_ordersHandler(req) {
 			orderBy: { createdAt: 'desc' }
 		});
 		const jobOrderRows = jobOrders.map((jobOrder) => {
-			const { submissions, interviews, offers, _count, ...jobOrderRest } = jobOrder;
+			const { submissions, interviews, offers, clientPortalAccesses, _count, ...jobOrderRest } = jobOrder;
+			const clientFeedbackCount = Array.isArray(clientPortalAccesses)
+				? clientPortalAccesses.reduce(
+						(total, portalAccess) => total + Number(portalAccess?._count?.feedbackEntries || 0),
+						0
+					)
+				: 0;
 			return {
 				...jobOrderRest,
 				submissionCount: _count?.submissions || 0,
+				clientFeedbackCount,
 				lastActivityAt: resolveJobOrderLastActivityAt(jobOrder)
 			};
 		});

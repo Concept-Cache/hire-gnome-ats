@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
@@ -90,6 +91,11 @@ export default function InterviewsPage() {
 		router.push(`/interviews/${row.id}`);
 	}
 
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setTypeFilter(String(nextState.typeFilter || 'all'));
+	}
+
 	const columns = [
 		{ key: 'subject', label: 'Subject', defaultVisible: false },
 		{
@@ -163,7 +169,16 @@ export default function InterviewsPage() {
 							</option>
 							))}
 						</select>
-						<TableColumnPicker tableKey="interviews" columns={columns} />
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="interviews"
+								columns={columns}
+								defaultState={{ query: '', typeFilter: 'all' }}
+								currentState={{ query, typeFilter }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="interviews" columns={columns} />
+						</div>
 					</div>
 					<EntityTable
 						tableKey="interviews"

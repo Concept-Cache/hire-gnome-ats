@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
@@ -185,6 +186,12 @@ export default function PlacementsPage() {
 		router.push(`/placements/${row.id}`);
 	}
 
+	function applySavedViewState(nextState = {}) {
+		setQuery(String(nextState.query ?? ''));
+		setStatusFilter(String(nextState.statusFilter || 'all'));
+		setTypeFilter(String(nextState.typeFilter || 'all'));
+	}
+
 	const columns = [
 		{
 			key: 'candidate',
@@ -267,7 +274,16 @@ export default function PlacementsPage() {
 							</option>
 							))}
 						</select>
-						<TableColumnPicker tableKey="placements" columns={columns} />
+						<div className="list-controls-toolbar-group">
+							<SavedListViews
+								listKey="placements"
+								columns={columns}
+								defaultState={{ query: '', statusFilter: 'all', typeFilter: 'all' }}
+								currentState={{ query, statusFilter, typeFilter }}
+								onApplyState={applySavedViewState}
+							/>
+							<TableColumnPicker tableKey="placements" columns={columns} />
+						</div>
 					</div>
 					<EntityTable
 						tableKey="placements"
