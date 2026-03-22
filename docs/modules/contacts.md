@@ -3,6 +3,8 @@
 ## What This Module Is For
 Contacts tracks people at client organizations, typically hiring managers and stakeholder partners.
 
+The contacts list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like client, owner, status, notes count, job-order count, and last-activity dates without overloading the basic search box.
+
 ## Required Fields
 - Name
 - Email
@@ -57,3 +59,13 @@ Behavior:
 1. Verify email and mobile before first outreach.
 2. Keep title/department current to improve submission targeting.
 3. Use notes for call outcomes and relationship intelligence.
+
+## Advanced Search
+Use advanced search on the contacts list when quick lookup is not enough.
+
+Useful examples:
+- `Client = Atlas Test`
+- `Status = Active`
+- `Job Orders >= 1`
+- `Notes > 0`
+- `Last Activity Date in past 30 days`

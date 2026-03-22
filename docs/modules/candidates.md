@@ -7,6 +7,8 @@ It also includes an on-demand AI summary modal, opened from the candidate detail
 
 Candidate detail now opens with a stronger candidate snapshot card that surfaces title, location, status, top skills, AI summary snippet, last activity, and profile completeness in one recruiter-friendly block.
 
+The candidates list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like owner, source, profile-completeness score, submission counts, and last-activity dates without overloading the basic search box.
+
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.
 
@@ -72,6 +74,8 @@ The score is intended as a recruiter readiness signal, not a hard validation rul
 The candidate snapshot card also calls out the top missing profile gaps so users know what to fix next.
 
 The candidates list also shows a compact profile-completeness chip so recruiters can spot weak records before opening detail.
+
+The same score can also be used as an advanced-search filter on the candidates list.
 
 When a recruiter tries to create a submission from a candidate with a thin profile, the app now shows a soft warning with the top missing gaps. The recruiter can still continue.
 

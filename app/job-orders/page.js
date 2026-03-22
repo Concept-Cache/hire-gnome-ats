@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
+import { Filter, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import JobOrderAdvancedSearchModal from '@/app/components/job-order-advanced-search-modal';
 import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
@@ -13,6 +14,11 @@ import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import { useToast } from '@/app/components/toast-provider';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	evaluateJobOrderAdvancedCriteria,
+	normalizeJobOrderAdvancedCriteria,
+	summarizeJobOrderAdvancedCriterion
+} from '@/lib/job-order-advanced-search';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { JOB_ORDER_STATUS_OPTIONS } from '@/lib/job-order-options';
 
@@ -47,9 +53,8 @@ export default function JobOrdersPage() {
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
-	const [statusFilter, setStatusFilter] = useState('all');
-	const [clientFilter, setClientFilter] = useState('all');
-	const [feedbackFilter, setFeedbackFilter] = useState('all');
+	const [advancedCriteria, setAdvancedCriteria] = useState([]);
+	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const [viewMode, setViewMode] = useState('list');
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
 	const { archivedIdSet } = useArchivedEntities('JOB_ORDER');
@@ -59,13 +64,26 @@ export default function JobOrdersPage() {
 		[rows, archivedIdSet]
 	);
 
-	const clientOptions = useMemo(() => {
-		return [...new Set(activeRows.map((row) => row.client).filter((value) => value && value !== '-'))].sort((a, b) =>
+	const clientOptions = useMemo(
+		() =>
+			[...new Set(activeRows.map((row) => row.client).filter((value) => value && value !== '-'))].sort((a, b) =>
+				String(a).localeCompare(String(b))
+			),
+		[activeRows]
+	);
+
+	const ownerOptions = useMemo(() => {
+		return [...new Set(activeRows.map((row) => row.owner).filter((value) => value && value !== '-'))].sort((a, b) =>
 			String(a).localeCompare(String(b))
 		);
 	}, [activeRows]);
 
-	const filteredRows = useMemo(() => {
+	const normalizedAdvancedCriteria = useMemo(
+		() => normalizeJobOrderAdvancedCriteria(advancedCriteria),
+		[advancedCriteria]
+	);
+
+	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return activeRows.filter((row) => {
 			const matchesText =
@@ -73,14 +91,18 @@ export default function JobOrdersPage() {
 				`${row.title} ${row.client} ${row.contact} ${row.owner ?? ''} ${row.location ?? ''} ${row.status} ${row.statusLabel}`
 					.toLowerCase()
 					.includes(q);
-			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
-			const matchesClient = clientFilter === 'all' || row.client === clientFilter;
-			const matchesFeedback =
-				feedbackFilter === 'all' ||
-				(feedbackFilter === 'with_feedback' ? Number(row.clientFeedbackCount || 0) > 0 : Number(row.clientFeedbackCount || 0) === 0);
-			return matchesText && matchesStatus && matchesClient && matchesFeedback;
+			return matchesText;
 		});
-	}, [activeRows, clientFilter, feedbackFilter, query, statusFilter]);
+	}, [activeRows, query]);
+
+	const filteredRows = useMemo(() => {
+		return quickFilteredRows.filter((row) => evaluateJobOrderAdvancedCriteria(row, normalizedAdvancedCriteria));
+	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	const advancedCriteriaSummary = useMemo(
+		() => normalizedAdvancedCriteria.map((criterion) => summarizeJobOrderAdvancedCriterion(criterion)).filter(Boolean),
+		[normalizedAdvancedCriteria]
+	);
 
 	const kanbanRows = useMemo(() => {
 		return [...filteredRows].sort((a, b) => {
@@ -154,11 +176,13 @@ export default function JobOrdersPage() {
 
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
-		setStatusFilter(String(nextState.statusFilter || 'all'));
-		setClientFilter(String(nextState.clientFilter || 'all'));
-		setFeedbackFilter(String(nextState.feedbackFilter || 'all'));
+		setAdvancedCriteria(normalizeJobOrderAdvancedCriteria(nextState.advancedCriteria || []));
 		const nextViewMode = String(nextState.viewMode || 'list');
 		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
+	}
+
+	function removeAdvancedCriterion(indexToRemove) {
+		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
 	async function onMoveJobOrder(rowId, nextStatus) {
@@ -304,51 +328,72 @@ export default function JobOrdersPage() {
 						</button>
 					</div>
 				</div>
-				<div className={`list-controls list-controls-four${viewMode === 'list' ? ' list-controls-with-columns' : ''}`}>
-					<input
-						placeholder="Search title, client, contact, location, status"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-					<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-						<option value="all">All Statuses</option>
-						{JOB_ORDER_STATUS_OPTIONS.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-					<select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)}>
-						<option value="all">All Clients</option>
-						{clientOptions.map((client) => (
-							<option key={client} value={client}>
-								{client}
-							</option>
-						))}
-					</select>
-					<select value={feedbackFilter} onChange={(e) => setFeedbackFilter(e.target.value)}>
-						<option value="all">All Feedback</option>
-						<option value="with_feedback">With Client Feedback</option>
-						<option value="no_feedback">No Client Feedback</option>
-					</select>
-					{viewMode === 'list' ? (
-						<div className="list-controls-toolbar-group">
+				<div className="list-controls job-orders-list-controls">
+					{advancedCriteriaSummary.length > 0 ? (
+						<div className="job-orders-search-token-field">
+							<div className="job-orders-search-token-field-chips" aria-label="Active advanced filters">
+								{advancedCriteriaSummary.map((summary, index) => (
+									<span key={`${summary}-${index}`} className="chip job-orders-advanced-search-chip">
+										<span>{summary}</span>
+										<button
+											type="button"
+											className="job-orders-advanced-search-chip-remove"
+											onClick={() => removeAdvancedCriterion(index)}
+											aria-label={`Remove ${summary}`}
+											title={`Remove ${summary}`}
+										>
+											<X aria-hidden="true" />
+										</button>
+									</span>
+								))}
+								<input
+									placeholder="Search within filtered job orders"
+									value={query}
+									onChange={(e) => setQuery(e.target.value)}
+									aria-label="Search within advanced filtered job orders"
+								/>
+							</div>
+						</div>
+					) : (
+						<input
+							placeholder="Search title, client, contact, location, status"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+						/>
+					)}
+					<div className="list-controls-toolbar-group job-orders-list-controls-tools">
+						<button
+							type="button"
+							className="table-toolbar-button job-orders-advanced-search-toggle"
+							onClick={() => setAdvancedSearchOpen(true)}
+						>
+							<Filter aria-hidden="true" />
+							Advanced Search
+							{advancedCriteriaSummary.length > 0 ? (
+								<span className="job-orders-advanced-search-count">{advancedCriteriaSummary.length}</span>
+							) : null}
+						</button>
+						{viewMode === 'list' ? (
+							<>
 							<SavedListViews
 								listKey="job-orders"
 								columns={columns}
 								defaultState={{
 									query: '',
-									statusFilter: 'all',
-									clientFilter: 'all',
-									feedbackFilter: 'all',
+									advancedCriteria: [],
 									viewMode: 'list'
 								}}
-								currentState={{ query, statusFilter, clientFilter, feedbackFilter, viewMode }}
+								currentState={{
+									query,
+									advancedCriteria: normalizedAdvancedCriteria,
+									viewMode
+								}}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="job-orders" columns={columns} />
-						</div>
-					) : null}
+							</>
+						) : null}
+					</div>
 				</div>
 				{viewMode === 'list' ? (
 					<EntityTable
@@ -383,6 +428,17 @@ export default function JobOrdersPage() {
 					/>
 				)}
 			</article>
+			<JobOrderAdvancedSearchModal
+				open={advancedSearchOpen}
+				criteria={normalizedAdvancedCriteria}
+				clientOptions={clientOptions}
+				ownerOptions={ownerOptions}
+				onApply={(nextCriteria) => {
+					setAdvancedCriteria(normalizeJobOrderAdvancedCriteria(nextCriteria));
+					setAdvancedSearchOpen(false);
+				}}
+				onClose={() => setAdvancedSearchOpen(false)}
+			/>
 		</section>
 	);
 }

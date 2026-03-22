@@ -3051,12 +3051,166 @@ p {
 	flex: 0 0 auto;
 }
 
+.report-detail-modal-close.btn-link-icon {
+	min-width: 2.3rem;
+	width: 2.3rem;
+	height: 2.3rem;
+}
+
 .report-detail-modal-body,
 .report-detail-list-modal {
 	max-height: calc(80vh - 7rem);
 	overflow-y: auto;
 	padding-right: 0.2rem;
 	min-height: 0;
+}
+
+.job-order-advanced-search-modal {
+	width: min(68rem, 94vw);
+	max-width: 68rem;
+	max-height: min(84vh, 56rem);
+	padding: 1rem 1rem 1.05rem;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 1rem;
+	box-shadow: 0 18px 45px rgba(12, 27, 53, 0.22);
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr) auto;
+	gap: 0.8rem;
+	overflow: hidden;
+}
+
+.job-order-advanced-search-modal-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.85rem;
+}
+
+.job-order-advanced-search-eyebrow {
+	margin: 0 0 0.12rem;
+	font-size: var(--text-micro);
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.job-order-advanced-search-modal-head h3 {
+	margin: 0;
+	font-size: 1.18rem;
+	color: var(--ink);
+}
+
+.job-order-advanced-search-copy {
+	margin: 0.16rem 0 0;
+	font-size: 0.84rem;
+	line-height: 1.45;
+	color: var(--muted);
+}
+
+.job-order-advanced-search-body {
+	display: grid;
+	gap: 0.8rem;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 0.15rem;
+}
+
+.job-order-advanced-search-rows {
+	display: grid;
+	gap: 0.58rem;
+}
+
+.job-order-advanced-search-empty {
+	display: flex;
+	align-items: center;
+	min-height: 2.65rem;
+	padding: 0.55rem 0.9rem;
+	border: 1px dashed var(--line);
+	border-radius: 0.85rem;
+	background: #fbfcff;
+	font-size: 0.82rem;
+	line-height: 1.45;
+	color: var(--muted);
+}
+
+.job-order-advanced-search-row {
+	display: grid;
+	grid-template-columns: minmax(10rem, 1.2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
+	gap: 0.48rem;
+	align-items: center;
+}
+
+.job-order-advanced-search-row-spacer {
+	min-height: 1px;
+}
+
+.job-order-advanced-search-row input,
+.job-order-advanced-search-row select {
+	width: 100%;
+	min-height: 2.65rem;
+	box-sizing: border-box;
+}
+
+.job-order-advanced-search-remove {
+	min-width: 2rem;
+	width: 2rem;
+	height: 2rem;
+	padding: 0;
+	justify-content: center;
+}
+
+.job-order-advanced-search-toolbar,
+.job-order-advanced-search-footer,
+.job-orders-advanced-search-summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.7rem;
+}
+
+.job-order-advanced-search-toolbar {
+	padding-top: 0.15rem;
+	justify-content: space-between;
+}
+
+.job-order-advanced-search-footer {
+	padding-top: 0.55rem;
+	border-top: 1px solid var(--line);
+}
+
+.job-order-advanced-search-footer-note {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.job-order-advanced-search-footer-note svg {
+	width: 0.88rem;
+	height: 0.88rem;
+}
+
+.job-order-advanced-search-footer-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.48rem;
+}
+
+.job-order-advanced-search-action,
+.job-order-advanced-search-apply {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.42rem;
+}
+
+.job-order-advanced-search-apply {
+	white-space: nowrap;
+	min-height: 2rem;
+	padding: 0.42rem 0.78rem;
+	border-radius: 8px;
 }
 
 .email-draft-modal {
@@ -4153,6 +4307,35 @@ button:disabled {
 	margin-left: 0.72rem;
 }
 
+.job-orders-list-controls,
+.list-controls-with-columns.job-orders-list-controls,
+.candidates-list-controls,
+.list-controls-with-columns.candidates-list-controls,
+.clients-list-controls,
+.list-controls-with-columns.clients-list-controls,
+.contacts-list-controls,
+.list-controls-with-columns.contacts-list-controls,
+.submissions-list-controls,
+.list-controls-with-columns.submissions-list-controls,
+.interviews-list-controls,
+.list-controls-with-columns.interviews-list-controls,
+.placements-list-controls,
+.list-controls-with-columns.placements-list-controls {
+	grid-template-columns: minmax(24rem, 1fr) auto;
+	align-items: center;
+}
+
+.job-orders-list-controls-tools,
+.candidates-list-controls-tools,
+.clients-list-controls-tools,
+.contacts-list-controls-tools,
+.submissions-list-controls-tools,
+.interviews-list-controls-tools,
+.placements-list-controls-tools {
+	margin-left: 0.4rem;
+	gap: 0.4rem;
+}
+
 .panel-header-row {
 	display: flex;
 	align-items: center;
@@ -4167,6 +4350,275 @@ button:disabled {
 
 .saved-list-views {
 	position: relative;
+}
+
+.job-orders-advanced-search-toggle,
+.candidates-advanced-search-toggle,
+.clients-advanced-search-toggle,
+.contacts-advanced-search-toggle,
+.submissions-advanced-search-toggle,
+.interviews-advanced-search-toggle,
+.placements-advanced-search-toggle {
+	min-height: 2rem;
+	gap: 0.42rem;
+	padding-inline: 0.68rem;
+	border: 1px solid var(--ui-secondary-border);
+	border-radius: 10px;
+	background: var(--ui-secondary-bg);
+	color: var(--ui-secondary-ink);
+	box-shadow: 0 1px 2px rgba(18, 36, 73, 0.08);
+}
+
+.job-orders-advanced-search-toggle:hover:not(:disabled),
+.candidates-advanced-search-toggle:hover:not(:disabled),
+.clients-advanced-search-toggle:hover:not(:disabled),
+.contacts-advanced-search-toggle:hover:not(:disabled),
+.submissions-advanced-search-toggle:hover:not(:disabled),
+.interviews-advanced-search-toggle:hover:not(:disabled),
+.placements-advanced-search-toggle:hover:not(:disabled),
+.job-orders-list-controls .table-toolbar-button:hover:not(:disabled),
+.candidates-list-controls .table-toolbar-button:hover:not(:disabled),
+.clients-list-controls .table-toolbar-button:hover:not(:disabled),
+.contacts-list-controls .table-toolbar-button:hover:not(:disabled),
+.submissions-list-controls .table-toolbar-button:hover:not(:disabled),
+.interviews-list-controls .table-toolbar-button:hover:not(:disabled),
+.placements-list-controls .table-toolbar-button:hover:not(:disabled) {
+	background: var(--ui-secondary-hover-bg);
+	border-color: var(--ui-secondary-hover-border);
+	color: var(--ui-secondary-hover-ink);
+}
+
+.job-orders-list-controls .table-toolbar-right,
+.candidates-list-controls .table-toolbar-right,
+.clients-list-controls .table-toolbar-right,
+.contacts-list-controls .table-toolbar-right,
+.submissions-list-controls .table-toolbar-right,
+.interviews-list-controls .table-toolbar-right,
+.placements-list-controls .table-toolbar-right {
+	align-self: center;
+}
+
+.job-orders-list-controls .table-toolbar-button,
+.candidates-list-controls .table-toolbar-button,
+.clients-list-controls .table-toolbar-button,
+.contacts-list-controls .table-toolbar-button,
+.submissions-list-controls .table-toolbar-button,
+.interviews-list-controls .table-toolbar-button,
+.placements-list-controls .table-toolbar-button {
+	min-height: 2rem;
+	padding: 0.36rem 0.62rem;
+	border: 1px solid var(--ui-secondary-border);
+	border-radius: 10px;
+	background: var(--ui-secondary-bg);
+	color: var(--ui-secondary-ink);
+	font-size: 0.82rem;
+	font-weight: 600;
+	box-shadow: 0 1px 2px rgba(18, 36, 73, 0.08);
+}
+
+.job-orders-list-controls .saved-list-views-menu .actions-menu-item,
+.job-orders-list-controls .table-columns-menu .table-columns-option,
+.candidates-list-controls .saved-list-views-menu .actions-menu-item,
+.candidates-list-controls .table-columns-menu .table-columns-option,
+.clients-list-controls .saved-list-views-menu .actions-menu-item,
+.clients-list-controls .table-columns-menu .table-columns-option,
+.contacts-list-controls .saved-list-views-menu .actions-menu-item,
+.contacts-list-controls .table-columns-menu .table-columns-option,
+.submissions-list-controls .saved-list-views-menu .actions-menu-item,
+.submissions-list-controls .table-columns-menu .table-columns-option,
+.interviews-list-controls .saved-list-views-menu .actions-menu-item,
+.interviews-list-controls .table-columns-menu .table-columns-option,
+.placements-list-controls .saved-list-views-menu .actions-menu-item,
+.placements-list-controls .table-columns-menu .table-columns-option {
+	font-size: 0.84rem;
+}
+
+.job-orders-list-controls .table-toolbar-button svg,
+.job-orders-advanced-search-toggle svg,
+.candidates-list-controls .table-toolbar-button svg,
+.candidates-advanced-search-toggle svg,
+.clients-list-controls .table-toolbar-button svg,
+.clients-advanced-search-toggle svg,
+.contacts-list-controls .table-toolbar-button svg,
+.contacts-advanced-search-toggle svg,
+.submissions-list-controls .table-toolbar-button svg,
+.submissions-advanced-search-toggle svg,
+.interviews-list-controls .table-toolbar-button svg,
+.interviews-advanced-search-toggle svg,
+.placements-list-controls .table-toolbar-button svg,
+.placements-advanced-search-toggle svg {
+	width: 0.92rem;
+	height: 0.92rem;
+}
+
+.job-orders-advanced-search-count,
+.candidates-advanced-search-count,
+.clients-advanced-search-count,
+.contacts-advanced-search-count,
+.submissions-advanced-search-count,
+.interviews-advanced-search-count,
+.placements-advanced-search-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.2rem;
+	height: 1.2rem;
+	padding: 0 0.34rem;
+	border-radius: 999px;
+	background: rgba(17, 38, 63, 0.1);
+	color: var(--ink);
+	font-size: 0.72rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.job-orders-search-token-field,
+.candidates-search-token-field,
+.clients-search-token-field,
+.contacts-search-token-field,
+.submissions-search-token-field,
+.interviews-search-token-field,
+.placements-search-token-field {
+	display: flex;
+	align-items: center;
+	min-height: 2.65rem;
+	padding: 0.34rem 0.44rem;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: #ffffff;
+}
+
+.job-orders-search-token-field:focus-within,
+.candidates-search-token-field:focus-within,
+.clients-search-token-field:focus-within,
+.contacts-search-token-field:focus-within,
+.submissions-search-token-field:focus-within,
+.interviews-search-token-field:focus-within,
+.placements-search-token-field:focus-within {
+	border-color: var(--ui-primary-border);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary-focus) 55%, transparent);
+}
+
+.job-orders-search-token-field-chips,
+.candidates-search-token-field-chips,
+.clients-search-token-field-chips,
+.contacts-search-token-field-chips,
+.submissions-search-token-field-chips,
+.interviews-search-token-field-chips,
+.placements-search-token-field-chips {
+	display: flex;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.job-orders-search-token-field input,
+.candidates-search-token-field input,
+.clients-search-token-field input,
+.contacts-search-token-field input,
+.submissions-search-token-field input,
+.interviews-search-token-field input,
+.placements-search-token-field input {
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	padding: 0.16rem 0;
+	min-width: 12rem;
+	flex: 1 1 12rem;
+}
+
+.job-orders-search-token-field input:focus,
+.candidates-search-token-field input:focus,
+.clients-search-token-field input:focus,
+.contacts-search-token-field input:focus,
+.submissions-search-token-field input:focus,
+.interviews-search-token-field input:focus,
+.placements-search-token-field input:focus {
+	outline: none;
+}
+
+.job-orders-search-token-field .chip,
+.candidates-search-token-field .chip,
+.clients-search-token-field .chip,
+.contacts-search-token-field .chip,
+.submissions-search-token-field .chip,
+.interviews-search-token-field .chip,
+.placements-search-token-field .chip {
+	background: var(--ui-secondary-bg);
+	border-color: var(--ui-secondary-border);
+	color: var(--ui-secondary-ink);
+}
+
+.job-orders-advanced-search-chip,
+.candidates-advanced-search-chip,
+.clients-advanced-search-chip,
+.contacts-advanced-search-chip,
+.submissions-advanced-search-chip,
+.interviews-advanced-search-chip,
+.placements-advanced-search-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.38rem;
+	padding: 0.28rem 0.58rem;
+}
+
+.job-orders-advanced-search-chip-remove,
+.candidates-advanced-search-chip-remove,
+.clients-advanced-search-chip-remove,
+.contacts-advanced-search-chip-remove,
+.submissions-advanced-search-chip-remove,
+.interviews-advanced-search-chip-remove,
+.placements-advanced-search-chip-remove {
+	background: transparent;
+	border: 0;
+	color: inherit;
+	min-height: 0;
+	width: auto;
+	padding: 0;
+	font-size: 0.78rem;
+	line-height: 1;
+	cursor: pointer;
+	box-shadow: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.job-orders-advanced-search-chip-remove svg,
+.candidates-advanced-search-chip-remove svg,
+.clients-advanced-search-chip-remove svg,
+.contacts-advanced-search-chip-remove svg,
+.submissions-advanced-search-chip-remove svg,
+.interviews-advanced-search-chip-remove svg,
+.placements-advanced-search-chip-remove svg {
+	width: 0.76rem;
+	height: 0.76rem;
+	stroke-width: 2.2;
+}
+
+.job-orders-advanced-search-chip-remove:hover:not(:disabled),
+.candidates-advanced-search-chip-remove:hover:not(:disabled),
+.clients-advanced-search-chip-remove:hover:not(:disabled),
+.contacts-advanced-search-chip-remove:hover:not(:disabled),
+.submissions-advanced-search-chip-remove:hover:not(:disabled),
+.interviews-advanced-search-chip-remove:hover:not(:disabled),
+.placements-advanced-search-chip-remove:hover:not(:disabled) {
+	background: transparent;
+	border-color: transparent;
+	color: var(--ui-secondary-hover-ink);
+	box-shadow: none;
+}
+
+.job-orders-advanced-search-chip-remove:focus-visible,
+.candidates-advanced-search-chip-remove:focus-visible,
+.clients-advanced-search-chip-remove:focus-visible,
+.contacts-advanced-search-chip-remove:focus-visible,
+.submissions-advanced-search-chip-remove:focus-visible,
+.interviews-advanced-search-chip-remove:focus-visible,
+.placements-advanced-search-chip-remove:focus-visible {
+	outline: 2px solid var(--ui-primary-focus);
+	outline-offset: 2px;
 }
 
 .saved-list-views-menu {
@@ -8015,6 +8467,98 @@ small {
 	.list-controls-toolbar-group {
 		width: 100%;
 		justify-content: flex-end;
+	}
+
+	.job-orders-list-controls,
+	.list-controls-with-columns.job-orders-list-controls,
+	.candidates-list-controls,
+	.list-controls-with-columns.candidates-list-controls,
+	.clients-list-controls,
+	.list-controls-with-columns.clients-list-controls,
+	.contacts-list-controls,
+	.list-controls-with-columns.contacts-list-controls,
+	.submissions-list-controls,
+	.list-controls-with-columns.submissions-list-controls,
+	.interviews-list-controls,
+	.list-controls-with-columns.interviews-list-controls,
+	.placements-list-controls,
+	.list-controls-with-columns.placements-list-controls {
+		grid-template-columns: 1fr;
+	}
+
+	.job-orders-search-token-field input,
+	.candidates-search-token-field input,
+	.clients-search-token-field input,
+	.contacts-search-token-field input,
+	.submissions-search-token-field input,
+	.interviews-search-token-field input,
+	.placements-search-token-field input {
+		min-width: 8rem;
+		flex-basis: 8rem;
+	}
+
+	.job-orders-list-controls-tools,
+	.candidates-list-controls-tools,
+	.clients-list-controls-tools,
+	.contacts-list-controls-tools,
+	.submissions-list-controls-tools,
+	.interviews-list-controls-tools,
+	.placements-list-controls-tools {
+		margin-left: 0;
+		width: 100%;
+		flex-wrap: wrap;
+		justify-content: flex-start;
+	}
+
+	.job-orders-list-controls .table-toolbar-right,
+	.job-orders-list-controls .table-toolbar-button,
+	.job-orders-advanced-search-toggle,
+	.candidates-list-controls .table-toolbar-right,
+	.candidates-list-controls .table-toolbar-button,
+	.candidates-advanced-search-toggle,
+	.clients-list-controls .table-toolbar-right,
+	.clients-list-controls .table-toolbar-button,
+	.clients-advanced-search-toggle,
+	.contacts-list-controls .table-toolbar-right,
+	.contacts-list-controls .table-toolbar-button,
+	.contacts-advanced-search-toggle,
+	.submissions-list-controls .table-toolbar-right,
+	.submissions-list-controls .table-toolbar-button,
+	.submissions-advanced-search-toggle,
+	.interviews-list-controls .table-toolbar-right,
+	.interviews-list-controls .table-toolbar-button,
+	.interviews-advanced-search-toggle,
+	.placements-list-controls .table-toolbar-right,
+	.placements-list-controls .table-toolbar-button,
+	.placements-advanced-search-toggle {
+		width: auto;
+		max-width: 100%;
+	}
+
+	.job-order-advanced-search-modal {
+		width: min(100vw - 1rem, 68rem);
+		max-height: calc(100vh - 1rem);
+		padding: 0.9rem;
+	}
+
+	.job-order-advanced-search-summary,
+	.job-order-advanced-search-toolbar,
+	.job-order-advanced-search-footer,
+	.job-orders-advanced-search-summary {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.job-order-advanced-search-row {
+		grid-template-columns: 1fr;
+	}
+
+	.job-order-advanced-search-row-spacer {
+		display: none;
+	}
+
+	.job-orders-advanced-search-summary {
+		margin-top: 0.35rem;
 	}
 
 	.kanban-column {

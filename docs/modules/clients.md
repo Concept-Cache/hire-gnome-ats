@@ -3,6 +3,8 @@
 ## What This Module Is For
 Clients represents companies your team sells into and recruits for.
 
+The clients list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like owner, status, notes count, job-order volume, and last-activity dates without overloading the basic search box.
+
 ## Key Fields
 - Client name
 - Status (`Prospect`, `Active`, `Active + Verified`, `Inactive`)
@@ -39,3 +41,12 @@ From client detail, common actions include:
 ## Team Accountability
 - Keep notes factual and timestamped.
 - Capture ownership changes through normal save flow so audit logs track who changed what.
+
+## Advanced Search
+Use advanced search on the clients list when quick lookup is not enough.
+
+Useful examples:
+- `Status = Active`
+- `Job Orders >= 3`
+- `Notes > 0`
+- `Last Activity Date in past 30 days`

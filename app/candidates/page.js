@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutGrid, LayoutList, Plus } from 'lucide-react';
+import { Filter, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
+import CandidateAdvancedSearchModal from '@/app/components/candidate-advanced-search-modal';
 import EntityTable from '@/app/components/entity-table';
 import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
@@ -11,6 +12,11 @@ import KanbanBoard from '@/app/components/kanban-board';
 import { useToast } from '@/app/components/toast-provider';
 import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
+import {
+	evaluateCandidateAdvancedCriteria,
+	normalizeCandidateAdvancedCriteria,
+	summarizeCandidateAdvancedCriterion
+} from '@/lib/candidate-advanced-search';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { CANDIDATE_STATUS_OPTIONS } from '@/lib/candidate-status';
@@ -45,8 +51,8 @@ export default function CandidatesPage() {
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
-	const [statusFilter, setStatusFilter] = useState('all');
-	const [ownerFilter, setOwnerFilter] = useState('all');
+	const [advancedCriteria, setAdvancedCriteria] = useState([]);
+	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const [viewMode, setViewMode] = useState('list');
 	const [movingRowIds, setMovingRowIds] = useState(new Set());
 	const { archivedIdSet } = useArchivedEntities('CANDIDATE');
@@ -62,20 +68,44 @@ export default function CandidatesPage() {
 		);
 	}, [activeRows]);
 
-	const filteredRows = useMemo(() => {
+	const sourceOptions = useMemo(() => {
+		return [...new Set(activeRows.map((row) => row.sourceLabel).filter((value) => value && value !== '-'))].sort((a, b) =>
+			String(a).localeCompare(String(b))
+		);
+	}, [activeRows]);
+
+	const divisionOptions = useMemo(() => {
+		return [...new Set(activeRows.map((row) => row.divisionName).filter((value) => value && value !== '-'))].sort((a, b) =>
+			String(a).localeCompare(String(b))
+		);
+	}, [activeRows]);
+
+	const normalizedAdvancedCriteria = useMemo(
+		() => normalizeCandidateAdvancedCriteria(advancedCriteria),
+		[advancedCriteria]
+	);
+
+	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.fullName} ${row.email} ${row.status} ${row.statusLabel} ${row.source ?? ''} ${row.currentEmployer ?? ''}`
+				`${row.fullName} ${row.email} ${row.status} ${row.statusLabel} ${row.source ?? ''} ${row.currentEmployer ?? ''} ${row.ownerName ?? ''}`
 					.toLowerCase()
 					.includes(q);
-			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
-			const matchesOwner = ownerFilter === 'all' || row.ownerName === ownerFilter;
-			return matchesQuery && matchesStatus && matchesOwner;
+			return matchesQuery;
 		});
-	}, [activeRows, query, statusFilter, ownerFilter]);
+	}, [activeRows, query]);
+
+	const filteredRows = useMemo(() => {
+		return quickFilteredRows.filter((row) => evaluateCandidateAdvancedCriteria(row, normalizedAdvancedCriteria));
+	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	const advancedCriteriaSummary = useMemo(
+		() => normalizedAdvancedCriteria.map((criterion) => summarizeCandidateAdvancedCriterion(criterion)).filter(Boolean),
+		[normalizedAdvancedCriteria]
+	);
 
 	const kanbanRows = useMemo(() => {
 		return [...filteredRows].sort((a, b) => {
@@ -152,6 +182,7 @@ export default function CandidatesPage() {
 						submissionCount: candidate._count?.submissions || 0,
 						noteCount: candidate._count?.notes || 0,
 						activityCount: candidate._count?.activities || 0,
+						fileCount: candidate._count?.attachments || 0,
 						ownerName: candidate.ownerUser
 							? `${candidate.ownerUser.firstName} ${candidate.ownerUser.lastName}`.trim()
 							: '-'
@@ -182,10 +213,13 @@ export default function CandidatesPage() {
 
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
-		setStatusFilter(String(nextState.statusFilter || 'all'));
-		setOwnerFilter(String(nextState.ownerFilter || 'all'));
+		setAdvancedCriteria(normalizeCandidateAdvancedCriteria(nextState.advancedCriteria || []));
 		const nextViewMode = String(nextState.viewMode || 'list');
 		setNextViewMode(nextViewMode === 'kanban' ? 'kanban' : 'list');
+	}
+
+	function removeAdvancedCriterion(indexToRemove) {
+		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
 	async function onMoveCandidate(rowId, nextStatus) {
@@ -337,40 +371,64 @@ export default function CandidatesPage() {
 						</button>
 					</div>
 				</div>
-				<div className={`list-controls list-controls-three${viewMode === 'list' ? ' list-controls-with-columns' : ''}`}>
-					<input
-						placeholder="Search name, owner, title, email"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-					<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-						<option value="all">All Stages</option>
-						{CANDIDATE_STATUS_OPTIONS.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-					<select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
-						<option value="all">All Owners</option>
-						{ownerOptions.map((owner) => (
-							<option key={owner} value={owner}>
-								{owner}
-							</option>
-						))}
-					</select>
-					{viewMode === 'list' ? (
-						<div className="list-controls-toolbar-group">
-							<SavedListViews
-								listKey="candidates"
-								columns={columns}
-								defaultState={{ query: '', statusFilter: 'all', ownerFilter: 'all', viewMode: 'list' }}
-								currentState={{ query, statusFilter, ownerFilter, viewMode }}
-								onApplyState={applySavedViewState}
-							/>
-							<TableColumnPicker tableKey="candidates" columns={columns} />
+				<div className="list-controls candidates-list-controls">
+					{advancedCriteriaSummary.length > 0 ? (
+						<div className="candidates-search-token-field">
+							<div className="candidates-search-token-field-chips" aria-label="Active advanced filters">
+								{advancedCriteriaSummary.map((summary, index) => (
+									<span key={`${summary}-${index}`} className="chip candidates-advanced-search-chip">
+										<span>{summary}</span>
+										<button
+											type="button"
+											className="candidates-advanced-search-chip-remove"
+											onClick={() => removeAdvancedCriterion(index)}
+											aria-label={`Remove ${summary}`}
+											title={`Remove ${summary}`}
+										>
+											<X aria-hidden="true" />
+										</button>
+									</span>
+								))}
+								<input
+									placeholder="Search within filtered candidates"
+									value={query}
+									onChange={(e) => setQuery(e.target.value)}
+									aria-label="Search within advanced filtered candidates"
+								/>
+							</div>
 						</div>
-					) : null}
+					) : (
+						<input
+							placeholder="Search name, owner, title, email"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+						/>
+					)}
+					<div className="list-controls-toolbar-group candidates-list-controls-tools">
+						<button
+							type="button"
+							className="table-toolbar-button candidates-advanced-search-toggle"
+							onClick={() => setAdvancedSearchOpen(true)}
+						>
+							<Filter aria-hidden="true" />
+							Advanced Search
+							{advancedCriteriaSummary.length > 0 ? (
+								<span className="candidates-advanced-search-count">{advancedCriteriaSummary.length}</span>
+							) : null}
+						</button>
+						{viewMode === 'list' ? (
+							<>
+								<SavedListViews
+									listKey="candidates"
+									columns={columns}
+									defaultState={{ query: '', advancedCriteria: [], viewMode: 'list' }}
+									currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, viewMode }}
+									onApplyState={applySavedViewState}
+								/>
+								<TableColumnPicker tableKey="candidates" columns={columns} />
+							</>
+						) : null}
+					</div>
 				</div>
 				{viewMode === 'list' ? (
 					<EntityTable
@@ -405,6 +463,18 @@ export default function CandidatesPage() {
 					/>
 				)}
 			</article>
+			<CandidateAdvancedSearchModal
+				open={advancedSearchOpen}
+				criteria={normalizedAdvancedCriteria}
+				ownerOptions={ownerOptions}
+				sourceOptions={sourceOptions}
+				divisionOptions={divisionOptions}
+				onApply={(nextCriteria) => {
+					setAdvancedCriteria(normalizeCandidateAdvancedCriteria(nextCriteria));
+					setAdvancedSearchOpen(false);
+				}}
+				onClose={() => setAdvancedSearchOpen(false)}
+			/>
 		</section>
 	);
 }

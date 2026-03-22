@@ -39,7 +39,7 @@ const candidateListInclude = {
 			}
 		}
 	},
-	_count: { select: { submissions: true, notes: true, activities: true } },
+	_count: { select: { submissions: true, notes: true, activities: true, attachments: true } },
 	candidateEducations: {
 		select: { id: true }
 	},

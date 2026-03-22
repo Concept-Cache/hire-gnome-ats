@@ -40,6 +40,13 @@ Use this sequence as your default process:
 - Top search: global search across records.
 - User menu (`top-right`): account settings, Help, and sign out.
 - List pages: search, filters, sorting, paging, and column chooser.
+- `Job Orders` also includes a separate `Advanced Search` builder for structured criteria like date ranges and minimum submissions, without replacing the fast basic search box.
+- `Candidates` also includes a separate `Advanced Search` builder for structured criteria like owner, source, profile completeness, and activity thresholds, without replacing the fast basic search box.
+- `Clients` also includes a separate `Advanced Search` builder for structured criteria like owner, status, notes volume, job-order volume, and last-activity dates, without replacing the fast basic search box.
+- `Contacts` also includes a separate `Advanced Search` builder for structured criteria like client, owner, status, notes volume, job-order counts, and last-activity dates, without replacing the fast basic search box.
+- `Submissions` also includes a separate `Advanced Search` builder for structured criteria like status, origin, submitter, client-portal visibility, and submitted/updated date ranges, without replacing the fast basic search box.
+- `Interviews` also includes a separate `Advanced Search` builder for structured criteria like type, status, interviewer, location, and start-date ranges, without replacing the fast basic search box.
+- `Placements` also includes a separate `Advanced Search` builder for structured criteria like placement type, compensation type, status, and offered/join/end date ranges, without replacing the fast basic search box.
 - Column chooser keeps the default list layouts intact while letting users reveal extra optional columns per module, drag columns into a preferred order, and save those preferences to their user account so the same view follows them across devices.
 - Saved views let you capture the current list state as a reusable named view, including filters and column layout, apply it later, and set one saved view as your personal default per module.
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
@@ -132,6 +139,7 @@ Profile completeness:
 - Uses existing profile data to score recruiter readiness.
 - Highlights top missing profile gaps like resume summary, skills, work history, education, resume attachment, and required custom fields.
 - Also appears as a compact score chip on the candidates list.
+- Use `Advanced Search` on the candidates list when quick lookup is not enough, for example `Profile Completeness >= 80` plus `Submissions >= 2` or `Last Activity Date in past 14 days`.
 - Creating a submission from a low-completeness candidate shows a soft warning, but does not hard-block the workflow.
 
 Duplicate handling:
@@ -157,6 +165,9 @@ Common actions:
 - New contact (client locked)
 - New job order (client locked)
 
+List workflow:
+- Use `Advanced Search` on the clients list when quick lookup is not enough, for example `Status = Active` plus `Job Orders >= 3` or `Last Activity Date in past 30 days`.
+
 ## Contacts
 
 Primary purpose:
@@ -178,6 +189,7 @@ Behavior notes:
 - For existing contact records, client is not editable.
 - Contact actions include `Draft Email` for recruiter-facing outbound draft generation.
 - If OpenAI is not configured, the action stays visible but disabled with a hint.
+- Use `Advanced Search` on the contacts list when quick lookup is not enough, for example `Client = Atlas Test` plus `Job Orders >= 1` or `Last Activity Date in past 30 days`.
 
 ## Job Orders
 
@@ -206,6 +218,7 @@ Submission workflow:
 - Sending the portal link from the modal uses a branded email invite that follows the selected theme, with a direct portal CTA and job context for the client contact.
 - In the client portal, hiring managers can save structured scorecards for `Communication`, `Technical Fit`, `Culture Fit`, and `Overall Recommendation` alongside comments or interview/pass actions.
 - If the client portal is disabled in `Admin Area > System Settings`, passive portal UI is hidden and the actions-menu entry will explain that an administrator must enable it.
+- Use `Advanced Search` on the job-order list when the basic search is not enough, for example `closed in the past 30 days` plus `Submissions >= 4`.
 
 ## Submissions
 
@@ -231,6 +244,7 @@ Behavior notes:
 - The client portal only exposes the candidate's labeled primary resume. If no primary resume is set, the portal does not offer a file download.
 - Submission detail includes a `Client Portal` visibility field plus actions to `Promote to Client Portal` or `Hide from Client Portal`.
 - Submission detail also includes a `Submission Packet` action that opens a print-friendly internal packet for browser PDF export.
+- Use `Advanced Search` on the submissions list when quick lookup is not enough, for example `Origin = Web` plus `Client Portal = Hidden` or `Submitted At in past 14 days`.
 
 ## Interviews
 
@@ -255,6 +269,7 @@ Calendar + email behavior:
 - Status `Completed` does not trigger invite update emails.
 - Cancel interview action requires confirmation and marks status accordingly.
 - `Interview Questions` are generated on demand, saved on the record, editable, and can be refreshed or copied later.
+- Use `Advanced Search` on the interviews list when quick lookup is not enough, for example `Type = Video` plus `Starts At in past 7 days`.
 
 ## Placements
 
@@ -270,6 +285,7 @@ Common actions:
 Status behavior:
 - `Accepted` locks the placement record read-only.
 - Actions include withdraw/cancel with confirmation and reason capture.
+- Use `Advanced Search` on the placements list when quick lookup is not enough, for example `Placement Type = Perm` plus `Compensation Type = Salary` or `Expected Join in past 30 days`.
 
 ## Archive
 

@@ -20,8 +20,31 @@ import { withApiLogging } from '@/lib/api-logging';
 const clientListInclude = {
 	ownerUser: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true } },
 	division: { select: { id: true, name: true, accessMode: true } },
-	_count: { select: { contacts: true, jobOrders: true } }
+	_count: { select: { contacts: true, jobOrders: true, notes: true } },
+	notes: {
+		select: { createdAt: true, updatedAt: true },
+		orderBy: { updatedAt: 'desc' },
+		take: 1
+	}
 };
+
+function toTime(value) {
+	if (!value) return null;
+	const date = new Date(value);
+	const time = date.getTime();
+	return Number.isNaN(time) ? null : time;
+}
+
+function resolveClientLastActivityAt(client) {
+	const timestamps = [
+		toTime(client.updatedAt),
+		toTime(client.notes?.[0]?.updatedAt),
+		toTime(client.notes?.[0]?.createdAt)
+	].filter((value) => typeof value === 'number');
+
+	if (timestamps.length === 0) return null;
+	return new Date(Math.max(...timestamps)).toISOString();
+}
 
 function handleError(error, fallbackMessage) {
 	if (error instanceof AccessControlError) {
@@ -43,7 +66,15 @@ async function getClientsHandler(req) {
 			include: clientListInclude
 		});
 
-		return NextResponse.json(clients);
+		const clientRows = clients.map((client) => {
+			const { notes, ...clientRest } = client;
+			return {
+				...clientRest,
+				lastActivityAt: resolveClientLastActivityAt(client)
+			};
+		});
+
+		return NextResponse.json(clientRows);
 	} catch (error) {
 		return handleError(error, 'Failed to load clients.');
 	}

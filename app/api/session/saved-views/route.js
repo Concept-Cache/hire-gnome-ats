@@ -13,8 +13,10 @@ import {
 import { normalizeColumnVisibilityState } from '@/lib/table-columns';
 import { withApiLogging } from '@/lib/api-logging';
 
-const primitiveSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
-const listViewStateSchema = z.record(z.string().trim().min(1), primitiveSchema).default({});
+const jsonSafeValueSchema = z.lazy(() =>
+	z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonSafeValueSchema), z.record(z.string().trim().min(1), jsonSafeValueSchema)])
+);
+const listViewStateSchema = z.record(z.string().trim().min(1), jsonSafeValueSchema).default({});
 const visibilityStateSchema = z.object({
 	hiddenColumnKeys: z.array(z.string().trim().min(1)).default([]),
 	shownColumnKeys: z.array(z.string().trim().min(1)).default([]),

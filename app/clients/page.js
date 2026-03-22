@@ -3,16 +3,27 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Filter, Plus, X } from 'lucide-react';
+import ClientAdvancedSearchModal from '@/app/components/client-advanced-search-modal';
 import EntityTable from '@/app/components/entity-table';
 import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
-import { CLIENT_STATUS_OPTIONS, normalizeClientStatusValue } from '@/lib/client-status-options';
+import {
+	evaluateClientAdvancedCriteria,
+	normalizeClientAdvancedCriteria,
+	summarizeClientAdvancedCriterion
+} from '@/lib/client-advanced-search';
+import { normalizeClientStatusValue } from '@/lib/client-status-options';
+import { formatDateTimeAt } from '@/lib/date-format';
 
 function formatLocation(city, state) {
 	const parts = [city, state].map((value) => String(value || '').trim()).filter(Boolean);
 	return parts.length > 0 ? parts.join(', ') : '-';
+}
+
+function formatDateTime(value) {
+	return formatDateTimeAt(value);
 }
 
 export default function ClientsPage() {
@@ -20,8 +31,8 @@ export default function ClientsPage() {
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
-	const [statusFilter, setStatusFilter] = useState('all');
-	const [ownerFilter, setOwnerFilter] = useState('all');
+	const [advancedCriteria, setAdvancedCriteria] = useState([]);
+	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const { archivedIdSet } = useArchivedEntities('CLIENT');
 
 	const activeRows = useMemo(
@@ -35,19 +46,37 @@ export default function ClientsPage() {
 		);
 	}, [activeRows]);
 
-	const filteredRows = useMemo(() => {
+	const divisionOptions = useMemo(() => {
+		return [...new Set(activeRows.map((row) => row.divisionName).filter((value) => value && value !== '-'))].sort((a, b) =>
+			String(a).localeCompare(String(b))
+		);
+	}, [activeRows]);
+
+	const normalizedAdvancedCriteria = useMemo(
+		() => normalizeClientAdvancedCriteria(advancedCriteria),
+		[advancedCriteria]
+	);
+
+	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.name} ${row.industry ?? ''} ${row.status ?? ''} ${row.owner ?? ''}`
+				`${row.name} ${row.industry ?? ''} ${row.status ?? ''} ${row.owner ?? ''} ${row.locationLabel ?? ''}`
 					.toLowerCase()
 					.includes(q);
-			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
-			const matchesOwner = ownerFilter === 'all' || row.owner === ownerFilter;
-			return matchesQuery && matchesStatus && matchesOwner;
+			return matchesQuery;
 		});
-	}, [activeRows, query, statusFilter, ownerFilter]);
+	}, [activeRows, query]);
+
+	const filteredRows = useMemo(() => {
+		return quickFilteredRows.filter((row) => evaluateClientAdvancedCriteria(row, normalizedAdvancedCriteria));
+	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	const advancedCriteriaSummary = useMemo(
+		() => normalizedAdvancedCriteria.map((criterion) => summarizeClientAdvancedCriterion(criterion)).filter(Boolean),
+		[normalizedAdvancedCriteria]
+	);
 
 	async function load() {
 		setLoading(true);
@@ -63,6 +92,9 @@ export default function ClientsPage() {
 					websiteLabel: client.website || '-',
 					contactCount: client._count?.contacts || 0,
 					jobOrderCount: client._count?.jobOrders || 0,
+					noteCount: client._count?.notes || 0,
+					lastActivityAt: client.lastActivityAt || client.updatedAt || client.createdAt || null,
+					lastActivityAtLabel: formatDateTime(client.lastActivityAt || client.updatedAt || client.createdAt || null),
 					owner: client.ownerUser
 						? `${client.ownerUser.firstName} ${client.ownerUser.lastName}`
 						: '-'
@@ -83,8 +115,11 @@ export default function ClientsPage() {
 
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
-		setStatusFilter(String(nextState.statusFilter || 'all'));
-		setOwnerFilter(String(nextState.ownerFilter || 'all'));
+		setAdvancedCriteria(normalizeClientAdvancedCriteria(nextState.advancedCriteria || []));
+	}
+
+	function removeAdvancedCriterion(indexToRemove) {
+		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
 	const columns = [
@@ -96,7 +131,9 @@ export default function ClientsPage() {
 		{ key: 'divisionName', label: 'Division', defaultVisible: false },
 		{ key: 'websiteLabel', label: 'Website', defaultVisible: false },
 		{ key: 'contactCount', label: 'Contacts', defaultVisible: false },
-		{ key: 'jobOrderCount', label: 'Job Orders', defaultVisible: false }
+		{ key: 'jobOrderCount', label: 'Job Orders', defaultVisible: false },
+		{ key: 'noteCount', label: 'Notes', defaultVisible: false },
+		{ key: 'lastActivityAtLabel', label: 'Last Activity Date', defaultVisible: false, getSortValue: (row) => row.lastActivityAt || '' }
 	];
 
 	return (
@@ -114,34 +151,56 @@ export default function ClientsPage() {
 
 			<article className="panel">
 				<h3>Client List</h3>
-					<div className="list-controls list-controls-three list-controls-with-columns">
-						<input
-							placeholder="Search client, industry, status, owner"
-							value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-					<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-						<option value="all">All Statuses</option>
-						{CLIENT_STATUS_OPTIONS.map((status) => (
-							<option key={status.value} value={status.value}>
-								{status.label}
-							</option>
-						))}
-					</select>
-						<select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
-							<option value="all">All Owners</option>
-						{ownerOptions.map((owner) => (
-							<option key={owner} value={owner}>
-								{owner}
-							</option>
-							))}
-						</select>
-						<div className="list-controls-toolbar-group">
+					<div className="list-controls clients-list-controls">
+						{advancedCriteriaSummary.length > 0 ? (
+							<div className="clients-search-token-field">
+								<div className="clients-search-token-field-chips" aria-label="Active advanced filters">
+									{advancedCriteriaSummary.map((summary, index) => (
+										<span key={`${summary}-${index}`} className="chip clients-advanced-search-chip">
+											<span>{summary}</span>
+											<button
+												type="button"
+												className="clients-advanced-search-chip-remove"
+												onClick={() => removeAdvancedCriterion(index)}
+												aria-label={`Remove ${summary}`}
+												title={`Remove ${summary}`}
+											>
+												<X aria-hidden="true" />
+											</button>
+										</span>
+									))}
+									<input
+										placeholder="Search within filtered clients"
+										value={query}
+										onChange={(e) => setQuery(e.target.value)}
+										aria-label="Search within advanced filtered clients"
+									/>
+								</div>
+							</div>
+						) : (
+							<input
+								placeholder="Search client, industry, status, owner"
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+							/>
+						)}
+						<div className="list-controls-toolbar-group clients-list-controls-tools">
+							<button
+								type="button"
+								className="table-toolbar-button clients-advanced-search-toggle"
+								onClick={() => setAdvancedSearchOpen(true)}
+							>
+								<Filter aria-hidden="true" />
+								Advanced Search
+								{advancedCriteriaSummary.length > 0 ? (
+									<span className="clients-advanced-search-count">{advancedCriteriaSummary.length}</span>
+								) : null}
+							</button>
 							<SavedListViews
 								listKey="clients"
 								columns={columns}
-								defaultState={{ query: '', statusFilter: 'all', ownerFilter: 'all' }}
-								currentState={{ query, statusFilter, ownerFilter }}
+								defaultState={{ query: '', advancedCriteria: [] }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="clients" columns={columns} />
@@ -156,6 +215,17 @@ export default function ClientsPage() {
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
+			<ClientAdvancedSearchModal
+				open={advancedSearchOpen}
+				criteria={normalizedAdvancedCriteria}
+				ownerOptions={ownerOptions}
+				divisionOptions={divisionOptions}
+				onApply={(nextCriteria) => {
+					setAdvancedCriteria(normalizeClientAdvancedCriteria(nextCriteria));
+					setAdvancedSearchOpen(false);
+				}}
+				onClose={() => setAdvancedSearchOpen(false)}
+			/>
 		</section>
 	);
 }

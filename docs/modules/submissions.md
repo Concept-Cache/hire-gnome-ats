@@ -3,6 +3,8 @@
 ## What This Module Is For
 Submissions tracks candidate presentation to a specific job order.
 
+The submissions list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like status, origin, submitter, client-portal visibility, and submitted/updated date ranges without overloading the basic search box.
+
 ## Core Relationships
 Each submission is linked to:
 - One candidate
@@ -78,3 +80,13 @@ Snapshot emphasizes immutable context and links back to source records.
 ## Best Practice
 - Always add concise submission notes so downstream users understand positioning.
 - Keep status current to improve dashboard priority logic.
+
+## Advanced Search
+Use advanced search on the submissions list when quick lookup is not enough.
+
+Useful examples:
+- `Status = Submitted`
+- `Origin = Web`
+- `Client Portal = Hidden`
+- `Submitted By = Alicia Morgan`
+- `Submitted At in past 14 days`

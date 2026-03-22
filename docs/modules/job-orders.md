@@ -81,3 +81,13 @@ Behavior:
 1. Keep internal and public descriptions distinct.
 2. Confirm hiring manager contact before first submission.
 3. Close job orders promptly when no longer active.
+
+## List Search
+The job-order list keeps the basic search for fast lookups and adds a separate `Advanced Search` builder for structured criteria.
+
+Advanced search supports combining criteria such as:
+- Closed date in the past `30` days
+- `Submissions` greater than or equal to `4`
+- Specific owner, client, status, employment type, or career-site visibility
+
+Advanced search stays additive to the basic list search and can be saved as part of a saved view.
