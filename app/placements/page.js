@@ -3,13 +3,19 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Filter, Plus, X } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import PlacementAdvancedSearchModal from '@/app/components/placement-advanced-search-modal';
 import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	evaluatePlacementAdvancedCriteria,
+	normalizePlacementAdvancedCriteria,
+	summarizePlacementAdvancedCriterion
+} from '@/lib/placement-advanced-search';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 
 function formatDateTime(value) {
@@ -99,8 +105,8 @@ export default function PlacementsPage() {
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
-	const [statusFilter, setStatusFilter] = useState('all');
-	const [typeFilter, setTypeFilter] = useState('all');
+	const [advancedCriteria, setAdvancedCriteria] = useState([]);
+	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const { archivedIdSet } = useArchivedEntities('PLACEMENT');
 
 	const activeRows = useMemo(
@@ -126,7 +132,12 @@ export default function PlacementsPage() {
 			.sort((a, b) => a.label.localeCompare(b.label));
 	}, [activeRows]);
 
-	const filteredRows = useMemo(() => {
+	const normalizedAdvancedCriteria = useMemo(
+		() => normalizePlacementAdvancedCriteria(advancedCriteria),
+		[advancedCriteria]
+	);
+
+	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return activeRows.filter((row) => {
 			const matchesQuery =
@@ -134,11 +145,18 @@ export default function PlacementsPage() {
 				`${row.candidate} ${row.jobOrder} ${row.client} ${row.statusLabel} ${row.placementTypeLabel} ${row.compensationLabel}`
 					.toLowerCase()
 					.includes(q);
-			const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
-			const matchesType = typeFilter === 'all' || row.placementType === typeFilter;
-			return matchesQuery && matchesStatus && matchesType;
+			return matchesQuery;
 		});
-	}, [activeRows, query, statusFilter, typeFilter]);
+	}, [activeRows, query]);
+
+	const filteredRows = useMemo(() => {
+		return quickFilteredRows.filter((row) => evaluatePlacementAdvancedCriteria(row, normalizedAdvancedCriteria));
+	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	const advancedCriteriaSummary = useMemo(
+		() => normalizedAdvancedCriteria.map((criterion) => summarizePlacementAdvancedCriterion(criterion)).filter(Boolean),
+		[normalizedAdvancedCriteria]
+	);
 
 	useEffect(() => {
 		let active = true;
@@ -188,8 +206,11 @@ export default function PlacementsPage() {
 
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
-		setStatusFilter(String(nextState.statusFilter || 'all'));
-		setTypeFilter(String(nextState.typeFilter || 'all'));
+		setAdvancedCriteria(normalizePlacementAdvancedCriteria(nextState.advancedCriteria || []));
+	}
+
+	function removeAdvancedCriterion(indexToRemove) {
+		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
 	const columns = [
@@ -252,34 +273,56 @@ export default function PlacementsPage() {
 
 			<article className="panel">
 				<h3>Placement List</h3>
-					<div className="list-controls list-controls-three list-controls-with-columns">
-					<input
-						placeholder="Search candidate, job order, status, type, compensation"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-					<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-						<option value="all">All Statuses</option>
-						{statusOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-						<select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-							<option value="all">All Types</option>
-						{typeOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-							))}
-						</select>
-						<div className="list-controls-toolbar-group">
+					<div className="list-controls placements-list-controls">
+					{advancedCriteriaSummary.length > 0 ? (
+						<div className="placements-search-token-field">
+							<div className="placements-search-token-field-chips" aria-label="Active advanced filters">
+								{advancedCriteriaSummary.map((summary, index) => (
+									<span key={`${summary}-${index}`} className="chip placements-advanced-search-chip">
+										<span>{summary}</span>
+										<button
+											type="button"
+											className="placements-advanced-search-chip-remove"
+											onClick={() => removeAdvancedCriterion(index)}
+											aria-label={`Remove ${summary}`}
+											title={`Remove ${summary}`}
+										>
+											<X aria-hidden="true" />
+										</button>
+									</span>
+								))}
+								<input
+									placeholder="Search within filtered placements"
+									value={query}
+									onChange={(e) => setQuery(e.target.value)}
+									aria-label="Search within advanced filtered placements"
+								/>
+							</div>
+						</div>
+					) : (
+						<input
+							placeholder="Search candidate, job order, status, type, compensation"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+						/>
+					)}
+						<div className="list-controls-toolbar-group placements-list-controls-tools">
+							<button
+								type="button"
+								className="table-toolbar-button placements-advanced-search-toggle"
+								onClick={() => setAdvancedSearchOpen(true)}
+							>
+								<Filter aria-hidden="true" />
+								Advanced Search
+								{advancedCriteriaSummary.length > 0 ? (
+									<span className="placements-advanced-search-count">{advancedCriteriaSummary.length}</span>
+								) : null}
+							</button>
 							<SavedListViews
 								listKey="placements"
 								columns={columns}
-								defaultState={{ query: '', statusFilter: 'all', typeFilter: 'all' }}
-								currentState={{ query, statusFilter, typeFilter }}
+								defaultState={{ query: '', advancedCriteria: [] }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="placements" columns={columns} />
@@ -294,6 +337,17 @@ export default function PlacementsPage() {
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
+			<PlacementAdvancedSearchModal
+				open={advancedSearchOpen}
+				criteria={normalizedAdvancedCriteria}
+				statusOptions={statusOptions}
+				typeOptions={typeOptions}
+				onApply={(nextCriteria) => {
+					setAdvancedCriteria(normalizePlacementAdvancedCriteria(nextCriteria));
+					setAdvancedSearchOpen(false);
+				}}
+				onClose={() => setAdvancedSearchOpen(false)}
+			/>
 		</section>
 	);
 }

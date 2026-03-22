@@ -3,14 +3,20 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Filter, Plus, X } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
+import InterviewAdvancedSearchModal from '@/app/components/interview-advanced-search-modal';
 import SavedListViews from '@/app/components/saved-list-views';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
+import {
+	evaluateInterviewAdvancedCriteria,
+	normalizeInterviewAdvancedCriteria,
+	summarizeInterviewAdvancedCriterion
+} from '@/lib/interview-advanced-search';
 import { normalizeInterviewType } from '@/app/constants/interview-type-options';
 
 function formatDateTime(value) {
@@ -22,7 +28,8 @@ export default function InterviewsPage() {
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
-	const [typeFilter, setTypeFilter] = useState('all');
+	const [advancedCriteria, setAdvancedCriteria] = useState([]);
+	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const { archivedIdSet } = useArchivedEntities('INTERVIEW');
 
 	const activeRows = useMemo(
@@ -39,7 +46,21 @@ export default function InterviewsPage() {
 			.sort((a, b) => a.label.localeCompare(b.label));
 	}, [activeRows]);
 
-	const filteredRows = useMemo(() => {
+	const statusOptions = useMemo(() => {
+		return [...new Set(activeRows.map((row) => row.status).filter(Boolean))]
+			.map((status) => ({
+				value: status,
+				label: activeRows.find((row) => row.status === status)?.statusLabel || status
+			}))
+			.sort((a, b) => a.label.localeCompare(b.label));
+	}, [activeRows]);
+
+	const normalizedAdvancedCriteria = useMemo(
+		() => normalizeInterviewAdvancedCriteria(advancedCriteria),
+		[advancedCriteria]
+	);
+
+	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return activeRows.filter((row) => {
 			const matchesQuery =
@@ -47,10 +68,18 @@ export default function InterviewsPage() {
 				`${row.subject} ${row.candidate} ${row.jobOrder} ${row.client} ${row.interviewMode} ${row.interviewModeLabel}`
 					.toLowerCase()
 					.includes(q);
-			const matchesType = typeFilter === 'all' || row.interviewMode === typeFilter;
-			return matchesQuery && matchesType;
+			return matchesQuery;
 		});
-	}, [activeRows, query, typeFilter]);
+	}, [activeRows, query]);
+
+	const filteredRows = useMemo(() => {
+		return quickFilteredRows.filter((row) => evaluateInterviewAdvancedCriteria(row, normalizedAdvancedCriteria));
+	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	const advancedCriteriaSummary = useMemo(
+		() => normalizedAdvancedCriteria.map((criterion) => summarizeInterviewAdvancedCriterion(criterion)).filter(Boolean),
+		[normalizedAdvancedCriteria]
+	);
 
 	async function load() {
 		setLoading(true);
@@ -93,7 +122,11 @@ export default function InterviewsPage() {
 
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
-		setTypeFilter(String(nextState.typeFilter || 'all'));
+		setAdvancedCriteria(normalizeInterviewAdvancedCriteria(nextState.advancedCriteria || []));
+	}
+
+	function removeAdvancedCriterion(indexToRemove) {
+		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
 	const columns = [
@@ -155,26 +188,56 @@ export default function InterviewsPage() {
 
 			<article className="panel">
 				<h3>Interview List</h3>
-					<div className="list-controls list-controls-two interview-list-controls list-controls-with-columns">
-						<input
-						placeholder="Search subject, candidate, client, job order"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-						<select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-							<option value="all">All Types</option>
-						{typeOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-							))}
-						</select>
-						<div className="list-controls-toolbar-group">
+					<div className="list-controls interviews-list-controls">
+						{advancedCriteriaSummary.length > 0 ? (
+							<div className="interviews-search-token-field">
+								<div className="interviews-search-token-field-chips" aria-label="Active advanced filters">
+									{advancedCriteriaSummary.map((summary, index) => (
+										<span key={`${summary}-${index}`} className="chip interviews-advanced-search-chip">
+											<span>{summary}</span>
+											<button
+												type="button"
+												className="interviews-advanced-search-chip-remove"
+												onClick={() => removeAdvancedCriterion(index)}
+												aria-label={`Remove ${summary}`}
+												title={`Remove ${summary}`}
+											>
+												<X aria-hidden="true" />
+											</button>
+										</span>
+									))}
+									<input
+										placeholder="Search within filtered interviews"
+										value={query}
+										onChange={(e) => setQuery(e.target.value)}
+										aria-label="Search within advanced filtered interviews"
+									/>
+								</div>
+							</div>
+						) : (
+							<input
+								placeholder="Search subject, candidate, client, job order"
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+							/>
+						)}
+						<div className="list-controls-toolbar-group interviews-list-controls-tools">
+							<button
+								type="button"
+								className="table-toolbar-button interviews-advanced-search-toggle"
+								onClick={() => setAdvancedSearchOpen(true)}
+							>
+								<Filter aria-hidden="true" />
+								Advanced Search
+								{advancedCriteriaSummary.length > 0 ? (
+									<span className="interviews-advanced-search-count">{advancedCriteriaSummary.length}</span>
+								) : null}
+							</button>
 							<SavedListViews
 								listKey="interviews"
 								columns={columns}
-								defaultState={{ query: '', typeFilter: 'all' }}
-								currentState={{ query, typeFilter }}
+								defaultState={{ query: '', advancedCriteria: [] }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="interviews" columns={columns} />
@@ -189,6 +252,17 @@ export default function InterviewsPage() {
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
+			<InterviewAdvancedSearchModal
+				open={advancedSearchOpen}
+				criteria={normalizedAdvancedCriteria}
+				typeOptions={typeOptions}
+				statusOptions={statusOptions}
+				onApply={(nextCriteria) => {
+					setAdvancedCriteria(normalizeInterviewAdvancedCriteria(nextCriteria));
+					setAdvancedSearchOpen(false);
+				}}
+				onClose={() => setAdvancedSearchOpen(false)}
+			/>
 		</section>
 	);
 }

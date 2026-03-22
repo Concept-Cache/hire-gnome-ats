@@ -3,14 +3,20 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Filter, Plus, X } from 'lucide-react';
 import EntityTable from '@/app/components/entity-table';
 import SavedListViews from '@/app/components/saved-list-views';
+import SubmissionAdvancedSearchModal from '@/app/components/submission-advanced-search-modal';
 import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
+import {
+	evaluateSubmissionAdvancedCriteria,
+	normalizeSubmissionAdvancedCriteria,
+	summarizeSubmissionAdvancedCriterion
+} from '@/lib/submission-advanced-search';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 
@@ -23,9 +29,8 @@ export default function SubmissionsPage() {
 	const [rows, setRows] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [query, setQuery] = useState('');
-	const [statusFilter, setStatusFilter] = useState('all');
-	const [submitterFilter, setSubmitterFilter] = useState('all');
-	const [originFilter, setOriginFilter] = useState('all');
+	const [advancedCriteria, setAdvancedCriteria] = useState([]);
+	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
 	const { archivedIdSet } = useArchivedEntities('SUBMISSION');
 
 	const activeRows = useMemo(
@@ -48,7 +53,12 @@ export default function SubmissionsPage() {
 		);
 	}, [activeRows]);
 
-	const filteredRows = useMemo(() => {
+	const normalizedAdvancedCriteria = useMemo(
+		() => normalizeSubmissionAdvancedCriteria(advancedCriteria),
+		[advancedCriteria]
+	);
+
+	const quickFilteredRows = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return activeRows.filter((row) => {
 			const matchesQuery =
@@ -56,12 +66,18 @@ export default function SubmissionsPage() {
 				`${row.candidate} ${row.jobOrder} ${row.client} ${row.effectiveStatus} ${row.statusLabel} ${row.originLabel ?? ''} ${row.submittedBy ?? ''}`
 					.toLowerCase()
 					.includes(q);
-			const matchesStatus = statusFilter === 'all' || row.effectiveStatus === statusFilter;
-			const matchesSubmitter = submitterFilter === 'all' || row.submittedBy === submitterFilter;
-			const matchesOrigin = originFilter === 'all' || String(row.originLabel || '').toLowerCase() === originFilter;
-			return matchesQuery && matchesStatus && matchesSubmitter && matchesOrigin;
+			return matchesQuery;
 		});
-	}, [activeRows, originFilter, query, statusFilter, submitterFilter]);
+	}, [activeRows, query]);
+
+	const filteredRows = useMemo(() => {
+		return quickFilteredRows.filter((row) => evaluateSubmissionAdvancedCriteria(row, normalizedAdvancedCriteria));
+	}, [normalizedAdvancedCriteria, quickFilteredRows]);
+
+	const advancedCriteriaSummary = useMemo(
+		() => normalizedAdvancedCriteria.map((criterion) => summarizeSubmissionAdvancedCriterion(criterion)).filter(Boolean),
+		[normalizedAdvancedCriteria]
+	);
 
 	async function load() {
 		setLoading(true);
@@ -105,9 +121,11 @@ export default function SubmissionsPage() {
 
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
-		setStatusFilter(String(nextState.statusFilter || 'all'));
-		setSubmitterFilter(String(nextState.submitterFilter || 'all'));
-		setOriginFilter(String(nextState.originFilter || 'all'));
+		setAdvancedCriteria(normalizeSubmissionAdvancedCriteria(nextState.advancedCriteria || []));
+	}
+
+	function removeAdvancedCriterion(indexToRemove) {
+		setAdvancedCriteria((current) => current.filter((_, index) => index !== indexToRemove));
 	}
 
 	const columns = [
@@ -194,39 +212,56 @@ export default function SubmissionsPage() {
 
 			<article className="panel">
 				<h3>Submission List</h3>
-					<div className="list-controls list-controls-four list-controls-with-columns">
-					<input
-						placeholder="Search candidate, job order, client, status, origin, submitter"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-					<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-						<option value="all">All Statuses</option>
-						{statusOptions.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-						<select value={submitterFilter} onChange={(e) => setSubmitterFilter(e.target.value)}>
-							<option value="all">All Submitters</option>
-						{submitterOptions.map((submitter) => (
-							<option key={submitter} value={submitter}>
-								{submitter}
-							</option>
-							))}
-						</select>
-						<select value={originFilter} onChange={(e) => setOriginFilter(e.target.value)}>
-							<option value="all">All Origins</option>
-							<option value="recruiter">Recruiter</option>
-							<option value="web">Web</option>
-						</select>
-						<div className="list-controls-toolbar-group">
+					<div className="list-controls submissions-list-controls">
+					{advancedCriteriaSummary.length > 0 ? (
+						<div className="submissions-search-token-field">
+							<div className="submissions-search-token-field-chips" aria-label="Active advanced filters">
+								{advancedCriteriaSummary.map((summary, index) => (
+									<span key={`${summary}-${index}`} className="chip submissions-advanced-search-chip">
+										<span>{summary}</span>
+										<button
+											type="button"
+											className="submissions-advanced-search-chip-remove"
+											onClick={() => removeAdvancedCriterion(index)}
+											aria-label={`Remove ${summary}`}
+											title={`Remove ${summary}`}
+										>
+											<X aria-hidden="true" />
+										</button>
+									</span>
+								))}
+								<input
+									placeholder="Search within filtered submissions"
+									value={query}
+									onChange={(e) => setQuery(e.target.value)}
+									aria-label="Search within advanced filtered submissions"
+								/>
+							</div>
+						</div>
+					) : (
+						<input
+							placeholder="Search candidate, job order, client, status, origin, submitter"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+						/>
+					)}
+						<div className="list-controls-toolbar-group submissions-list-controls-tools">
+							<button
+								type="button"
+								className="table-toolbar-button submissions-advanced-search-toggle"
+								onClick={() => setAdvancedSearchOpen(true)}
+							>
+								<Filter aria-hidden="true" />
+								Advanced Search
+								{advancedCriteriaSummary.length > 0 ? (
+									<span className="submissions-advanced-search-count">{advancedCriteriaSummary.length}</span>
+								) : null}
+							</button>
 							<SavedListViews
 								listKey="submissions"
 								columns={columns}
-								defaultState={{ query: '', statusFilter: 'all', submitterFilter: 'all', originFilter: 'all' }}
-								currentState={{ query, statusFilter, submitterFilter, originFilter }}
+								defaultState={{ query: '', advancedCriteria: [] }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="submissions" columns={columns} />
@@ -241,6 +276,17 @@ export default function SubmissionsPage() {
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>
+			<SubmissionAdvancedSearchModal
+				open={advancedSearchOpen}
+				criteria={normalizedAdvancedCriteria}
+				statusOptions={statusOptions}
+				submitterOptions={submitterOptions}
+				onApply={(nextCriteria) => {
+					setAdvancedCriteria(normalizeSubmissionAdvancedCriteria(nextCriteria));
+					setAdvancedSearchOpen(false);
+				}}
+				onClose={() => setAdvancedSearchOpen(false)}
+			/>
 		</section>
 	);
 }

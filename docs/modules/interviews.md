@@ -3,6 +3,8 @@
 ## What This Module Is For
 Interviews handles scheduling, participant coordination, and calendar payload generation.
 
+The interviews list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like interview type, status, interviewer, location, and start-date ranges without overloading the basic search box.
+
 ## Required Fields
 - Interviewer
 - Interviewer email
@@ -43,3 +45,12 @@ Test safety behavior:
 1. Confirm participant emails before save.
 2. Keep location/video link accurate.
 3. Use optional participants for coordinators and panel observers.
+
+## Advanced Search
+Use advanced search on the interviews list when quick lookup is not enough.
+
+Useful examples:
+- `Type = Video`
+- `Status = Scheduled`
+- `Starts At in past 7 days`
+- `Interviewer contains Thomas`

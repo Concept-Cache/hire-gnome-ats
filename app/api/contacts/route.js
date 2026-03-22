@@ -20,6 +20,7 @@ const contactListInclude = {
 	client: true,
 	ownerUser: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true } },
 	division: { select: { id: true, name: true, accessMode: true } },
+	_count: { select: { notes: true, jobOrders: true } },
 	notes: {
 		select: { createdAt: true, updatedAt: true },
 		orderBy: { updatedAt: 'desc' },
