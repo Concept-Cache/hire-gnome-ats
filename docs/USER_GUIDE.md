@@ -41,7 +41,7 @@ Use this sequence as your default process:
 - User menu (`top-right`): account settings, Help, and sign out.
 - List pages: search, sorting, paging, and column chooser.
 - `Job Orders` also includes a separate `Advanced Search` builder for structured criteria like date ranges and minimum submissions, without replacing the fast basic search box.
-- `Candidates` also includes a separate `Advanced Search` builder for structured criteria like owner, source, profile completeness, and activity thresholds, without replacing the fast basic search box.
+- `Candidates` also includes a separate `Advanced Search` builder for structured criteria like owner, source, skills, profile completeness, and activity thresholds, without replacing the fast basic search box.
 - `Clients` also includes a separate `Advanced Search` builder for structured criteria like owner, status, notes volume, job-order volume, and last-activity dates, without replacing the fast basic search box.
 - `Contacts` also includes a separate `Advanced Search` builder for structured criteria like client, owner, status, notes volume, job-order counts, and last-activity dates, without replacing the fast basic search box.
 - `Submissions` also includes a separate `Advanced Search` builder for structured criteria like status, origin, submitter, client-portal visibility, and submitted/updated date ranges, without replacing the fast basic search box.
@@ -141,7 +141,7 @@ Profile completeness:
 - Uses existing profile data to score recruiter readiness.
 - Highlights top missing profile gaps like resume summary, skills, work history, education, resume attachment, and required custom fields.
 - Also appears as a compact score chip on the candidates list.
-- Use `Advanced Search` on the candidates list when quick lookup is not enough, for example `Profile Completeness >= 80` plus `Submissions >= 2` or `Last Activity Date in past 14 days`.
+- Use `Advanced Search` on the candidates list when quick lookup is not enough, for example `Skills contains React` plus `Profile Completeness >= 80`, or `Last Activity Date in past 14 days`.
 - Creating a submission from a low-completeness candidate shows a soft warning, but does not hard-block the workflow.
 
 Duplicate handling:
