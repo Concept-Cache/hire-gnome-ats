@@ -7,6 +7,8 @@ It also includes an on-demand AI summary modal, opened from the candidate detail
 
 Candidate detail now opens with a stronger candidate snapshot card that surfaces title, location, status, top skills, AI summary snippet, last activity, and profile completeness in one recruiter-friendly block.
 
+Candidate detail also includes a unified `Timeline` workspace tab so recruiters can review notes, activities, file uploads, status changes, submissions, interviews, placements, and AI-summary events in one chronological feed.
+
 The candidates list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like owner, source, profile-completeness score, submission counts, and last-activity dates without overloading the basic search box.
 
 ## Required Fields
@@ -53,6 +55,7 @@ The workspace provides linked execution views:
 - Activities
 - Files
 - Matched Job Orders
+- Timeline
 
 ## Profile Completeness
 Candidate detail calculates profile completeness from the live record and current form values.

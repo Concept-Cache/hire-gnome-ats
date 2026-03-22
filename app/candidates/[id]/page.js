@@ -14,6 +14,7 @@ import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/comp
 import SkillChipSelect from '@/app/components/skill-chip-select';
 import ListSortControls from '@/app/components/list-sort-controls';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
+import ActivityTimeline from '@/app/components/activity-timeline';
 import MatchExplanationModal from '@/app/components/match-explanation-modal';
 import EmailDraftModal from '@/app/components/email-draft-modal';
 import { useToast } from '@/app/components/toast-provider';
@@ -34,6 +35,7 @@ import { sortByConfig } from '@/lib/list-sort';
 import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { getCandidateCompleteness } from '@/lib/candidate-completeness';
+import { buildCandidateTimeline } from '@/lib/activity-timeline';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { CANDIDATE_STATUS_OPTIONS, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 
@@ -331,7 +333,7 @@ export default function CandidateDetailsPage() {
 	const [attachmentFile, setAttachmentFile] = useState(null);
 	const [attachmentIsResume, setAttachmentIsResume] = useState(false);
 	const [attachmentInputKey, setAttachmentInputKey] = useState(0);
-	const [workspaceTab, setWorkspaceTab] = useState('notes');
+	const [workspaceTab, setWorkspaceTab] = useState('status-history');
 	const [matchExplanationTarget, setMatchExplanationTarget] = useState(null);
 	const [summaryState, setSummaryState] = useState({ generating: false });
 	const [aiAvailable, setAiAvailable] = useState(false);
@@ -446,6 +448,7 @@ export default function CandidateDetailsPage() {
 		return '';
 	}, [candidate?.aiSummary?.overview, editForm.summary]);
 	const latestCandidateActivity = useMemo(() => getLatestCandidateActivity(candidate), [candidate]);
+	const candidateTimelineItems = useMemo(() => buildCandidateTimeline(candidate), [candidate]);
 
 	const submissionRows = useMemo(() => {
 		if (!candidate) return [];
@@ -1805,10 +1808,22 @@ export default function CandidateDetailsPage() {
 					<article className="panel workspace-panel workspace-panel-lock-height" style={workspacePanelStyle}>
 						<h3>Candidate Workspace</h3>
 						<div
-							className="side-tabs side-tabs-four side-tabs-warm side-tabs-counted"
+							className="side-tabs side-tabs-warm side-tabs-counted"
 							role="tablist"
 							aria-label="Candidate workspace tabs"
 						>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={workspaceTab === 'status-history'}
+							className={workspaceTab === 'status-history' ? 'side-tab active' : 'side-tab'}
+							onClick={() => setWorkspaceTab('status-history')}
+						>
+							<span>Timeline</span>
+							<span className="side-tab-count" aria-hidden="true">
+								{candidateTimelineItems.length}
+							</span>
+						</button>
 						<button
 							type="button"
 							role="tab"
@@ -1878,18 +1893,6 @@ export default function CandidateDetailsPage() {
 							>
 								<span>Matches</span>
 								<span className="side-tab-count" aria-hidden="true">{jobMatchState.matches.length}</span>
-							</button>
-							<button
-								type="button"
-								role="tab"
-								aria-selected={workspaceTab === 'status-history'}
-								className={workspaceTab === 'status-history' ? 'side-tab active' : 'side-tab'}
-								onClick={() => setWorkspaceTab('status-history')}
-							>
-								<span>Stage History</span>
-								<span className="side-tab-count" aria-hidden="true">
-									{candidate.statusChanges?.length ?? 0}
-								</span>
 							</button>
 						</div>
 					{workspaceTab === 'notes' ? (
@@ -2680,34 +2683,12 @@ export default function CandidateDetailsPage() {
 
 						{workspaceTab === 'status-history' ? (
 							<div className="side-tab-content side-tab-content-with-scroll">
-								<h4 className="side-section-title">Status Changes</h4>
+								<h4 className="side-section-title">Timeline</h4>
+								<p className="panel-subtext">
+									Unified candidate activity across notes, activities, files, submissions, interviews, placements, and AI updates.
+								</p>
 								<div className="workspace-scroll-area">
-									{candidate.statusChanges?.length === 0 ? (
-										<p className="panel-subtext">No status changes logged yet.</p>
-									) : (
-										<ul className="simple-list">
-											{candidate.statusChanges.map((statusChange) => (
-												<li key={statusChange.id}>
-													<div>
-														<strong>
-															{statusChange.fromStatus
-																? formatSelectValueLabel(statusChange.fromStatus)
-																: 'Initial'}{' '}
-															{'->'} {formatSelectValueLabel(statusChange.toStatus)}
-														</strong>
-														{statusChange.reason ? <p>{statusChange.reason}</p> : null}
-														<p className="simple-list-meta">
-															By{' '}
-															{statusChange.changedByUser
-																? `${statusChange.changedByUser.firstName} ${statusChange.changedByUser.lastName}`
-																: 'Unknown User'}{' '}
-															@ <span className="meta-emphasis-time">{formatDate(statusChange.createdAt)}</span>
-														</p>
-													</div>
-												</li>
-											))}
-										</ul>
-									)}
+									<ActivityTimeline items={candidateTimelineItems} emptyText="No candidate timeline events yet." />
 								</div>
 							</div>
 						) : null}

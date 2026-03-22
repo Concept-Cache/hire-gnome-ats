@@ -4082,7 +4082,7 @@ button:disabled {
 }
 
 .help-index-intro {
-	font-size: 1rem;
+	font-size: 0.9rem;
 	font-weight: 600;
 	color: var(--ink);
 	margin-bottom: 0.55rem;
@@ -5241,6 +5241,10 @@ button:disabled {
 	grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.side-tabs-five {
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .side-tab {
 	background: var(--ui-tab-soft-bg);
 	color: var(--ui-tab-soft-ink);
@@ -5397,6 +5401,14 @@ button:disabled {
 .workspace-panel-lock-height .side-tab-content-list-only {
 	display: grid;
 	grid-template-rows: minmax(0, 1fr);
+	overflow: hidden;
+}
+
+.workspace-panel-lock-height .side-tab-content-scroll {
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr);
+	gap: 0.6rem;
+	min-height: 0;
 	overflow: hidden;
 }
 
@@ -6439,8 +6451,8 @@ button:disabled {
 
 .candidate-hero-summary-copy {
 	margin: 0;
-	font-size: 1rem;
-	line-height: 1.55;
+	font-size: 0.9rem;
+	line-height: 1.5;
 	color: var(--ink);
 }
 
@@ -7555,6 +7567,62 @@ button:disabled {
 	padding: 0.45rem;
 }
 
+.admin-settings-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	align-items: flex-end;
+	margin-bottom: 0.9rem;
+	padding: 0 0 0.05rem;
+	border-bottom: 1px solid var(--line);
+}
+
+.admin-settings-tab {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.7rem 1.05rem 0.72rem;
+	border-radius: 12px 12px 0 0;
+	border: 1px solid var(--line);
+	border-bottom-color: transparent;
+	background: transparent;
+	color: #3d547f;
+	font-size: 0.86rem;
+	font-weight: 650;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	line-height: 1;
+	box-shadow: none;
+	margin-bottom: -1px;
+}
+
+.admin-settings-tab:hover:not(:disabled) {
+	border-color: var(--line-strong);
+	border-bottom-color: transparent;
+	background: rgba(255, 255, 255, 0.55);
+	color: var(--ink);
+}
+
+.admin-settings-tab.is-active {
+	border-color: var(--line);
+	border-bottom-color: var(--panel);
+	background: var(--panel);
+	color: var(--ink);
+	box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.admin-settings-tab.is-active:hover:not(:disabled) {
+	border-color: var(--line);
+	border-bottom-color: var(--panel);
+	background: var(--panel);
+	color: var(--ink);
+}
+
+.admin-settings-tab:focus-visible {
+	outline: 2px solid var(--focus-ring);
+	outline-offset: 2px;
+}
+
 .settings-diagnostics-toolbar {
 	display: flex;
 	align-items: center;
@@ -7625,6 +7693,103 @@ button:disabled {
 	border-color: #f0b8b4;
 	background: #ffeceb;
 	color: #9f2d24;
+}
+
+.activity-timeline-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 0.8rem;
+}
+
+.activity-timeline-item {
+	display: block;
+}
+
+.activity-timeline-card {
+	display: grid;
+	gap: 0.22rem;
+	padding: 0.5rem;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #fbfcff;
+}
+
+.activity-timeline-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.activity-timeline-head-main {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.55rem;
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.activity-timeline-title {
+	font-size: 0.86rem;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+.chip.activity-timeline-category {
+	min-width: 0;
+	padding: 0.16rem 0.42rem;
+	font-size: 0.68rem;
+}
+
+.chip.activity-timeline-category-record,
+.chip.activity-timeline-category-status,
+.chip.activity-timeline-category-portal {
+	border-color: #c8d5e8;
+	background: #eef3fb;
+	color: #3b537a;
+}
+
+.chip.activity-timeline-category-note,
+.chip.activity-timeline-category-feedback {
+	border-color: #bfd3ef;
+	background: #eff5ff;
+	color: #345386;
+}
+
+.chip.activity-timeline-category-activity,
+.chip.activity-timeline-category-submission,
+.chip.activity-timeline-category-interview {
+	border-color: #b8e0c8;
+	background: #edf9f1;
+	color: #1f6a42;
+}
+
+.chip.activity-timeline-category-file,
+.chip.activity-timeline-category-placement,
+.chip.activity-timeline-category-ai {
+	border-color: #f0d0aa;
+	background: #fff5e7;
+	color: #8b5319;
+}
+
+.activity-timeline-detail {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.79rem;
+	line-height: 1.45;
+}
+
+.activity-timeline-meta,
+.activity-timeline-time {
+	margin: 0;
+}
+
+.activity-timeline-meta.simple-list-meta,
+.activity-timeline-time.simple-list-meta {
+	font-size: 0.74rem;
 }
 
 .table-wrap {

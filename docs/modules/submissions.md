@@ -74,6 +74,9 @@ Behavior:
 - The portal only exposes the candidate's labeled primary resume; other candidate attachments stay internal
 - Feedback is read-only internally and serves as the client-side activity trail on the submission
 
+## Workspace Timeline And Feedback
+Submission detail also includes a unified workspace that brings `Timeline` and `Client Feedback` together in one place. The timeline shows submission creation, client write-up generation, client feedback, and placement conversion events in chronological order.
+
 ## Snapshot Usage
 Snapshot emphasizes immutable context and links back to source records.
 

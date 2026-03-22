@@ -42,6 +42,8 @@ Use workspace tabs for:
 - Notes
 - Activities
 
+Job order detail also includes a unified `Timeline` workspace tab that rolls up submissions, interviews, placements, client feedback, and client-portal lifecycle activity into one chronological feed.
+
 ## Submission Rules
 - New submission from job detail is supported.
 - Job-order submissions can be ranked in recruiter preference order from the workspace using persisted drag-and-drop ordering.

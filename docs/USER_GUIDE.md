@@ -39,7 +39,7 @@ Use this sequence as your default process:
 - Left navigation: module list.
 - Top search: global search across records.
 - User menu (`top-right`): account settings, Help, and sign out.
-- List pages: search, filters, sorting, paging, and column chooser.
+- List pages: search, sorting, paging, and column chooser.
 - `Job Orders` also includes a separate `Advanced Search` builder for structured criteria like date ranges and minimum submissions, without replacing the fast basic search box.
 - `Candidates` also includes a separate `Advanced Search` builder for structured criteria like owner, source, profile completeness, and activity thresholds, without replacing the fast basic search box.
 - `Clients` also includes a separate `Advanced Search` builder for structured criteria like owner, status, notes volume, job-order volume, and last-activity dates, without replacing the fast basic search box.
@@ -48,8 +48,10 @@ Use this sequence as your default process:
 - `Interviews` also includes a separate `Advanced Search` builder for structured criteria like type, status, interviewer, location, and start-date ranges, without replacing the fast basic search box.
 - `Placements` also includes a separate `Advanced Search` builder for structured criteria like placement type, compensation type, status, and offered/join/end date ranges, without replacing the fast basic search box.
 - Column chooser keeps the default list layouts intact while letting users reveal extra optional columns per module, drag columns into a preferred order, and save those preferences to their user account so the same view follows them across devices.
-- Saved views let you capture the current list state as a reusable named view, including filters and column layout, apply it later, and set one saved view as your personal default per module.
+- Saved views let you capture the current list state as a reusable named view, including filters, sort order, and column layout, apply it later, and set one saved view as your personal default per module.
+- List tables sort ascending by the first column by default unless a saved view restores a different sort.
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
+- Candidate, job order, and submission detail pages now include a unified `Timeline` inside the workspace, so recent recruiting activity is visible without opening multiple screens.
 - Actions menu (`...`): context actions like archive, close, cancel, convert, and administrator-only audit access where supported.
 
 ## Demo Environment Note

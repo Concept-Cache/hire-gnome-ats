@@ -22,6 +22,11 @@ import {
 	readColumnVisibilityState,
 	TABLE_COLUMNS_CHANGED_EVENT
 } from '@/lib/table-columns';
+import {
+	buildDefaultTableSortState,
+	normalizeTableSortState,
+	tableSortStatesEqual
+} from '@/lib/table-sort';
 
 const PAGE_SIZE_STORAGE_KEY = 'hg-list-page-size';
 const DEFAULT_PAGE_SIZE = 10;
@@ -94,11 +99,13 @@ export default function EntityTable({
 	rows,
 	rowActions = [],
 	loading = false,
-	loadingLabel = 'Loading records'
+	loadingLabel = 'Loading records',
+	sortState: controlledSortState,
+	onSortStateChange
 }) {
 	const hasActions = rowActions.length > 0;
 	const [pendingActionKey, setPendingActionKey] = useState('');
-	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
+	const [localSortState, setLocalSortState] = useState({ key: '', direction: 'asc' });
 	const [currentPage, setCurrentPage] = useState(1);
 	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 	const [hiddenColumnKeys, setHiddenColumnKeys] = useState([]);
@@ -113,12 +120,27 @@ export default function EntityTable({
 		return orderColumns(columns, orderedColumnKeys);
 	}, [columns, hiddenColumnKeys, orderedColumnKeys]);
 
+	const implicitDefaultSortState = useMemo(() => buildDefaultTableSortState(visibleColumns), [visibleColumns]);
+	const usingControlledSortState = controlledSortState !== undefined;
+	const baseSortState = useMemo(() => {
+		if (usingControlledSortState) {
+			return normalizeTableSortState(controlledSortState);
+		}
+		return normalizeTableSortState(localSortState);
+	}, [controlledSortState, localSortState, usingControlledSortState]);
+	const effectiveSortState = useMemo(() => {
+		if (baseSortState.key && visibleColumns.some((column) => column.key === baseSortState.key)) {
+			return baseSortState;
+		}
+		return implicitDefaultSortState;
+	}, [baseSortState, implicitDefaultSortState, visibleColumns]);
+
 	const sortedRows = useMemo(() => {
-		if (!sortState.key) return rows;
-		const sortColumn = visibleColumns.find((column) => column.key === sortState.key);
+		if (!effectiveSortState.key) return rows;
+		const sortColumn = visibleColumns.find((column) => column.key === effectiveSortState.key);
 		if (!sortColumn) return rows;
 
-		const directionMultiplier = sortState.direction === 'desc' ? -1 : 1;
+		const directionMultiplier = effectiveSortState.direction === 'desc' ? -1 : 1;
 		return [...rows]
 			.map((row, index) => ({ row, index }))
 			.sort((a, b) => {
@@ -137,7 +159,13 @@ export default function EntityTable({
 				return a.index - b.index;
 			})
 			.map((entry) => entry.row);
-	}, [rows, visibleColumns, sortState]);
+	}, [effectiveSortState, rows, visibleColumns]);
+
+	useEffect(() => {
+		if (typeof onSortStateChange !== 'function') return;
+		if (tableSortStatesEqual(baseSortState, effectiveSortState)) return;
+		onSortStateChange(effectiveSortState);
+	}, [baseSortState, effectiveSortState, onSortStateChange]);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -204,20 +232,22 @@ export default function EntityTable({
 
 	function onSortColumn(column) {
 		if (column.sortable === false) return;
-		setSortState((current) => {
-			if (current.key === column.key) {
-				return {
+		const nextSortState =
+			effectiveSortState.key === column.key
+				? {
 					key: column.key,
-					direction: current.direction === 'asc' ? 'desc' : 'asc'
-				};
-			}
-			return { key: column.key, direction: 'asc' };
-		});
+					direction: effectiveSortState.direction === 'asc' ? 'desc' : 'asc'
+				}
+				: { key: column.key, direction: 'asc' };
+		if (!usingControlledSortState) {
+			setLocalSortState(nextSortState);
+		}
+		onSortStateChange?.(nextSortState);
 	}
 
 	function sortIconForColumn(column) {
-		if (sortState.key !== column.key) return ArrowUpDown;
-		return sortState.direction === 'asc' ? ArrowUp : ArrowDown;
+		if (effectiveSortState.key !== column.key) return ArrowUpDown;
+		return effectiveSortState.direction === 'asc' ? ArrowUp : ArrowDown;
 	}
 
 	async function onActionClick(action, row) {
@@ -261,7 +291,7 @@ export default function EntityTable({
 						<tr>
 							{visibleColumns.map((column) => {
 								const isSortable = column.sortable !== false;
-								const isActive = sortState.key === column.key;
+								const isActive = effectiveSortState.key === column.key;
 								const Icon = sortIconForColumn(column);
 								return (
 									<th key={column.key}>
@@ -270,7 +300,7 @@ export default function EntityTable({
 												type="button"
 												className="table-sort-button"
 												onClick={() => onSortColumn(column)}
-												aria-label={`Sort by ${column.label}${isActive ? ` (${sortState.direction})` : ''}`}
+												aria-label={`Sort by ${column.label}${isActive ? ` (${effectiveSortState.direction})` : ''}`}
 											>
 												<span>{column.label}</span>
 												<Icon

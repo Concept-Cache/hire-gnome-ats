@@ -18,6 +18,7 @@ import {
 	summarizeContactAdvancedCriterion
 } from '@/lib/contact-advanced-search';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 function formatDateTime(value) {
 	return formatDateTimeAt(value);
@@ -30,6 +31,7 @@ export default function ContactsPage() {
 	const [query, setQuery] = useState('');
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const { archivedIdSet } = useArchivedEntities('CONTACT');
 
 	const activeRows = useMemo(
@@ -129,6 +131,7 @@ export default function ContactsPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeContactAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 	}
 
 	function removeAdvancedCriterion(indexToRemove) {
@@ -167,6 +170,8 @@ export default function ContactsPage() {
 			getSortValue: (row) => row.lastActivityAt || ''
 		}
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -231,8 +236,8 @@ export default function ContactsPage() {
 							<SavedListViews
 								listKey="contacts"
 								columns={columns}
-								defaultState={{ query: '', advancedCriteria: [] }}
-								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
+								defaultState={{ query: '', advancedCriteria: [], sortState: defaultSortState }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, sortState: effectiveSortState }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="contacts" columns={columns} />
@@ -244,6 +249,8 @@ export default function ContactsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading contacts"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>

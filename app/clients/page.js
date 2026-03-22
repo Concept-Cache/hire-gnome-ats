@@ -16,6 +16,7 @@ import {
 } from '@/lib/client-advanced-search';
 import { normalizeClientStatusValue } from '@/lib/client-status-options';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 function formatLocation(city, state) {
 	const parts = [city, state].map((value) => String(value || '').trim()).filter(Boolean);
@@ -33,6 +34,7 @@ export default function ClientsPage() {
 	const [query, setQuery] = useState('');
 	const [advancedCriteria, setAdvancedCriteria] = useState([]);
 	const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+	const [sortState, setSortState] = useState({ key: '', direction: 'asc' });
 	const { archivedIdSet } = useArchivedEntities('CLIENT');
 
 	const activeRows = useMemo(
@@ -116,6 +118,7 @@ export default function ClientsPage() {
 	function applySavedViewState(nextState = {}) {
 		setQuery(String(nextState.query ?? ''));
 		setAdvancedCriteria(normalizeClientAdvancedCriteria(nextState.advancedCriteria || []));
+		setSortState(normalizeTableSortState(nextState.sortState));
 	}
 
 	function removeAdvancedCriterion(indexToRemove) {
@@ -135,6 +138,8 @@ export default function ClientsPage() {
 		{ key: 'noteCount', label: 'Notes', defaultVisible: false },
 		{ key: 'lastActivityAtLabel', label: 'Last Activity Date', defaultVisible: false, getSortValue: (row) => row.lastActivityAt || '' }
 	];
+	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
+	const effectiveSortState = sortState.key ? sortState : defaultSortState;
 
 	return (
 		<section className="module-page">
@@ -199,8 +204,8 @@ export default function ClientsPage() {
 							<SavedListViews
 								listKey="clients"
 								columns={columns}
-								defaultState={{ query: '', advancedCriteria: [] }}
-								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria }}
+								defaultState={{ query: '', advancedCriteria: [], sortState: defaultSortState }}
+								currentState={{ query, advancedCriteria: normalizedAdvancedCriteria, sortState: effectiveSortState }}
 								onApplyState={applySavedViewState}
 							/>
 							<TableColumnPicker tableKey="clients" columns={columns} />
@@ -212,6 +217,8 @@ export default function ClientsPage() {
 						rows={filteredRows}
 						loading={loading}
 						loadingLabel="Loading clients"
+						sortState={sortState.key ? sortState : undefined}
+						onSortStateChange={setSortState}
 					rowActions={[{ label: 'Open', onClick: onOpen }]}
 				/>
 			</article>

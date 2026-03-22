@@ -38,7 +38,7 @@ const submissionInclude = {
 		select: { id: true, firstName: true, lastName: true, email: true, isActive: true }
 	},
 	offer: {
-		select: { id: true, status: true, updatedAt: true }
+		select: { id: true, status: true, placementType: true, createdAt: true, updatedAt: true }
 	},
 	clientFeedback: {
 		orderBy: { createdAt: 'desc' },
