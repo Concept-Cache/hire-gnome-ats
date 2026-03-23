@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { deleteObject } from '@/lib/object-storage';
+import { syncCandidateResumeSearchText } from '@/lib/candidate-resume-search';
 import { AccessControlError, ensureScopedEntityAccess, getActingUser } from '@/lib/access-control';
 import { logDelete, logUpdate } from '@/lib/audit-log';
 import { parseJsonBody, parseRouteId, ValidationError } from '@/lib/request-validation';
@@ -93,6 +94,15 @@ async function patchCandidates_id_files_fileidHandler(req, { params }) {
 			metadata: { candidateId, isResume: nextIsResume }
 		});
 
+		if (nextIsResume) {
+			await syncCandidateResumeSearchText(candidateId);
+		} else if (existing.isResume) {
+			await prisma.candidate.update({
+				where: { id: candidateId },
+				data: { resumeSearchText: null }
+			});
+		}
+
 		return NextResponse.json(updated);
 	} catch (error) {
 		return handleError(error, 'Failed to update file.');
@@ -144,6 +154,13 @@ async function deleteCandidates_id_files_fileidHandler(req, { params }) {
 				entity: attachment,
 				metadata: { candidateId }
 			});
+
+			if (attachment.isResume) {
+				await prisma.candidate.update({
+					where: { id: candidateId },
+					data: { resumeSearchText: null }
+				});
+			}
 
 			return NextResponse.json({ ok: true });
 	} catch (error) {

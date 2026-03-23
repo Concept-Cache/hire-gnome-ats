@@ -14,6 +14,7 @@ import {
 	isAllowedCandidateAttachmentFileName
 } from '@/lib/candidate-attachment-options';
 import { buildCandidateAttachmentStorageKey, deleteObject, uploadObjectBuffer } from '@/lib/object-storage';
+import { deriveResumeSearchTextFromBuffer } from '@/lib/candidate-resume-search';
 import {
 	AccessControlError,
 	addScopeToWhere,
@@ -216,6 +217,14 @@ async function postCandidatesHandler(req) {
 		const resumeAttachmentBuffer = parsedResumeAttachmentFile
 			? Buffer.from(await parsedResumeAttachmentFile.arrayBuffer())
 			: null;
+		const resumeSearchText =
+			parsedResumeAttachmentFile && resumeAttachmentBuffer
+				? await deriveResumeSearchTextFromBuffer({
+						buffer: resumeAttachmentBuffer,
+						fileName: parsedResumeAttachmentFile.name,
+						contentType: parsedResumeAttachmentFile.type
+					})
+				: '';
 		const parsedFromResume = body?.parsedFromResume === true;
 		const parsed = candidateSchema.safeParse(body);
 
@@ -284,6 +293,7 @@ async function postCandidatesHandler(req) {
 				data: {
 					...normalized,
 					skillSet: resolvedSkillSet,
+					resumeSearchText: resumeSearchText || null,
 					ownerId: ownership.ownerId,
 					divisionId: ownership.divisionId,
 					...(resolvedSkills.hasSkillIds && resolvedSkills.skillIds.length > 0

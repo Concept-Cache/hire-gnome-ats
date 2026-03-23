@@ -9,6 +9,7 @@ import {
 	buildCandidateAttachmentStorageKey,
 	uploadObjectBuffer
 } from '@/lib/object-storage';
+import { deriveResumeSearchTextFromBuffer } from '@/lib/candidate-resume-search';
 import { AccessControlError, ensureScopedEntityAccess, getActingUser } from '@/lib/access-control';
 import { logCreate } from '@/lib/audit-log';
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
@@ -106,6 +107,13 @@ async function postCandidates_id_filesHandler(req, { params }) {
 		}
 
 		const buffer = Buffer.from(await file.arrayBuffer());
+		const resumeSearchText = isResume
+			? await deriveResumeSearchTextFromBuffer({
+					buffer,
+					fileName: file.name,
+					contentType: file.type
+				})
+			: '';
 		const storageKey = buildCandidateAttachmentStorageKey(candidateId, file.name);
 		const uploaded = await uploadObjectBuffer({
 			key: storageKey,
@@ -123,6 +131,10 @@ async function postCandidates_id_filesHandler(req, { params }) {
 					data: {
 						isResume: false
 					}
+				});
+				await tx.candidate.update({
+					where: { id: candidateId },
+					data: { resumeSearchText: resumeSearchText || null }
 				});
 			}
 
