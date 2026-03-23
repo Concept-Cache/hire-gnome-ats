@@ -216,6 +216,12 @@ function truncateText(value, maxLength = 220) {
 	return `${text.slice(0, maxLength).trimEnd()}...`;
 }
 
+function wait(ms) {
+	return new Promise((resolve) => {
+		window.setTimeout(resolve, ms);
+	});
+}
+
 function buildCandidateLocation(form) {
 	const city = String(form?.city || '').trim();
 	const state = String(form?.state || '').trim();
@@ -586,7 +592,7 @@ export default function CandidateDetailsPage() {
 
 	async function loadJobMatches(options = {}) {
 		if (!id) return;
-		const { keepResults = true } = options;
+		const { keepResults = true, retryOnFailure = true } = options;
 		if (!candidateQualifiedForSubmissionInterview) {
 			setJobMatchState((current) => ({
 				...current,
@@ -607,28 +613,46 @@ export default function CandidateDetailsPage() {
 			matches: keepResults ? current.matches : []
 		}));
 
-		const res = await fetch(`/api/candidates/${id}/matches?includeSubmitted=false&limit=10`);
-		if (!res.ok) {
-			const data = await res.json().catch(() => ({}));
+		try {
+			const res = await fetch(`/api/candidates/${id}/matches?includeSubmitted=false&limit=10`);
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				if (retryOnFailure) {
+					await wait(300);
+					await loadJobMatches({ keepResults, retryOnFailure: false });
+					return;
+				}
+				setJobMatchState((current) => ({
+					...current,
+					loading: false,
+					error: data.error || 'Failed to load job order matches.'
+				}));
+				return;
+			}
+
+			const data = await res.json();
 			setJobMatchState((current) => ({
 				...current,
 				loading: false,
-				error: data.error || 'Failed to load job order matches.'
+				error: '',
+				computedAt: data.computedAt || '',
+				totalJobOrdersEvaluated: Number(data.totalJobOrdersEvaluated || 0),
+				activeHiringJobOrders: Number(data.activeHiringJobOrders || 0),
+				matchEligibility: data.matchEligibility || '',
+				matches: Array.isArray(data.matches) ? data.matches : []
 			}));
-			return;
+		} catch {
+			if (retryOnFailure) {
+				await wait(300);
+				await loadJobMatches({ keepResults, retryOnFailure: false });
+				return;
+			}
+			setJobMatchState((current) => ({
+				...current,
+				loading: false,
+				error: 'Failed to load job order matches.'
+			}));
 		}
-
-		const data = await res.json();
-		setJobMatchState((current) => ({
-			...current,
-			loading: false,
-			error: '',
-			computedAt: data.computedAt || '',
-			totalJobOrdersEvaluated: Number(data.totalJobOrdersEvaluated || 0),
-			activeHiringJobOrders: Number(data.activeHiringJobOrders || 0),
-			matchEligibility: data.matchEligibility || '',
-			matches: Array.isArray(data.matches) ? data.matches : []
-		}));
 	}
 
 	useEffect(() => {
