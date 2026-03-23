@@ -627,7 +627,7 @@ export default function SubmissionDetailsPage() {
 					</p>
 				</div>
 			</article>
-			<div className="detail-layout">
+			<div className="detail-layout detail-layout-equal">
 			<article className="panel panel-spacious" ref={detailsPanelRef}>
 				<h3>Submission Details</h3>
 				<p className="panel-subtext">Edit submission details and save updates.</p>
@@ -637,7 +637,7 @@ export default function SubmissionDetailsPage() {
 				<form onSubmit={onSave} className="detail-form">
 					<section className="form-section">
 						<h4>Assignment</h4>
-						<div className="detail-form-grid-3">
+						<div className="detail-form-grid-2">
 							<FormField label="Candidate" required>
 								<div className="locked-field">
 									<input

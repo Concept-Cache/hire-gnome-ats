@@ -39,14 +39,18 @@ export default function ActivityTimeline({ items, emptyText = 'No timeline event
 								</span>
 								<strong className="activity-timeline-title">{item.title}</strong>
 							</div>
-							{item.timestamp ? (
-								<span className="simple-list-meta activity-timeline-time">
-									<span className="meta-emphasis-time">{formatTimelineTime(item.timestamp)}</span>
-								</span>
-							) : null}
 						</div>
 						{item.detail ? <p className="activity-timeline-detail">{item.detail}</p> : null}
-						{item.meta ? <p className="simple-list-meta activity-timeline-meta">{item.meta}</p> : null}
+						{item.meta || item.timestamp ? (
+							<div className="activity-timeline-foot">
+								{item.meta ? <p className="simple-list-meta activity-timeline-meta">{item.meta}</p> : <span />}
+								{item.timestamp ? (
+									<span className="simple-list-meta activity-timeline-time">
+										<span className="meta-emphasis-time">{formatTimelineTime(item.timestamp)}</span>
+									</span>
+								) : null}
+							</div>
+						) : null}
 					</div>
 				</li>
 			))}

@@ -43,6 +43,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Applied the same advanced-search pattern to the clients list so recruiters can combine structured filters like owner, status, note counts, job-order counts, and last-activity dates while keeping the basic search box simple.
 - Applied the same advanced-search pattern to the contacts list so recruiters can combine structured filters like client, owner, status, note counts, job-order counts, and last-activity dates while keeping the basic search box simple.
 - Applied the same advanced-search pattern to the submissions, interviews, and placements lists so recruiters can build structured list filters there as well, while keeping the basic search box simple.
+- Placement chips now use success-style colors in timelines, dashboard recent activity, and reporting so accepted outcomes no longer read as warning/error states.
 
 ## [1.5.0] - 2026-03-17
 
