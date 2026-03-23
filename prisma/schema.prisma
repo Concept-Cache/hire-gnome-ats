@@ -251,6 +251,7 @@ model Candidate {
 	linkedinUrl     String?
 	skillSet        String?             @db.Text
 	summary         String?             @db.Text
+	resumeSearchText String?            @db.Text
 	customFields    Json?
 	ownerId         Int?
 	divisionId      Int?

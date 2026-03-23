@@ -526,6 +526,7 @@ function buildSimplePdfBuffer(lines) {
 function buildSeedResumePdfBuffer(candidate) {
 	const candidateName = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || 'Candidate';
 	const location = [candidate.city, candidate.state].filter(Boolean).join(', ') || 'Open to relocation';
+	const skillNames = Array.isArray(candidate.skillNames) ? candidate.skillNames.filter(Boolean) : [];
 	return buildSimplePdfBuffer([
 		`${candidateName}`,
 		`${candidate.currentJobTitle || 'Professional'} | ${candidate.currentEmployer || 'Current Employer'}`,
@@ -538,10 +539,27 @@ function buildSeedResumePdfBuffer(candidate) {
 		'- Cross-functional collaboration',
 		'- Client-facing communication',
 		'- Process improvement and execution',
+		...(skillNames.length > 0 ? ['', 'Skills', skillNames.join(', ')] : []),
 		'',
 		'Experience',
 		`${candidate.currentEmployer || 'Current Employer'} - ${candidate.currentJobTitle || 'Professional'}`
 	]);
+}
+
+function buildSeedResumeSearchText(candidate) {
+	return [
+		`${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
+		candidate.currentJobTitle || '',
+		candidate.currentEmployer || '',
+		[candidate.city, candidate.state].filter(Boolean).join(', '),
+		candidate.summary || '',
+		Array.isArray(candidate.skillNames) ? candidate.skillNames.join(' ') : '',
+		candidate.skillSet || '',
+		'Cross-functional collaboration client-facing communication process improvement execution'
+	]
+		.join(' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 function buildCandidateProfileVariant(index) {
@@ -1071,33 +1089,6 @@ async function main() {
 			minuteStep: 11
 		});
 		const updatedAt = addHours(createdAt, 4 + ((i * 5) % 36));
-
-		const candidate = await prisma.candidate.create({
-			data: {
-				firstName,
-				lastName,
-				email: makeEmail('candidate', firstName, lastName, i),
-				phone: phoneFrom(700 + i),
-				mobile: phoneFrom(1200 + i),
-				status: pick(CANDIDATE_STATUSES, i),
-				source: pick(SOURCE_OPTIONS, i + 5),
-				ownerId: owner?.id ?? null,
-				divisionId: division.id,
-				currentJobTitle: title,
-				currentEmployer: employer,
-				city: market.city,
-				state: market.state,
-				zipCode: market.zipCode,
-				website: profileVariant.includeWebsite ? `https://portfolio.${slug(firstName)}${i + 1}.com` : null,
-				linkedinUrl: profileVariant.includeLinkedin ? `https://linkedin.com/in/${slug(firstName)}-${slug(lastName)}-${i + 1}` : null,
-				skillSet: profileVariant.includeOtherSkillsNote ? 'Additional niche tooling available on request.' : null,
-				summary: buildCandidateSeedSummary({ title, market, employer, variant: profileVariant }),
-				createdAt,
-				updatedAt
-			}
-		});
-		candidates.push(candidate);
-
 		const selectedSkills = [
 			allSkills[i % allSkills.length],
 			allSkills[(i + 2) % allSkills.length],
@@ -1105,6 +1096,44 @@ async function main() {
 			allSkills[(i + 11) % allSkills.length],
 			allSkills[(i + 14) % allSkills.length]
 		].filter(Boolean).slice(0, profileVariant.skillCount);
+		const candidateSeed = {
+			firstName,
+			lastName,
+			currentJobTitle: title,
+			currentEmployer: employer,
+			city: market.city,
+			state: market.state,
+			skillNames: selectedSkills.map((skill) => skill.name).filter(Boolean),
+			skillSet: profileVariant.includeOtherSkillsNote ? 'Additional niche tooling available on request.' : null,
+			summary: buildCandidateSeedSummary({ title, market, employer, variant: profileVariant })
+		};
+
+		const candidate = await prisma.candidate.create({
+			data: {
+				firstName: candidateSeed.firstName,
+				lastName: candidateSeed.lastName,
+				email: makeEmail('candidate', firstName, lastName, i),
+				phone: phoneFrom(700 + i),
+				mobile: phoneFrom(1200 + i),
+				status: pick(CANDIDATE_STATUSES, i),
+				source: pick(SOURCE_OPTIONS, i + 5),
+				ownerId: owner?.id ?? null,
+				divisionId: division.id,
+				currentJobTitle: candidateSeed.currentJobTitle,
+				currentEmployer: candidateSeed.currentEmployer,
+				city: candidateSeed.city,
+				state: candidateSeed.state,
+				zipCode: market.zipCode,
+				website: profileVariant.includeWebsite ? `https://portfolio.${slug(firstName)}${i + 1}.com` : null,
+				linkedinUrl: profileVariant.includeLinkedin ? `https://linkedin.com/in/${slug(firstName)}-${slug(lastName)}-${i + 1}` : null,
+				skillSet: candidateSeed.skillSet,
+				summary: candidateSeed.summary,
+				resumeSearchText: profileVariant.includeResume ? buildSeedResumeSearchText(candidateSeed) : null,
+				createdAt,
+				updatedAt
+			}
+		});
+		candidates.push(candidate);
 
 		for (const skill of selectedSkills) {
 			await prisma.candidateSkill.create({

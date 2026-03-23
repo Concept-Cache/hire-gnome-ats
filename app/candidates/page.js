@@ -183,6 +183,7 @@ export default function CandidatesPage() {
 						mobileLabel: candidate.mobile || candidate.phone || '-',
 						sourceLabel: candidate.source || '-',
 						skillsLabel,
+						resumeSearchText: candidate.resumeSearchText || '',
 						locationLabel: formatLocation(candidate.city, candidate.state),
 						divisionName: candidate.division?.name || '-',
 						lastActivityAt,

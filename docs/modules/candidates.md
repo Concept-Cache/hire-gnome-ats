@@ -9,7 +9,7 @@ Candidate detail now opens with a stronger candidate snapshot card that surfaces
 
 Candidate detail also includes a unified `Timeline` workspace tab so recruiters can review notes, activities, file uploads, status changes, submissions, interviews, placements, and AI-summary events in one chronological feed.
 
-The candidates list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like owner, source, skills, profile-completeness score, submission counts, and last-activity dates without overloading the basic search box.
+The candidates list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like owner, source, skills, resume keywords, profile-completeness score, submission counts, and last-activity dates without overloading the basic search box.
 
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.

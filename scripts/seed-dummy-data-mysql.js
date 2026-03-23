@@ -202,14 +202,32 @@ function buildSimplePdfBuffer(lines) {
 function buildSeedResumePdfBuffer(candidate) {
 	const candidateName = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || 'Candidate';
 	const location = [candidate.city, candidate.state].filter(Boolean).join(', ') || 'Open to relocation';
+	const skillNames = Array.isArray(candidate.skillNames) ? candidate.skillNames.filter(Boolean) : [];
 	return buildSimplePdfBuffer([
 		candidateName,
 		`${candidate.currentJobTitle || 'Professional'} | ${candidate.currentEmployer || 'Current Employer'}`,
 		location,
 		'',
 		'Profile Summary',
-		`${candidate.summary || 'Experienced professional with strong communication and delivery skills.'}`
+		`${candidate.summary || 'Experienced professional with strong communication and delivery skills.'}`,
+		...(skillNames.length > 0 ? ['', 'Skills', skillNames.join(', ')] : [])
 	]);
+}
+
+function buildSeedResumeSearchText(candidate) {
+	return [
+		`${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
+		candidate.currentJobTitle || '',
+		candidate.currentEmployer || '',
+		[candidate.city, candidate.state].filter(Boolean).join(', '),
+		candidate.summary || '',
+		Array.isArray(candidate.skillNames) ? candidate.skillNames.join(' ') : '',
+		candidate.skillSet || '',
+		'Cross-functional collaboration client-facing communication process improvement execution'
+	]
+		.join(' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 function buildCandidateProfileVariant(index) {
@@ -644,6 +662,9 @@ async function main() {
 			});
 			const updatedAt = addHours(createdAt, 4 + ((i * 5) % 36));
 			const profileVariant = buildCandidateProfileVariant(i);
+			const selectedSkills = [skills[i % skills.length], skills[(i + 3) % skills.length], skills[(i + 5) % skills.length], skills[(i + 7) % skills.length]]
+				.filter(Boolean)
+				.slice(0, profileVariant.skillCount);
 			const candidateSeed = {
 				firstName: `Candidate${i + 1}`,
 				lastName: `Demo${i + 1}`,
@@ -651,6 +672,8 @@ async function main() {
 				currentEmployer: `Employer ${i + 1}`,
 				city: i % 2 === 0 ? 'Austin' : 'Denver',
 				state: i % 2 === 0 ? 'TX' : 'CO',
+				skillNames: selectedSkills.map((skill) => skill.name).filter(Boolean),
+				skillSet: null,
 				summary: buildCandidateSeedSummary({
 					title: i % 2 === 0 ? 'Software Engineer' : 'Project Manager',
 					city: i % 2 === 0 ? 'Austin' : 'Denver',
@@ -660,8 +683,8 @@ async function main() {
 			};
 			const [result] = await connection.query(
 				`INSERT INTO \`Candidate\`
-				(\`firstName\`, \`lastName\`, \`email\`, \`phone\`, \`mobile\`, \`status\`, \`source\`, \`ownerId\`, \`divisionId\`, \`currentJobTitle\`, \`currentEmployer\`, \`city\`, \`state\`, \`zipCode\`, \`website\`, \`linkedinUrl\`, \`summary\`, \`createdAt\`, \`updatedAt\`)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				(\`firstName\`, \`lastName\`, \`email\`, \`phone\`, \`mobile\`, \`status\`, \`source\`, \`ownerId\`, \`divisionId\`, \`currentJobTitle\`, \`currentEmployer\`, \`city\`, \`state\`, \`zipCode\`, \`website\`, \`linkedinUrl\`, \`summary\`, \`resumeSearchText\`, \`createdAt\`, \`updatedAt\`)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				[
 					candidateSeed.firstName,
 					candidateSeed.lastName,
@@ -680,6 +703,7 @@ async function main() {
 					profileVariant.includeWebsite ? `https://candidate${i + 1}.portfolio.example` : null,
 					profileVariant.includeLinkedin ? `https://linkedin.com/in/candidate-demo-${i + 1}` : null,
 					candidateSeed.summary,
+					profileVariant.includeResume ? buildSeedResumeSearchText(candidateSeed) : null,
 					createdAt,
 					updatedAt
 				]
@@ -687,7 +711,7 @@ async function main() {
 			const candidateId = result.insertId;
 			candidates.push({ id: candidateId, divisionId: division.id, createdAt });
 
-			for (const skill of [skills[i % skills.length], skills[(i + 3) % skills.length], skills[(i + 5) % skills.length], skills[(i + 7) % skills.length]].slice(0, profileVariant.skillCount)) {
+			for (const skill of selectedSkills) {
 				await connection.query(
 					'INSERT IGNORE INTO `CandidateSkill` (`candidateId`, `skillId`, `createdAt`) VALUES (?, ?, NOW())',
 					[candidateId, skill.id]
