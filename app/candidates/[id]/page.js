@@ -1484,9 +1484,6 @@ export default function CandidateDetailsPage() {
 								<span className="chip candidate-hero-status-chip">
 									{formatSelectValueLabel(editForm.status)}
 								</span>
-								<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
-									{candidateCompleteness.scorePercent}% {candidateCompleteness.levelLabel}
-								</span>
 							</div>
 						</div>
 

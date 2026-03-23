@@ -747,6 +747,7 @@ html[data-theme='high_contrast'] {
 
 body {
 	margin: 0;
+	font-size: 0.9rem;
 	font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 	background: var(--body-bg);
 	color: var(--ink);
@@ -2997,9 +2998,9 @@ p {
 
 .report-owner-chips .report-owner-chip-placements,
 .report-trend-chips .report-owner-chip-placements {
-	--report-chip-bg: #fae8ff;
-	--report-chip-ink: #a21caf;
-	--report-chip-border: #f0abfc;
+	--report-chip-bg: #ecfdf3;
+	--report-chip-ink: #166534;
+	--report-chip-border: #86efac;
 	background: var(--report-chip-bg);
 	color: var(--report-chip-ink);
 	border: 1px solid var(--report-chip-border);
@@ -3385,6 +3386,16 @@ p {
 .candidate-ai-summary-modal {
 	width: min(46rem, calc(100vw - 2rem));
 	max-width: 46rem;
+}
+
+.ai-summary-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+}
+
+.ai-summary-toolbar .report-detail-modal-close {
+	margin-left: 0.45rem;
 }
 
 .email-draft-body {
@@ -6380,7 +6391,7 @@ button:disabled {
 .candidate-hero-side {
 	display: grid;
 	align-content: start;
-	gap: 0.75rem;
+	gap: 1.1rem;
 	padding: 0.95rem 1rem;
 	border: 1px solid color-mix(in srgb, var(--line) 80%, #d8e4f6 20%);
 	border-radius: var(--radius-md);
@@ -6482,9 +6493,9 @@ button:disabled {
 .candidate-completeness-summary {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-end;
+	align-items: flex-start;
 	gap: 0.18rem;
-	text-align: right;
+	text-align: left;
 }
 
 .candidate-completeness-label {
@@ -6498,6 +6509,7 @@ button:disabled {
 	display: flex;
 	align-items: center;
 	gap: 0.4rem;
+	margin-top: 0.45rem;
 }
 
 .candidate-completeness-score {
@@ -6537,7 +6549,7 @@ button:disabled {
 }
 
 .candidate-completeness-card {
-	margin-top: 0.15rem;
+	padding-top: 0.3rem;
 }
 
 .candidate-completeness-meter {
@@ -6562,7 +6574,7 @@ button:disabled {
 .candidate-completeness-gaps {
 	display: grid;
 	gap: 0.38rem;
-	margin-top: 0.52rem;
+	margin-top: 1.05rem;
 }
 
 .candidate-completeness-gaps-label {
@@ -7126,9 +7138,9 @@ button:disabled {
 }
 
 .dashboard-recent-item[data-entity-type="placement"] .dashboard-entity-chip {
-	background: #ffe4e6;
-	border-color: #fecdd3;
-	color: #be123c;
+	background: #ecfdf3;
+	border-color: #86efac;
+	color: #166534;
 }
 
 .dashboard-recent-grid {
@@ -7717,15 +7729,11 @@ button:disabled {
 }
 
 .activity-timeline-head {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 0.75rem;
-	flex-wrap: wrap;
+	display: block;
 }
 
 .activity-timeline-head-main {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
 	gap: 0.55rem;
 	flex-wrap: wrap;
@@ -7768,11 +7776,16 @@ button:disabled {
 }
 
 .chip.activity-timeline-category-file,
-.chip.activity-timeline-category-placement,
 .chip.activity-timeline-category-ai {
 	border-color: #f0d0aa;
 	background: #fff5e7;
 	color: #8b5319;
+}
+
+.chip.activity-timeline-category-placement {
+	border-color: #9ed9b6;
+	background: #edf9f1;
+	color: #1f6a42;
 }
 
 .activity-timeline-detail {
@@ -7780,6 +7793,14 @@ button:disabled {
 	color: var(--muted);
 	font-size: 0.79rem;
 	line-height: 1.45;
+}
+
+.activity-timeline-foot {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+	column-gap: 0.75rem;
+	row-gap: 0.2rem;
 }
 
 .activity-timeline-meta,
@@ -7790,6 +7811,12 @@ button:disabled {
 .activity-timeline-meta.simple-list-meta,
 .activity-timeline-time.simple-list-meta {
 	font-size: 0.74rem;
+}
+
+.activity-timeline-time {
+	justify-self: end;
+	text-align: right;
+	white-space: nowrap;
 }
 
 .table-wrap {
