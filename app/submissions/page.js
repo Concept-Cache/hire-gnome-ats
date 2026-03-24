@@ -11,6 +11,7 @@ import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { buildPersonNameSearchText, formatPersonName } from '@/lib/person-name';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import {
 	evaluateSubmissionAdvancedCriteria,
@@ -65,7 +66,7 @@ export default function SubmissionsPage() {
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.candidate} ${row.jobOrder} ${row.client} ${row.effectiveStatus} ${row.statusLabel} ${row.originLabel ?? ''} ${row.submittedBy ?? ''}`
+				`${row.candidateSearchText} ${row.jobOrder} ${row.client} ${row.effectiveStatus} ${row.statusLabel} ${row.originLabel ?? ''} ${row.submittedBy ?? ''}`
 					.toLowerCase()
 					.includes(q);
 			return matchesQuery;
@@ -92,9 +93,21 @@ export default function SubmissionsPage() {
 				rows.map((submission) => ({
 					...submission,
 					effectiveStatus: getEffectiveSubmissionStatus(submission),
-					candidate: submission.candidate
-						? `${submission.candidate.firstName} ${submission.candidate.lastName}`
-						: '-',
+					candidate: formatPersonName(
+						submission.candidate?.firstName,
+						submission.candidate?.lastName,
+						{ fallback: '-' }
+					),
+					candidateDisplayName: formatPersonName(
+						submission.candidate?.firstName,
+						submission.candidate?.lastName,
+						{ format: 'last-first', fallback: '-' }
+					),
+					candidateSearchText: buildPersonNameSearchText(
+						submission.candidate?.firstName,
+						submission.candidate?.lastName,
+						{ fallback: '-' }
+					),
 					candidateId: submission.candidate?.id || null,
 					jobOrder: submission.jobOrder?.title || '-',
 					jobOrderId: submission.jobOrder?.id || null,
@@ -135,11 +148,14 @@ export default function SubmissionsPage() {
 		{
 			key: 'candidate',
 			label: 'Candidate',
+			getSortValue: (row) => row.candidateDisplayName || row.candidate || '',
 			render: (row) =>
 				row.candidateId ? (
-					<TableEntityLink href={`/candidates/${row.candidateId}`}>{row.candidate}</TableEntityLink>
+					<TableEntityLink href={`/candidates/${row.candidateId}`}>
+						{row.candidateDisplayName || row.candidate}
+					</TableEntityLink>
 				) : (
-					row.candidate
+					row.candidateDisplayName || row.candidate
 				)
 		},
 		{

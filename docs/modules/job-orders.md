@@ -50,6 +50,7 @@ Job order detail also includes a unified `Timeline` workspace tab that rolls up 
 - Drag-and-drop reorder is available when the submissions workspace is sorted by `Priority Order`.
 - If a client passes on a submission through the portal, that submission is automatically moved to the bottom of the priority order.
 - Each submission row links directly to the candidate record and also includes a separate submission-detail link.
+- Candidate names in job-order candidate-linked lists are displayed as `Last, First` so recruiter sorting and scanning align better with alphabetic order.
 - The submissions workspace surfaces the latest client portal action/comment so recruiters can scan client response without opening each submission.
 - Career-site `Web` responses remain hidden from the client portal until a recruiter promotes them from submission detail.
 - Duplicate candidate+job submissions are blocked.

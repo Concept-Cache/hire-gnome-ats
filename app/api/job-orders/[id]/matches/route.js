@@ -4,6 +4,7 @@ import { AccessControlError, addScopeToWhere, getActingUser, getEntityScope } fr
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { JOB_ORDER_MATCH_RATE_LIMIT_MAX_REQUESTS, JOB_ORDER_MATCH_RATE_LIMIT_WINDOW_SECONDS } from '@/lib/security-constants';
 import { consumeRequestThrottle } from '@/lib/request-throttle';
+import { formatPersonName } from '@/lib/person-name';
 
 import { withApiLogging } from '@/lib/api-logging';
 
@@ -259,7 +260,10 @@ function scoreCandidate(candidate, jobOrder, allSkills, requiredSkillIds) {
 
 	return {
 		candidateId: candidate.id,
-		candidateName: `${candidate.firstName} ${candidate.lastName}`.trim(),
+		candidateName: formatPersonName(candidate.firstName, candidate.lastName, {
+			format: 'last-first',
+			fallback: 'Candidate'
+		}),
 		currentJobTitle: candidate.currentJobTitle || '',
 		ownerName: candidate.ownerUser ? `${candidate.ownerUser.firstName} ${candidate.ownerUser.lastName}` : '-',
 		score: Math.max(0, Math.min(1, weightedScore)),
