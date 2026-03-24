@@ -6385,17 +6385,15 @@ button:disabled {
 
 .candidate-hero-main {
 	display: grid;
+	grid-template-rows: auto auto auto minmax(0, 1fr) auto;
 	gap: 0.85rem;
+	height: 100%;
 }
 
 .candidate-hero-side {
 	display: grid;
-	align-content: start;
 	gap: 1.1rem;
-	padding: 0.95rem 1rem;
-	border: 1px solid color-mix(in srgb, var(--line) 80%, #d8e4f6 20%);
-	border-radius: var(--radius-md);
-	background: color-mix(in srgb, #f8fbff 86%, var(--panel) 14%);
+	align-content: start;
 }
 
 .candidate-hero-kicker {
@@ -6445,10 +6443,15 @@ button:disabled {
 }
 
 .candidate-hero-summary-card {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
 	padding: 0.95rem 1rem;
 	border: 1px solid color-mix(in srgb, var(--line) 78%, #d9e5f8 22%);
 	border-radius: var(--radius-md);
 	background: color-mix(in srgb, #ffffff 86%, #f6f9ff 14%);
+	min-height: 100%;
+	overflow: hidden;
 }
 
 .candidate-hero-section-label {
@@ -6465,6 +6468,8 @@ button:disabled {
 	font-size: 0.9rem;
 	line-height: 1.5;
 	color: var(--ink);
+	flex: 1 1 auto;
+	overflow: hidden;
 }
 
 .candidate-hero-meta-row {
@@ -6496,6 +6501,45 @@ button:disabled {
 	align-items: flex-start;
 	gap: 0.18rem;
 	text-align: left;
+}
+
+.candidate-completeness-panel {
+	display: grid;
+	gap: 0.7rem;
+	padding: 0.95rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--line) 80%, #d8e4f6 20%);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, #f8fbff 86%, var(--panel) 14%);
+}
+
+.candidate-next-step-card {
+	display: grid;
+	gap: 0.65rem;
+	padding: 0.95rem 1rem;
+	border: 1px solid color-mix(in srgb, #9bb6df 68%, var(--line) 32%);
+	border-radius: var(--radius-md);
+	background:
+		linear-gradient(135deg, color-mix(in srgb, #f2f7ff 88%, var(--panel) 12%), color-mix(in srgb, #fffaf0 76%, var(--panel) 24%));
+}
+
+.candidate-next-step-title {
+	margin: 0;
+	font-size: 1rem;
+	line-height: 1.3;
+}
+
+.candidate-next-step-copy {
+	margin: 0;
+	font-size: 0.9rem;
+	line-height: 1.5;
+	color: var(--muted);
+}
+
+.candidate-next-step-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	padding-top: 0.1rem;
 }
 
 .candidate-completeness-label {
@@ -6549,7 +6593,7 @@ button:disabled {
 }
 
 .candidate-completeness-card {
-	padding-top: 0.3rem;
+	padding-top: 0.1rem;
 }
 
 .candidate-completeness-meter {
@@ -6642,10 +6686,16 @@ button:disabled {
 @media (max-width: 1080px) {
 	.candidate-hero-grid {
 		grid-template-columns: 1fr;
+		align-items: start;
+	}
+
+	.candidate-hero-main {
+		grid-template-rows: auto;
+		height: auto;
 	}
 
 	.candidate-hero-side {
-		padding-top: 0.9rem;
+		padding-top: 0;
 	}
 }
 

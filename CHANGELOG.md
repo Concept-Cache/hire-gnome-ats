@@ -2,6 +2,12 @@
 
 This changelog captures the main recent product-facing changes shipped in Hire Gnome ATS.
 
+## [Unreleased]
+
+#### Changed
+- Candidate detail now includes a timeline-aware `Suggested Next Step` card in the snapshot area, with direct action links for likely recruiter follow-up.
+- Candidate names now display as `Last, First` in candidate-linked table/list views so sorting is more natural across candidates, submissions, interviews, placements, and job-order workspace lists.
+
 ## [1.5.1] - 2026-03-17
 
 #### Changed

@@ -28,6 +28,7 @@ import {
 	JOB_ORDER_STATUS_OPTIONS,
 	toJobOrderStatusValue
 } from '@/lib/job-order-options';
+import { formatPersonName } from '@/lib/person-name';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { sortByConfig } from '@/lib/list-sort';
@@ -289,7 +290,9 @@ export default function JobOrderDetailsPage() {
 				if (field === 'submissionPriority') return Number(submission.submissionPriority || 0);
 				if (field === 'createdAt') return submission.createdAt || '';
 				if (field === 'candidate') {
-					return `${submission.candidate?.firstName || ''} ${submission.candidate?.lastName || ''}`;
+					return formatPersonName(submission.candidate?.firstName, submission.candidate?.lastName, {
+						format: 'last-first'
+					});
 				}
 				if (field === 'status') return formatSelectValueLabel(submission.status);
 				if (field === 'submittedBy') return submissionCreatedByLabel(submission);
@@ -315,7 +318,9 @@ export default function JobOrderDetailsPage() {
 				if (field === 'subject') return interview.subject || '';
 				if (field === 'status') return formatSelectValueLabel(interview.status);
 				if (field === 'candidate') {
-					return `${interview.candidate?.firstName || ''} ${interview.candidate?.lastName || ''}`;
+					return formatPersonName(interview.candidate?.firstName, interview.candidate?.lastName, {
+						format: 'last-first'
+					});
 				}
 				return '';
 			}),
@@ -328,7 +333,9 @@ export default function JobOrderDetailsPage() {
 				if (field === 'createdAt') return offer.createdAt || '';
 				if (field === 'status') return formatSelectValueLabel(offer.status);
 				if (field === 'candidate') {
-					return `${offer.candidate?.firstName || ''} ${offer.candidate?.lastName || ''}`;
+					return formatPersonName(offer.candidate?.firstName, offer.candidate?.lastName, {
+						format: 'last-first'
+					});
 				}
 				return '';
 			}),
@@ -1808,11 +1815,15 @@ export default function JobOrderDetailsPage() {
 																{canReorderSubmissions ? <GripVertical aria-hidden="true" /> : null}
 																<strong>#{submission.submissionPriority || 0}</strong>
 															</span>
-															<strong>
-																<Link href={`/candidates/${submission.candidate.id}`}>
-																	{submission.candidate.firstName} {submission.candidate.lastName}
-																</Link>
-															</strong>
+												<strong>
+													<Link href={`/candidates/${submission.candidate.id}`}>
+														{formatPersonName(
+															submission.candidate?.firstName,
+															submission.candidate?.lastName,
+															{ format: 'last-first', fallback: 'Candidate unavailable' }
+														)}
+													</Link>
+												</strong>
 														</div>
 														<p className="simple-list-meta">
 															By{' '}
@@ -1843,7 +1854,11 @@ export default function JobOrderDetailsPage() {
 														href={`/submissions/${submission.id}`}
 														className="row-action-icon submission-open-link"
 														title="Open submission detail"
-														aria-label={`Open submission detail for ${submission.candidate.firstName} ${submission.candidate.lastName}`}
+														aria-label={`Open submission detail for ${formatPersonName(
+															submission.candidate?.firstName,
+															submission.candidate?.lastName,
+															{ format: 'last-first', fallback: 'candidate' }
+														)}`}
 													>
 														<ArrowUpRight aria-hidden="true" />
 													</Link>
@@ -1903,7 +1918,11 @@ export default function JobOrderDetailsPage() {
 													</strong>
 													<p>
 														{interview.candidate
-															? `${interview.candidate.firstName} ${interview.candidate.lastName}`
+															? formatPersonName(
+																interview.candidate.firstName,
+																interview.candidate.lastName,
+																{ format: 'last-first' }
+															)
 															: 'Candidate unavailable'}
 													</p>
 													<p className="simple-list-meta">@ <span className="meta-emphasis-time">{formatDate(interview.startsAt || interview.createdAt)}</span></p>
@@ -1952,7 +1971,9 @@ export default function JobOrderDetailsPage() {
 													</strong>
 													<p>
 														{offer.candidate
-															? `${offer.candidate.firstName} ${offer.candidate.lastName}`
+															? formatPersonName(offer.candidate.firstName, offer.candidate.lastName, {
+																format: 'last-first'
+															})
 															: 'Candidate unavailable'}
 													</p>
 													<p className="simple-list-meta">@ <span className="meta-emphasis-time">{formatDate(offer.createdAt)}</span></p>

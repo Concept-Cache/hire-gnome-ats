@@ -18,6 +18,7 @@ import {
 	summarizeCandidateAdvancedCriterion
 } from '@/lib/candidate-advanced-search';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { buildPersonNameSearchText, formatPersonName } from '@/lib/person-name';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { CANDIDATE_STATUS_OPTIONS } from '@/lib/candidate-status';
 import { getCandidateCompleteness } from '@/lib/candidate-completeness';
@@ -93,7 +94,7 @@ export default function CandidatesPage() {
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.fullName} ${row.email} ${row.status} ${row.statusLabel} ${row.source ?? ''} ${row.currentEmployer ?? ''} ${row.ownerName ?? ''}`
+				`${row.nameSearchText} ${row.email} ${row.status} ${row.statusLabel} ${row.source ?? ''} ${row.currentEmployer ?? ''} ${row.ownerName ?? ''}`
 					.toLowerCase()
 					.includes(q);
 			return matchesQuery;
@@ -175,7 +176,14 @@ export default function CandidatesPage() {
 					});
 					return {
 						...candidate,
-						fullName: `${candidate.firstName} ${candidate.lastName}`,
+						fullName: formatPersonName(candidate.firstName, candidate.lastName, { fallback: '-' }),
+						displayName: formatPersonName(candidate.firstName, candidate.lastName, {
+							format: 'last-first',
+							fallback: '-'
+						}),
+						nameSearchText: buildPersonNameSearchText(candidate.firstName, candidate.lastName, {
+							fallback: '-'
+						}),
 						statusLabel: formatSelectValueLabel(candidate.status),
 						currentTitle: candidate.currentJobTitle || '-',
 						currentEmployerLabel: candidate.currentEmployer || '-',
@@ -296,7 +304,12 @@ export default function CandidatesPage() {
 	}
 
 	const columns = [
-		{ key: 'fullName', label: 'Name' },
+		{
+			key: 'fullName',
+			label: 'Name',
+			getSortValue: (row) => row.displayName || row.fullName || '',
+			render: (row) => row.displayName || row.fullName
+		},
 		{ key: 'currentTitle', label: 'Current Title' },
 		{ key: 'currentEmployerLabel', label: 'Current Employer', defaultVisible: false },
 		{ key: 'emailLabel', label: 'Email', defaultVisible: false },

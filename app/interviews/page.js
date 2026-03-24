@@ -11,6 +11,7 @@ import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { buildPersonNameSearchText, formatPersonName } from '@/lib/person-name';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import {
 	evaluateInterviewAdvancedCriteria,
@@ -67,7 +68,7 @@ export default function InterviewsPage() {
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.subject} ${row.candidate} ${row.jobOrder} ${row.client} ${row.interviewMode} ${row.interviewModeLabel}`
+				`${row.subject} ${row.candidateSearchText} ${row.jobOrder} ${row.client} ${row.interviewMode} ${row.interviewModeLabel}`
 					.toLowerCase()
 					.includes(q);
 			return matchesQuery;
@@ -93,9 +94,19 @@ export default function InterviewsPage() {
 				data.map((interview) => {
 					return {
 						...interview,
-						candidate: interview.candidate
-							? `${interview.candidate.firstName} ${interview.candidate.lastName}`
-							: '-',
+						candidate: formatPersonName(interview.candidate?.firstName, interview.candidate?.lastName, {
+							fallback: '-'
+						}),
+						candidateDisplayName: formatPersonName(
+							interview.candidate?.firstName,
+							interview.candidate?.lastName,
+							{ format: 'last-first', fallback: '-' }
+						),
+						candidateSearchText: buildPersonNameSearchText(
+							interview.candidate?.firstName,
+							interview.candidate?.lastName,
+							{ fallback: '-' }
+						),
 						candidateId: interview.candidate?.id || null,
 						jobOrder: interview.jobOrder?.title || '-',
 						jobOrderId: interview.jobOrder?.id || null,
@@ -137,11 +148,14 @@ export default function InterviewsPage() {
 		{
 			key: 'candidate',
 			label: 'Candidate',
+			getSortValue: (row) => row.candidateDisplayName || row.candidate || '',
 			render: (row) =>
 				row.candidateId ? (
-					<TableEntityLink href={`/candidates/${row.candidateId}`}>{row.candidate}</TableEntityLink>
+					<TableEntityLink href={`/candidates/${row.candidateId}`}>
+						{row.candidateDisplayName || row.candidate}
+					</TableEntityLink>
 				) : (
-					row.candidate
+					row.candidateDisplayName || row.candidate
 				)
 		},
 		{

@@ -7,9 +7,13 @@ It also includes an on-demand AI summary modal, opened from the candidate detail
 
 Candidate detail now opens with a stronger candidate snapshot card that surfaces title, location, status, top skills, AI summary snippet, last activity, and profile completeness in one recruiter-friendly block.
 
+The snapshot card also surfaces a timeline-based `Suggested Next Step` so recruiters can see the most likely next action, such as reviewing the resume, submitting to a job order, scheduling an interview, or following up on an offer.
+
 Candidate detail also includes a unified `Timeline` workspace tab so recruiters can review notes, activities, file uploads, status changes, submissions, interviews, placements, and AI-summary events in one chronological feed.
 
 The candidates list also supports a separate `Advanced Search` builder so recruiters can combine structured filters like owner, source, skills, resume keywords, profile-completeness score, submission counts, and last-activity dates without overloading the basic search box.
+
+Candidate names in table/list contexts are shown as `Last, First` so alphabetic sorting is more useful across candidate-linked lists.
 
 ## Required Fields
 On create, required fields are enforced with red `*` markers and disabled Save until valid.
@@ -79,6 +83,8 @@ The candidate snapshot card also calls out the top missing profile gaps so users
 The candidates list also shows a compact profile-completeness chip so recruiters can spot weak records before opening detail.
 
 The same score can also be used as an advanced-search filter on the candidates list.
+
+The suggested-next-step card complements this score by turning current timeline and pipeline state into a recommended recruiter action.
 
 When a recruiter tries to create a submission from a candidate with a thin profile, the app now shows a soft warning with the top missing gaps. The recruiter can still continue.
 

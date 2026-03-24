@@ -36,6 +36,7 @@ import { submissionCreatedByLabel, submissionOriginLabel } from '@/lib/submissio
 import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { getCandidateCompleteness } from '@/lib/candidate-completeness';
 import { buildCandidateTimeline } from '@/lib/activity-timeline';
+import { deriveCandidateSuggestedNextStep } from '@/lib/candidate-next-step';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { CANDIDATE_STATUS_OPTIONS, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 
@@ -362,6 +363,7 @@ export default function CandidateDetailsPage() {
 		submittingJobOrderId: ''
 	});
 	const detailsPanelRef = useRef(null);
+	const workspacePanelRef = useRef(null);
 	const actionsMenuRef = useRef(null);
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
@@ -449,12 +451,28 @@ export default function CandidateDetailsPage() {
 		return uniqueSkillNames([...selectedSkillNames, ...otherSkillNames]).slice(0, 8);
 	}, [editForm.skillIds, editForm.skillSet, skills]);
 	const candidateSummarySnippet = useMemo(() => {
-		if (candidate?.aiSummary?.overview) return truncateText(candidate.aiSummary.overview, 240);
-		if (editForm.summary) return truncateText(editForm.summary, 220);
+		if (candidate?.aiSummary?.overview) return String(candidate.aiSummary.overview).trim();
+		if (editForm.summary) return String(editForm.summary).trim();
 		return '';
 	}, [candidate?.aiSummary?.overview, editForm.summary]);
 	const latestCandidateActivity = useMemo(() => getLatestCandidateActivity(candidate), [candidate]);
 	const candidateTimelineItems = useMemo(() => buildCandidateTimeline(candidate), [candidate]);
+	const candidateSuggestedNextStep = useMemo(
+		() =>
+			deriveCandidateSuggestedNextStep(candidate, {
+				aiAvailable,
+				completenessScore: candidateCompleteness.scorePercent,
+				jobMatchCount: jobMatchState.matches.length,
+				topGaps: candidateCompleteness.topGaps
+			}),
+		[
+			aiAvailable,
+			candidate,
+			candidateCompleteness.scorePercent,
+			candidateCompleteness.topGaps,
+			jobMatchState.matches.length
+		]
+	);
 
 	const submissionRows = useMemo(() => {
 		if (!candidate) return [];
@@ -868,6 +886,50 @@ export default function CandidateDetailsPage() {
 	function onToggleAuditTrail() {
 		setActionsOpen(false);
 		setShowAuditTrail((current) => !current);
+	}
+
+	function scrollToRef(ref) {
+		ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	function openWorkspaceTab(tabKey) {
+		setWorkspaceTab(tabKey);
+		window.requestAnimationFrame(() => {
+			scrollToRef(workspacePanelRef);
+		});
+	}
+
+	async function onRunSuggestedNextStep() {
+		if (!candidateSuggestedNextStep?.actionKey) return;
+
+		switch (candidateSuggestedNextStep.actionKey) {
+			case 'details':
+				scrollToRef(detailsPanelRef);
+				return;
+			case 'files':
+				openWorkspaceTab('files');
+				return;
+			case 'activities':
+				openWorkspaceTab('activities');
+				return;
+			case 'status-history':
+				openWorkspaceTab('status-history');
+				return;
+			case 'email-draft':
+				onOpenEmailDraft();
+				return;
+			case 'add-submission':
+				await onAddSubmission();
+				return;
+			case 'add-interview':
+				await onAddInterview();
+				return;
+			case 'add-placement':
+				await onAddPlacement();
+				return;
+			default:
+				return;
+		}
 	}
 
 	async function onArchiveCandidate() {
@@ -1525,39 +1587,61 @@ export default function CandidateDetailsPage() {
 					</div>
 
 					<div className="candidate-hero-side">
-						<div className="candidate-completeness-summary">
-							<span className="candidate-completeness-label">Profile Completeness</span>
-							<div className="candidate-completeness-summary-main">
-								<span className="candidate-completeness-score">{candidateCompleteness.scorePercent}%</span>
-								<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
-									{candidateCompleteness.levelLabel}
-								</span>
-							</div>
-						</div>
-						<div className="candidate-completeness-card">
-							<div className="candidate-completeness-meter" aria-hidden="true">
-								<span
-									className="candidate-completeness-meter-fill"
-									style={{ width: `${candidateCompleteness.scorePercent}%` }}
-								/>
-							</div>
-							<p className="panel-subtext candidate-completeness-copy">
-								{candidateCompleteness.completedSections} of {candidateCompleteness.totalSections} profile areas are complete.
+						<div className="candidate-next-step-card">
+							<span className="candidate-hero-section-label">Suggested Next Step</span>
+							<h4 className="candidate-next-step-title">
+								{candidateSuggestedNextStep?.title || 'Review Recent Candidate Activity'}
+							</h4>
+							<p className="candidate-next-step-copy">
+								{candidateSuggestedNextStep?.description || 'No timeline signal is available yet, so review the candidate profile and recent activity.'}
 							</p>
-							{candidateCompleteness.topGaps.length > 0 ? (
-								<div className="candidate-completeness-gaps">
-									<span className="candidate-completeness-gaps-label">Top gaps</span>
-									<div className="candidate-completeness-gap-list">
-										{candidateCompleteness.topGaps.map((gap) => (
-											<span key={gap} className="chip candidate-completeness-gap-chip">
-												{gap}
-											</span>
-										))}
-									</div>
+							{candidateSuggestedNextStep?.actionLabel ? (
+								<div className="candidate-next-step-actions">
+									<button
+										type="button"
+										className="btn-secondary"
+										onClick={onRunSuggestedNextStep}
+									>
+										{candidateSuggestedNextStep.actionLabel}
+									</button>
 								</div>
-							) : (
-								<p className="panel-subtext candidate-completeness-copy">Profile is in strong shape for recruiter review.</p>
-							)}
+							) : null}
+						</div>
+						<div className="candidate-completeness-panel">
+							<div className="candidate-completeness-summary">
+								<span className="candidate-completeness-label">Profile Completeness</span>
+								<div className="candidate-completeness-summary-main">
+									<span className="candidate-completeness-score">{candidateCompleteness.scorePercent}%</span>
+									<span className={`chip candidate-completeness-chip${candidateCompletenessSeverityClass}`}>
+										{candidateCompleteness.levelLabel}
+									</span>
+								</div>
+							</div>
+							<div className="candidate-completeness-card">
+								<div className="candidate-completeness-meter" aria-hidden="true">
+									<span
+										className="candidate-completeness-meter-fill"
+										style={{ width: `${candidateCompleteness.scorePercent}%` }}
+									/>
+								</div>
+								<p className="panel-subtext candidate-completeness-copy">
+									{candidateCompleteness.completedSections} of {candidateCompleteness.totalSections} profile areas are complete.
+								</p>
+								{candidateCompleteness.topGaps.length > 0 ? (
+									<div className="candidate-completeness-gaps">
+										<span className="candidate-completeness-gaps-label">Top gaps</span>
+										<div className="candidate-completeness-gap-list">
+											{candidateCompleteness.topGaps.map((gap) => (
+												<span key={gap} className="chip candidate-completeness-gap-chip">
+													{gap}
+												</span>
+											))}
+										</div>
+									</div>
+								) : (
+									<p className="panel-subtext candidate-completeness-copy">Profile is in strong shape for recruiter review.</p>
+								)}
+							</div>
 						</div>
 					</div>
 				</div>
@@ -1826,7 +1910,7 @@ export default function CandidateDetailsPage() {
 				</form>
 				</article>
 
-					<article className="panel workspace-panel workspace-panel-lock-height" style={workspacePanelStyle}>
+					<article className="panel workspace-panel workspace-panel-lock-height" style={workspacePanelStyle} ref={workspacePanelRef}>
 						<h3>Candidate Workspace</h3>
 						<div
 							className="side-tabs side-tabs-warm side-tabs-counted"

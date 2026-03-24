@@ -50,6 +50,7 @@ Use this sequence as your default process:
 - Column chooser keeps the default list layouts intact while letting users reveal extra optional columns per module, drag columns into a preferred order, and save those preferences to their user account so the same view follows them across devices.
 - Saved views let you capture the current list state as a reusable named view, including filters, sort order, and column layout, apply it later, and set one saved view as your personal default per module.
 - List tables sort ascending by the first column by default unless a saved view restores a different sort.
+- Candidate names in list/table views are shown as `Last, First` anywhere candidate records are being sorted or scanned in a table.
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
 - Candidate, job order, and submission detail pages now include a unified `Timeline` inside the workspace, so recent recruiting activity is visible without opening multiple screens.
 - Actions menu (`...`): context actions like archive, close, cancel, convert, and administrator-only audit access where supported.
@@ -110,7 +111,8 @@ Common actions:
 4. Add notes, education, work history, and file attachments.
 5. Use the candidate detail sparkles `AI Summary` header button to open the summary modal. If no summary exists yet, it generates automatically.
 6. Use the candidate detail snapshot card to quickly review title, location, status, top skills, AI summary snippet, last activity, and profile completeness before submission.
-7. Use `Actions` for fast create:
+7. Use the `Suggested Next Step` card on candidate detail for a timeline-aware recommendation such as `Review Resume`, `Submit To Job Order`, `Schedule Interview`, or `Follow Up On Offer`.
+8. Use `Actions` for fast create:
 - Add submission
 - Add interview
 - Add placement
