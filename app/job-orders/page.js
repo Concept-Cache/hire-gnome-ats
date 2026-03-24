@@ -19,6 +19,8 @@ import {
 	normalizeJobOrderAdvancedCriteria,
 	summarizeJobOrderAdvancedCriterion
 } from '@/lib/job-order-advanced-search';
+import { sortByConfig } from '@/lib/list-sort';
+import { saveRecordNavigationContext, withRecordNavigationQuery } from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { JOB_ORDER_STATUS_OPTIONS } from '@/lib/job-order-options';
 import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
@@ -172,8 +174,23 @@ export default function JobOrdersPage() {
 		}
 	}
 
+	function persistNavigationContext() {
+		const navigationRows = viewMode === 'kanban' ? kanbanRows : sortedListRows;
+		saveRecordNavigationContext('job-order', {
+			ids: navigationRows.map((row) => row.id),
+			label:
+				query.trim() || normalizedAdvancedCriteria.length > 0
+					? 'Filtered Job Orders'
+					: viewMode === 'kanban'
+						? 'Job Order Pipeline'
+						: 'Job Order List',
+			listPath: '/job-orders'
+		});
+	}
+
 	function onOpen(row) {
-		router.push(`/job-orders/${row.id}`);
+		persistNavigationContext();
+		router.push(withRecordNavigationQuery(`/job-orders/${row.id}`));
 	}
 
 	function applySavedViewState(nextState = {}) {
@@ -288,6 +305,20 @@ export default function JobOrdersPage() {
 	];
 	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
 	const effectiveSortState = sortState.key ? sortState : defaultSortState;
+	const sortedListRows = useMemo(() => {
+		if (!effectiveSortState.key) return filteredRows;
+		const sortColumn = columns.find((column) => column.key === effectiveSortState.key);
+		if (!sortColumn) return filteredRows;
+
+		return sortByConfig(
+			filteredRows,
+			{ field: effectiveSortState.key, direction: effectiveSortState.direction },
+			(row) =>
+				typeof sortColumn.getSortValue === 'function'
+					? sortColumn.getSortValue(row)
+					: row[sortColumn.key]
+		);
+	}, [columns, effectiveSortState.direction, effectiveSortState.key, filteredRows]);
 
 	return (
 		<section className="module-page">

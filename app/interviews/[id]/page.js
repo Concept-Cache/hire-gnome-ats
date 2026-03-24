@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Copy, LoaderCircle, Lock, MoreVertical, Sparkles } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
@@ -19,6 +19,12 @@ import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { INTERVIEW_TYPE_OPTIONS, normalizeInterviewType } from '@/app/constants/interview-type-options';
 import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 import { isValidOptionalHttpUrl, normalizeHttpUrl } from '@/lib/url-validation';
 import {
 	VIDEO_CALL_PROVIDER_OPTIONS,
@@ -127,6 +133,7 @@ function parseFilenameFromDisposition(disposition) {
 export default function InterviewDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const actionsMenuRef = useRef(null);
 	const [interview, setInterview] = useState(null);
 	const [aiAvailable, setAiAvailable] = useState(false);
@@ -140,11 +147,12 @@ export default function InterviewDetailsPage() {
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('INTERVIEW');
 	const isAdmin = useIsAdministrator();
-	const { markAsClean } = useUnsavedChangesGuard(form, {
+	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(interview)
 	});
 
@@ -170,6 +178,22 @@ export default function InterviewDetailsPage() {
 		form.videoLink.trim() && !hasValidVideoLink
 			? 'Enter a valid video call link URL, including http:// or https://.'
 			: '';
+	const interviewNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Interviews',
+			listPath: recordNavigationContext.listPath || '/interviews',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
 	async function load() {
 		setLoading(true);
@@ -203,6 +227,15 @@ export default function InterviewDetailsPage() {
 	useEffect(() => {
 		load();
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('interview'));
+			return;
+		}
+		clearRecordNavigationContext('interview');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		function onMouseDown(event) {
@@ -443,6 +476,12 @@ export default function InterviewDetailsPage() {
 		router.push('/interviews');
 	}
 
+	async function onNavigateToInterview(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/interviews/${targetId}`));
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -466,7 +505,13 @@ export default function InterviewDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/interviews" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={interviewNavigationState?.listPath || '/interviews'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>{interview.subject}</h2>
 					<p>
 						{interview.candidate?.firstName || '-'} {interview.candidate?.lastName || ''} |{' '}
@@ -474,7 +519,36 @@ export default function InterviewDetailsPage() {
 					</p>
 				</div>
 				<div className="module-header-actions">
-										<div className="actions-menu" ref={actionsMenuRef}>
+					{interviewNavigationState ? (
+						<div className="record-navigation-controls" aria-label={`${interviewNavigationState.label} navigation`}>
+							<p className="simple-list-meta record-navigation-meta">
+								{interviewNavigationState.label}: {interviewNavigationState.position} of {interviewNavigationState.total}
+							</p>
+							<div className="record-navigation-buttons">
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToInterview(interviewNavigationState.previousId)}
+									disabled={!interviewNavigationState.previousId}
+									aria-label="Previous Interview"
+									title="Previous Interview"
+								>
+									<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToInterview(interviewNavigationState.nextId)}
+									disabled={!interviewNavigationState.nextId}
+									aria-label="Next Interview"
+									title="Next Interview"
+								>
+									<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+					) : null}
+					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
 							type="button"
 							className="btn-secondary actions-menu-toggle"

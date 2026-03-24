@@ -33,8 +33,7 @@ export default function ReportOwnerPerformancePanel({ owners, onSelectOwnerDetai
 								<OwnerMetricChip className="report-owner-chip-jobs" count={owner.jobOrdersOpened} label="Jobs" onClick={() => onSelectOwnerDetail(owner, 'jobOrdersOpened', 'Job Orders')} />
 								<OwnerMetricChip className="report-owner-chip-submissions" count={owner.submissionsCreated} label="Submissions" onClick={() => onSelectOwnerDetail(owner, 'submissionsCreated', 'Submissions')} />
 								<OwnerMetricChip className="report-owner-chip-interviews" count={owner.interviewsScheduled} label="Interviews" onClick={() => onSelectOwnerDetail(owner, 'interviewsScheduled', 'Interviews')} />
-								<OwnerMetricChip className="report-owner-chip-placements" count={owner.placementsCreated} label="Placements" onClick={() => onSelectOwnerDetail(owner, 'placementsCreated', 'Placements')} />
-								<OwnerMetricChip className="report-owner-chip-accepted" count={owner.placementsAccepted} label="Accepted" onClick={() => onSelectOwnerDetail(owner, 'placementsAccepted', 'Accepted Placements')} />
+								<OwnerMetricChip className="report-owner-chip-placements" count={owner.placementsClosed} label="Placements" onClick={() => onSelectOwnerDetail(owner, 'placementsClosed', 'Placements')} />
 							</div>
 						</div>
 					))}

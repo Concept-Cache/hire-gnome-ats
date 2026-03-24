@@ -69,8 +69,7 @@ function emptyReportState() {
 			jobOrdersOpened: 0,
 			submissionsCreated: 0,
 			interviewsScheduled: 0,
-			placementsCreated: 0,
-			placementsAccepted: 0,
+			placementsClosed: 0,
 			openJobOrders: 0
 		},
 		pipeline: {
@@ -98,8 +97,7 @@ function kpiCards(summary) {
 		{ key: 'jobOrdersOpened', label: 'New Job Orders', value: summary.jobOrdersOpened },
 		{ key: 'submissionsCreated', label: 'New Submissions', value: summary.submissionsCreated },
 		{ key: 'interviewsScheduled', label: 'New Interviews', value: summary.interviewsScheduled },
-		{ key: 'placementsCreated', label: 'New Placements', value: summary.placementsCreated },
-		{ key: 'placementsAccepted', label: 'Accepted', value: summary.placementsAccepted },
+		{ key: 'placementsClosed', label: 'Placements', value: summary.placementsClosed },
 		{ key: 'openJobOrders', label: 'Open Job Orders', value: summary.openJobOrders }
 	];
 }

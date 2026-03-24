@@ -16,6 +16,8 @@ import {
 } from '@/lib/client-advanced-search';
 import { normalizeClientStatusValue } from '@/lib/client-status-options';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { sortByConfig } from '@/lib/list-sort';
+import { saveRecordNavigationContext, withRecordNavigationQuery } from '@/lib/record-navigation-context';
 import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
 
 function formatLocation(city, state) {
@@ -111,8 +113,17 @@ export default function ClientsPage() {
 		load();
 	}, []);
 
+	function persistNavigationContext() {
+		saveRecordNavigationContext('client', {
+			ids: sortedListRows.map((row) => row.id),
+			label: query.trim() || normalizedAdvancedCriteria.length > 0 ? 'Filtered Clients' : 'Client List',
+			listPath: '/clients'
+		});
+	}
+
 	function onOpen(row) {
-		router.push(`/clients/${row.id}`);
+		persistNavigationContext();
+		router.push(withRecordNavigationQuery(`/clients/${row.id}`));
 	}
 
 	function applySavedViewState(nextState = {}) {
@@ -140,6 +151,20 @@ export default function ClientsPage() {
 	];
 	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
 	const effectiveSortState = sortState.key ? sortState : defaultSortState;
+	const sortedListRows = useMemo(() => {
+		if (!effectiveSortState.key) return filteredRows;
+		const sortColumn = columns.find((column) => column.key === effectiveSortState.key);
+		if (!sortColumn) return filteredRows;
+
+		return sortByConfig(
+			filteredRows,
+			{ field: effectiveSortState.key, direction: effectiveSortState.direction },
+			(row) =>
+				typeof sortColumn.getSortValue === 'function'
+					? sortColumn.getSortValue(row)
+					: row[sortColumn.key]
+		);
+	}, [columns, effectiveSortState.direction, effectiveSortState.key, filteredRows]);
 
 	return (
 		<section className="module-page">

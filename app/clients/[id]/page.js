@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { MoreVertical, Save } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ChevronLeft, ChevronRight, MoreVertical, Save } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
@@ -21,6 +21,12 @@ import { INDUSTRY_OPTIONS, normalizeIndustryValue } from '@/app/constants/indust
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { cascadeSelectionFromIds, getArchiveCascadeOptions } from '@/lib/archive-cascade-options';
 import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { sortByConfig } from '@/lib/list-sort';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
@@ -76,6 +82,7 @@ function normalizeZipFromPlace(postalCode) {
 export default function ClientDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const actionsMenuRef = useRef(null);
 	const [actingUser, setActingUser] = useState(null);
 	const [client, setClient] = useState(null);
@@ -93,6 +100,7 @@ export default function ClientDetailsPage() {
 	const [notesSort, setNotesSort] = useState({ field: 'createdAt', direction: 'desc' });
 	const [contactsSort, setContactsSort] = useState({ field: 'name', direction: 'asc' });
 	const [jobsSort, setJobsSort] = useState({ field: 'title', direction: 'asc' });
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const detailsPanelRef = useRef(null);
 	const toast = useToast();
 	const { requestConfirmWithOptions } = useConfirmDialog();
@@ -114,9 +122,25 @@ export default function ClientDetailsPage() {
 	);
 	const websiteError =
 		form.website.trim() && !hasValidWebsite ? 'Enter a valid website URL, including http:// or https://.' : '';
-	const { markAsClean } = useUnsavedChangesGuard(form, {
+	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(client)
 	});
+	const clientNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Clients',
+			listPath: recordNavigationContext.listPath || '/clients',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
 	const sortedNotes = useMemo(
 		() =>
@@ -194,6 +218,15 @@ export default function ClientDetailsPage() {
 	useEffect(() => {
 		load();
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('client'));
+			return;
+		}
+		clearRecordNavigationContext('client');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		const panel = detailsPanelRef.current;
@@ -351,6 +384,12 @@ export default function ClientDetailsPage() {
 		router.push('/clients');
 	}
 
+	async function onNavigateToClient(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/clients/${targetId}`));
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -377,11 +416,46 @@ export default function ClientDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/clients" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={clientNavigationState?.listPath || '/clients'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>{client.name}</h2>
 					<p>{client.industry || 'No industry set'}</p>
 				</div>
 				<div className="module-header-actions">
+					{clientNavigationState ? (
+						<div className="record-navigation-controls" aria-label={`${clientNavigationState.label} navigation`}>
+							<p className="simple-list-meta record-navigation-meta">
+								{clientNavigationState.label}: {clientNavigationState.position} of {clientNavigationState.total}
+							</p>
+							<div className="record-navigation-buttons">
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToClient(clientNavigationState.previousId)}
+									disabled={!clientNavigationState.previousId}
+									aria-label="Previous Client"
+									title="Previous Client"
+								>
+									<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToClient(clientNavigationState.nextId)}
+									disabled={!clientNavigationState.nextId}
+									aria-label="Next Client"
+									title="Next Client"
+								>
+									<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+					) : null}
 					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
 							type="button"

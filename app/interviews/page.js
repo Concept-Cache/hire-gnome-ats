@@ -11,7 +11,9 @@ import TableColumnPicker from '@/app/components/table-column-picker';
 import TableEntityLink from '@/app/components/table-entity-link';
 import useArchivedEntities from '@/app/hooks/use-archived-entities';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { sortByConfig } from '@/lib/list-sort';
 import { buildPersonNameSearchText, formatPersonName } from '@/lib/person-name';
+import { saveRecordNavigationContext, withRecordNavigationQuery } from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import {
 	evaluateInterviewAdvancedCriteria,
@@ -129,8 +131,17 @@ export default function InterviewsPage() {
 		load();
 	}, []);
 
+	function persistNavigationContext() {
+		saveRecordNavigationContext('interview', {
+			ids: sortedListRows.map((row) => row.id),
+			label: query.trim() || normalizedAdvancedCriteria.length > 0 ? 'Filtered Interviews' : 'Interview List',
+			listPath: '/interviews'
+		});
+	}
+
 	function onOpen(row) {
-		router.push(`/interviews/${row.id}`);
+		persistNavigationContext();
+		router.push(withRecordNavigationQuery(`/interviews/${row.id}`));
 	}
 
 	function applySavedViewState(nextState = {}) {
@@ -186,6 +197,20 @@ export default function InterviewsPage() {
 	];
 	const defaultSortState = useMemo(() => buildDefaultTableSortState(columns), [columns]);
 	const effectiveSortState = sortState.key ? sortState : defaultSortState;
+	const sortedListRows = useMemo(() => {
+		if (!effectiveSortState.key) return filteredRows;
+		const sortColumn = columns.find((column) => column.key === effectiveSortState.key);
+		if (!sortColumn) return filteredRows;
+
+		return sortByConfig(
+			filteredRows,
+			{ field: effectiveSortState.key, direction: effectiveSortState.direction },
+			(row) =>
+				typeof sortColumn.getSortValue === 'function'
+					? sortColumn.getSortValue(row)
+					: row[sortColumn.key]
+		);
+	}, [columns, effectiveSortState.direction, effectiveSortState.key, filteredRows]);
 
 	return (
 		<section className="module-page">

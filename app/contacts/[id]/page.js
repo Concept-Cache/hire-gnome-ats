@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, MoreVertical, Save } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ArrowUpRight, ChevronLeft, ChevronRight, MoreVertical, Save } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
@@ -24,6 +24,12 @@ import {
 } from '@/app/constants/contact-source-options';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { sortByConfig } from '@/lib/list-sort';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
@@ -77,6 +83,7 @@ function formatDate(value) {
 export default function ContactDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const [contact, setContact] = useState(null);
 	const [form, setForm] = useState(initialForm);
 	const [noteContent, setNoteContent] = useState('');
@@ -93,6 +100,7 @@ export default function ContactDetailsPage() {
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [notesSort, setNotesSort] = useState({ field: 'createdAt', direction: 'desc' });
 	const [jobsSort, setJobsSort] = useState({ field: 'title', direction: 'asc' });
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const detailsPanelRef = useRef(null);
 	const actionsMenuRef = useRef(null);
 	const toast = useToast();
@@ -108,7 +116,7 @@ export default function ContactDetailsPage() {
 		customFieldDefinitions,
 		form.customFields
 	);
-	const { markAsClean } = useUnsavedChangesGuard(form, {
+	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(contact)
 	});
 
@@ -128,6 +136,22 @@ export default function ContactDetailsPage() {
 		[customFieldsComplete, form, hasValidLinkedinUrl]
 	);
 	const isClientLocked = Boolean(contact?.id);
+	const contactNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Contacts',
+			listPath: recordNavigationContext.listPath || '/contacts',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
 	const sortedNotes = useMemo(
 		() =>
@@ -183,6 +207,15 @@ export default function ContactDetailsPage() {
 	useEffect(() => {
 		load();
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('contact'));
+			return;
+		}
+		clearRecordNavigationContext('contact');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		const panel = detailsPanelRef.current;
@@ -345,6 +378,12 @@ export default function ContactDetailsPage() {
 		router.push('/contacts');
 	}
 
+	async function onNavigateToContact(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/contacts/${targetId}`));
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -371,13 +410,48 @@ export default function ContactDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/contacts" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={contactNavigationState?.listPath || '/contacts'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>
 						{contact.firstName} {contact.lastName}
 					</h2>
 					<p>{contact.client?.name || 'No client linked'}</p>
 				</div>
 				<div className="module-header-actions">
+					{contactNavigationState ? (
+						<div className="record-navigation-controls" aria-label={`${contactNavigationState.label} navigation`}>
+							<p className="simple-list-meta record-navigation-meta">
+								{contactNavigationState.label}: {contactNavigationState.position} of {contactNavigationState.total}
+							</p>
+							<div className="record-navigation-buttons">
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToContact(contactNavigationState.previousId)}
+									disabled={!contactNavigationState.previousId}
+									aria-label="Previous Contact"
+									title="Previous Contact"
+								>
+									<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToContact(contactNavigationState.nextId)}
+									disabled={!contactNavigationState.nextId}
+									aria-label="Next Contact"
+									title="Next Contact"
+								>
+									<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+					) : null}
 					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
 							type="button"
