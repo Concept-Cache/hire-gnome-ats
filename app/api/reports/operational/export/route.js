@@ -259,8 +259,7 @@ function appendSummarySheet(workbook, { report, selectedDivision, selectedOwner 
 	worksheet.addRow(['New Job Orders', report.summary.jobOrdersOpened]);
 	worksheet.addRow(['New Submissions', report.summary.submissionsCreated]);
 	worksheet.addRow(['New Interviews', report.summary.interviewsScheduled]);
-	worksheet.addRow(['New Placements', report.summary.placementsCreated]);
-	worksheet.addRow(['Accepted Placements', report.summary.placementsAccepted]);
+	worksheet.addRow(['Placements', report.summary.placementsClosed]);
 	worksheet.addRow(['Open Job Orders', report.summary.openJobOrders]);
 
 	styleHeaderRow(worksheet.getRow(1));

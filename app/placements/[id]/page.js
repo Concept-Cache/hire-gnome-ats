@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, Lock, MoreVertical } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Lock, MoreVertical } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
@@ -17,6 +17,12 @@ import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 
 const initialForm = {
 	status: 'planned',
@@ -225,6 +231,7 @@ function hasPlacementStarted(value) {
 export default function PlacementDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const actionsMenuRef = useRef(null);
 	const [placement, setPlacement] = useState(null);
 	const [form, setForm] = useState(initialForm);
@@ -234,6 +241,7 @@ export default function PlacementDetailsPage() {
 	const [actionsOpen, setActionsOpen] = useState(false);
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('PLACEMENT');
@@ -245,7 +253,7 @@ export default function PlacementDetailsPage() {
 	const placementStarted = hasPlacementStarted(form.expectedJoinDate || placement?.expectedJoinDate);
 	const canWithdrawPlacement = !acceptedReadOnly && !placementStarted && nextStatus !== 'withdrawn';
 	const canCancelPlacement = !acceptedReadOnly && placementStarted && nextStatus !== 'declined';
-	const { markAsClean } = useUnsavedChangesGuard(form, {
+	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(placement) && !acceptedReadOnly
 	});
 
@@ -297,6 +305,22 @@ export default function PlacementDetailsPage() {
 		customFieldDefinitions,
 		form.customFields
 	);
+	const placementNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Placements',
+			listPath: recordNavigationContext.listPath || '/placements',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
 	useEffect(() => {
 		let active = true;
@@ -330,6 +354,15 @@ export default function PlacementDetailsPage() {
 			active = false;
 		};
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('placement'));
+			return;
+		}
+		clearRecordNavigationContext('placement');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		if (form.placementType !== 'perm') return;
@@ -616,6 +649,12 @@ export default function PlacementDetailsPage() {
 		router.push('/placements');
 	}
 
+	async function onNavigateToPlacement(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/placements/${targetId}`));
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -639,13 +678,48 @@ export default function PlacementDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/placements" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={placementNavigationState?.listPath || '/placements'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>Placement #{placement.id}</h2>
 					<p>
 						{placement.candidate?.firstName || '-'} {placement.candidate?.lastName || ''} | {placement.jobOrder?.title || '-'}
 					</p>
 				</div>
 				<div className="module-header-actions">
+					{placementNavigationState ? (
+						<div className="record-navigation-controls" aria-label={`${placementNavigationState.label} navigation`}>
+							<p className="simple-list-meta record-navigation-meta">
+								{placementNavigationState.label}: {placementNavigationState.position} of {placementNavigationState.total}
+							</p>
+							<div className="record-navigation-buttons">
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToPlacement(placementNavigationState.previousId)}
+									disabled={!placementNavigationState.previousId}
+									aria-label="Previous Placement"
+									title="Previous Placement"
+								>
+									<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToPlacement(placementNavigationState.nextId)}
+									disabled={!placementNavigationState.nextId}
+									aria-label="Next Placement"
+									title="Next Placement"
+								>
+									<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+					) : null}
 					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
 							type="button"

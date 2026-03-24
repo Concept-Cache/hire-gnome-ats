@@ -10,8 +10,7 @@ The Reports module gives teams a scoped operational view of hiring activity with
 	- Job orders opened
 	- Submissions created
 	- Interviews scheduled
-	- Placements created
-	- Placements accepted
+	- Placements
 	- Current open job orders
 - See live pipeline totals for candidates, job orders, submissions, and placements
 - Review interview type mix (`Phone`, `Video`, `In Person`)
@@ -73,7 +72,7 @@ Included sheets:
 - `Interviews`
 - `Placements`
 
-Each entity sheet contains the unique records included in the report counts, along with status-style tags, metadata, and flags showing whether the record contributed to a summary-card count such as `New Candidate`, `Open Job Order`, or `Accepted Placement`.
+Each entity sheet contains the unique records included in the report counts, along with status-style tags, metadata, and flags showing whether the record contributed to a summary-card count such as `New Candidate`, `Open Job Order`, or `Placement`.
 Each entity sheet mirrors the record detail shown in the report modal, using entity-specific columns instead of a generic title/subtitle export.
 
 Examples:
@@ -129,10 +128,8 @@ Each detail tab is sorted by status first, then alphabetically by the primary re
 	- New submissions created in the selected range
 - `Interviews Scheduled`
 	- Interview records created in the selected range
-- `Placements Created`
-	- Placement records created in the selected range
-- `Placements Accepted`
-	- Placements whose status changed to `Accepted` during the selected range
+- `Placements`
+	- Placements that reached `Accepted` during the selected range
 - `Current Open Job Orders`
 	- Open or on-hold job orders in the current accessible pipeline
 
@@ -168,7 +165,6 @@ Each owner metric chip is clickable:
 - `Submissions`
 - `Interviews`
 - `Placements`
-- `Accepted`
 
 Clicking a chip opens the same report detail modal used elsewhere, filtered to that owner and metric.
 

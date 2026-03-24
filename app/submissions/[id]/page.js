@@ -2,8 +2,19 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, BriefcaseBusiness, Copy, LoaderCircle, Lock, MoreVertical, Sparkles, UserRound } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import {
+	ArrowUpRight,
+	BriefcaseBusiness,
+	ChevronLeft,
+	ChevronRight,
+	Copy,
+	LoaderCircle,
+	Lock,
+	MoreVertical,
+	Sparkles,
+	UserRound
+} from 'lucide-react';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
@@ -22,6 +33,12 @@ import {
 	parseClientFeedbackScorecard
 } from '@/lib/client-feedback-scorecard';
 import { formatDateTimeAt } from '@/lib/date-format';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 import { submissionOriginLabel } from '@/lib/submission-origin';
 import { getEffectiveSubmissionStatus, isSubmissionPlacementLocked } from '@/lib/submission-status';
 import { buildSubmissionTimeline } from '@/lib/activity-timeline';
@@ -82,6 +99,7 @@ function formatClientPortalVisibilityLabel(value) {
 export default function SubmissionDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const actionsMenuRef = useRef(null);
 	const detailsPanelRef = useRef(null);
 	const [submission, setSubmission] = useState(null);
@@ -98,6 +116,7 @@ export default function SubmissionDetailsPage() {
 	const [workspaceTab, setWorkspaceTab] = useState('timeline');
 	const [detailsPanelHeight, setDetailsPanelHeight] = useState(0);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const toast = useToast();
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('SUBMISSION');
@@ -111,6 +130,22 @@ export default function SubmissionDetailsPage() {
 		form.customFields
 	);
 	const submissionTimelineItems = useMemo(() => buildSubmissionTimeline(submission), [submission]);
+	const submissionNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Submissions',
+			listPath: recordNavigationContext.listPath || '/submissions',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 	const workspacePanelStyle =
 		detailsPanelHeight > 0 ? { height: `${detailsPanelHeight}px`, maxHeight: `${detailsPanelHeight}px` } : undefined;
 
@@ -147,6 +182,15 @@ export default function SubmissionDetailsPage() {
 	useEffect(() => {
 		load();
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('submission'));
+			return;
+		}
+		clearRecordNavigationContext('submission');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		function onMouseDown(event) {
@@ -280,6 +324,12 @@ export default function SubmissionDetailsPage() {
 		if (!submission?.jobOrderId) return;
 		if (!(await confirmNavigation())) return;
 		router.push(`/job-orders/${submission.jobOrderId}`);
+	}
+
+	async function onNavigateToSubmission(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/submissions/${targetId}`));
 	}
 
 	function onOpenSubmissionPacket() {
@@ -477,7 +527,13 @@ export default function SubmissionDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/submissions" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={submissionNavigationState?.listPath || '/submissions'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>Submission #{submission.id}</h2>
 					<p>
 						{submission.candidate?.firstName || '-'} {submission.candidate?.lastName || ''} |{' '}
@@ -485,6 +541,35 @@ export default function SubmissionDetailsPage() {
 					</p>
 				</div>
 				<div className="module-header-actions">
+					{submissionNavigationState ? (
+						<div className="record-navigation-controls" aria-label={`${submissionNavigationState.label} navigation`}>
+							<p className="simple-list-meta record-navigation-meta">
+								{submissionNavigationState.label}: {submissionNavigationState.position} of {submissionNavigationState.total}
+							</p>
+							<div className="record-navigation-buttons">
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToSubmission(submissionNavigationState.previousId)}
+									disabled={!submissionNavigationState.previousId}
+									aria-label="Previous Submission"
+									title="Previous Submission"
+								>
+									<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToSubmission(submissionNavigationState.nextId)}
+									disabled={!submissionNavigationState.nextId}
+									aria-label="Next Submission"
+									title="Next Submission"
+								>
+									<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+					) : null}
 					<button
 						type="button"
 						className="btn-secondary btn-link-icon submission-header-link"

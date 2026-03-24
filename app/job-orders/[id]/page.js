@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowUpRight, GripVertical, MoreVertical, RefreshCcw, Sparkles, UserPlus } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ArrowUpRight, ChevronLeft, ChevronRight, GripVertical, MoreVertical, RefreshCcw, Sparkles, UserPlus } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
@@ -29,6 +29,12 @@ import {
 	toJobOrderStatusValue
 } from '@/lib/job-order-options';
 import { formatPersonName } from '@/lib/person-name';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { hasMeaningfulRichTextContent } from '@/lib/rich-text';
 import { sortByConfig } from '@/lib/list-sort';
@@ -181,6 +187,7 @@ function formatDate(value) {
 export default function JobOrderDetailsPage() {
 	const { id } = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const [actingUser, setActingUser] = useState(null);
 	const [jobOrder, setJobOrder] = useState(null);
 	const [portalAccess, setPortalAccess] = useState(null);
@@ -217,6 +224,7 @@ export default function JobOrderDetailsPage() {
 		draggingId: '',
 		overId: ''
 	});
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const [matchState, setMatchState] = useState({
 		loading: false,
 		error: '',
@@ -233,9 +241,25 @@ export default function JobOrderDetailsPage() {
 	const { archiveEntity } = useArchivedEntities('JOB_ORDER');
 	const toast = useToast();
 	const isAdmin = useIsAdministrator(actingUser);
-	const { markAsClean } = useUnsavedChangesGuard(form, {
+	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
 		enabled: !loading && Boolean(jobOrder)
 	});
+	const jobOrderNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Job Orders',
+			listPath: recordNavigationContext.listPath || '/job-orders',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
 	const selectedDivisionId = useMemo(() => {
 		if (isAdmin) return form.divisionId || '';
@@ -443,6 +467,15 @@ export default function JobOrderDetailsPage() {
 	useEffect(() => {
 		load();
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('job-order'));
+			return;
+		}
+		clearRecordNavigationContext('job-order');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		if (!jobOrder?.id) return;
@@ -1061,6 +1094,12 @@ export default function JobOrderDetailsPage() {
 		router.push('/job-orders');
 	}
 
+	async function onNavigateToJobOrder(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/job-orders/${targetId}`));
+	}
+
 	if (loading) {
 		return (
 			<section className="module-page">
@@ -1124,12 +1163,47 @@ export default function JobOrderDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/job-orders" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={jobOrderNavigationState?.listPath || '/job-orders'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>{jobOrder.title}</h2>
 					<p>{jobOrder.client?.name || 'No client linked'}</p>
 				</div>
 				<div className="module-header-actions">
-										<div className="actions-menu" ref={actionsMenuRef}>
+					{jobOrderNavigationState ? (
+						<div className="record-navigation-controls" aria-label={`${jobOrderNavigationState.label} navigation`}>
+							<p className="simple-list-meta record-navigation-meta">
+								{jobOrderNavigationState.label}: {jobOrderNavigationState.position} of {jobOrderNavigationState.total}
+							</p>
+							<div className="record-navigation-buttons">
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToJobOrder(jobOrderNavigationState.previousId)}
+									disabled={!jobOrderNavigationState.previousId}
+									aria-label="Previous Job Order"
+									title="Previous Job Order"
+								>
+									<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+								<button
+									type="button"
+									className="btn-secondary record-navigation-button"
+									onClick={() => onNavigateToJobOrder(jobOrderNavigationState.nextId)}
+									disabled={!jobOrderNavigationState.nextId}
+									aria-label="Next Job Order"
+									title="Next Job Order"
+								>
+									<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+								</button>
+							</div>
+						</div>
+					) : null}
+					<div className="actions-menu" ref={actionsMenuRef}>
 						<button
 							type="button"
 							className="btn-secondary actions-menu-toggle"

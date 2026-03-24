@@ -2346,6 +2346,31 @@ p {
 	justify-content: flex-end;
 }
 
+.record-navigation-controls {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	margin-right: 0.5rem;
+}
+
+.record-navigation-meta {
+	margin: 0;
+	white-space: nowrap;
+}
+
+.record-navigation-buttons {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.record-navigation-button {
+	min-width: 2.1rem;
+	padding-inline: 0.45rem;
+}
+
 .module-header > div > p {
 	display: none;
 }
@@ -2924,7 +2949,7 @@ p {
 
 .report-owner-chips {
 	display: grid;
-	grid-template-columns: repeat(6, minmax(0, 1fr));
+	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: 0.35rem;
 	width: 100%;
 }
@@ -4221,6 +4246,11 @@ button:disabled {
 	height: 1px;
 	margin: 0.25rem 0;
 	background: rgba(42, 78, 130, 0.14);
+}
+
+.actions-menu-list > .actions-menu-divider:first-child,
+.actions-menu-list > .actions-menu-item-danger:first-child + .actions-menu-divider {
+	display: none;
 }
 
 .actions-menu-hint {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { BookmarkPlus, BookmarkX, Download, FileText, LoaderCircle, MoreVertical, RefreshCcw, Save, Sparkles, Trash2, Upload, UserPlus, X } from 'lucide-react';
+import { BookmarkPlus, BookmarkX, ChevronLeft, ChevronRight, Download, FileText, LoaderCircle, MoreVertical, RefreshCcw, Save, Sparkles, Trash2, Upload, UserPlus, X } from 'lucide-react';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
@@ -37,6 +37,12 @@ import { getEffectiveSubmissionStatus } from '@/lib/submission-status';
 import { getCandidateCompleteness } from '@/lib/candidate-completeness';
 import { buildCandidateTimeline } from '@/lib/activity-timeline';
 import { deriveCandidateSuggestedNextStep } from '@/lib/candidate-next-step';
+import {
+	clearRecordNavigationContext,
+	readRecordNavigationContext,
+	RECORD_NAVIGATION_QUERY_PARAM,
+	withRecordNavigationQuery
+} from '@/lib/record-navigation-context';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { CANDIDATE_STATUS_OPTIONS, isCandidateQualifiedForPipeline } from '@/lib/candidate-status';
 
@@ -370,6 +376,7 @@ export default function CandidateDetailsPage() {
 	const [showAuditTrail, setShowAuditTrail] = useState(false);
 	const [emailDraftOpen, setEmailDraftOpen] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
+	const [recordNavigationContext, setRecordNavigationContext] = useState(null);
 	const toast = useToast();
 	const { requestConfirm, requestConfirmWithOptions } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('CANDIDATE');
@@ -473,6 +480,22 @@ export default function CandidateDetailsPage() {
 			jobMatchState.matches.length
 		]
 	);
+	const candidateNavigationState = useMemo(() => {
+		if (!recordNavigationContext?.ids?.length || !id) return null;
+		const ids = recordNavigationContext.ids.map((value) => String(value));
+		const currentId = String(id);
+		const currentIndex = ids.indexOf(currentId);
+		if (currentIndex < 0) return null;
+		return {
+			label: recordNavigationContext.label || 'Filtered Candidates',
+			listPath: recordNavigationContext.listPath || '/candidates',
+			position: currentIndex + 1,
+			total: ids.length,
+			previousId: currentIndex > 0 ? ids[currentIndex - 1] : '',
+			nextId: currentIndex < ids.length - 1 ? ids[currentIndex + 1] : ''
+		};
+	}, [id, recordNavigationContext]);
+	const shouldUseRecordNavigation = searchParams.get(RECORD_NAVIGATION_QUERY_PARAM) === '1';
 
 	const submissionRows = useMemo(() => {
 		if (!candidate) return [];
@@ -692,6 +715,15 @@ export default function CandidateDetailsPage() {
 	useEffect(() => {
 		load();
 	}, [id]);
+
+	useEffect(() => {
+		if (shouldUseRecordNavigation) {
+			setRecordNavigationContext(readRecordNavigationContext('candidate'));
+			return;
+		}
+		clearRecordNavigationContext('candidate');
+		setRecordNavigationContext(null);
+	}, [id, shouldUseRecordNavigation]);
 
 	useEffect(() => {
 		if (!candidate?.id) return;
@@ -930,6 +962,12 @@ export default function CandidateDetailsPage() {
 			default:
 				return;
 		}
+	}
+
+	async function onNavigateToCandidate(targetId) {
+		if (!targetId || String(targetId) === String(id)) return;
+		if (!(await confirmNavigation())) return;
+		router.push(withRecordNavigationQuery(`/candidates/${targetId}`));
 	}
 
 	async function onArchiveCandidate() {
@@ -1417,7 +1455,13 @@ export default function CandidateDetailsPage() {
 		<section className="module-page">
 			<header className="module-header">
 				<div>
-					<Link href="/candidates" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
+					<Link
+						href={candidateNavigationState?.listPath || '/candidates'}
+						className="module-back-link"
+						aria-label="Back to List"
+					>
+						&larr; Back
+					</Link>
 					<h2>
 						{candidate.firstName} {candidate.lastName}
 					</h2>
@@ -1426,6 +1470,35 @@ export default function CandidateDetailsPage() {
 					</p>
 				</div>
 					<div className="module-header-actions">
+						{candidateNavigationState ? (
+							<div className="record-navigation-controls" aria-label={`${candidateNavigationState.label} navigation`}>
+								<p className="simple-list-meta record-navigation-meta">
+									{candidateNavigationState.label}: {candidateNavigationState.position} of {candidateNavigationState.total}
+								</p>
+								<div className="record-navigation-buttons">
+									<button
+										type="button"
+										className="btn-secondary record-navigation-button"
+										onClick={() => onNavigateToCandidate(candidateNavigationState.previousId)}
+										disabled={!candidateNavigationState.previousId}
+										aria-label="Previous Candidate"
+										title="Previous Candidate"
+									>
+										<ChevronLeft aria-hidden="true" className="btn-refresh-icon-svg" />
+									</button>
+									<button
+										type="button"
+										className="btn-secondary record-navigation-button"
+										onClick={() => onNavigateToCandidate(candidateNavigationState.nextId)}
+										disabled={!candidateNavigationState.nextId}
+										aria-label="Next Candidate"
+										title="Next Candidate"
+									>
+										<ChevronRight aria-hidden="true" className="btn-refresh-icon-svg" />
+									</button>
+								</div>
+							</div>
+						) : null}
 						<button
 							type="button"
 							className="btn-secondary btn-link-icon candidate-ai-summary-trigger"
