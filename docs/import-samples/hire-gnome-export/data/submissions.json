@@ -1,0 +1,54 @@
+[
+  {
+    "id": 5101,
+    "externalId": "sub-amelia-data-analyst",
+    "recordId": "Submission-AMELIADATAANALYST",
+    "candidateId": 3101,
+    "candidateExternalId": "cand-amelia-bailey",
+    "candidateEmail": "amelia.bailey@example.com",
+    "jobOrderId": 4101,
+    "jobOrderExternalId": "job-senior-data-analyst",
+    "jobOrderTitle": "Senior Data Analyst",
+    "status": "submitted",
+    "notes": "Submitted with updated resume and salary expectations."
+  },
+  {
+    "id": 5102,
+    "externalId": "sub-noah-clinical-recruiter",
+    "recordId": "Submission-NOAHCLINICALRECRUITER",
+    "candidateId": 3102,
+    "candidateExternalId": "cand-noah-bennett",
+    "candidateEmail": "noah.bennett@example.com",
+    "jobOrderId": 4102,
+    "jobOrderExternalId": "job-clinical-recruiter",
+    "jobOrderTitle": "Clinical Recruiter",
+    "status": "interview",
+    "notes": "Strong healthcare recruiting background and ready for final team review."
+  },
+  {
+    "id": 5103,
+    "externalId": "sub-sophia-product-manager",
+    "recordId": "Submission-SOPHIAPRODUCTMANAGER",
+    "candidateId": 3103,
+    "candidateExternalId": "cand-sophia-klein",
+    "candidateEmail": "sophia.klein@example.com",
+    "jobOrderId": 4103,
+    "jobOrderExternalId": "job-product-manager",
+    "jobOrderTitle": "Senior Product Manager",
+    "status": "submitted",
+    "notes": "Strong product strategy candidate with B2B SaaS roadmap ownership."
+  },
+  {
+    "id": 5104,
+    "externalId": "sub-ethan-data-analyst",
+    "recordId": "Submission-ETHANDATAANALYST",
+    "candidateId": 3104,
+    "candidateExternalId": "cand-ethan-park",
+    "candidateEmail": "ethan.park@example.com",
+    "jobOrderId": 4101,
+    "jobOrderExternalId": "job-senior-data-analyst",
+    "jobOrderTitle": "Senior Data Analyst",
+    "status": "submitted",
+    "notes": "Modern analytics engineering profile with strong warehouse automation experience."
+  }
+]

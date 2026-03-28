@@ -1,0 +1,5 @@
+Source ID,External ID,First Name,Last Name,Email,Phone / Mobile,Title,Department,Source,Address,Client External ID,Client Name
+2101,contact-megan-holt,Megan,Holt,megan.holt@northpeak.example,(555) 410-2211,Director of Analytics,Finance,Referral,1200 Market Street,client-north-peak,North Peak Advisory
+2102,contact-daniel-brooks,Daniel,Brooks,daniel.brooks@northpeak.example,(555) 410-2212,Hiring Manager,Data Strategy,LinkedIn Outreach,1200 Market Street,client-north-peak,North Peak Advisory
+2103,contact-kevin-sullivan,Kevin,Sullivan,kevin.sullivan@riverstone.example,(555) 410-3311,VP Clinical Operations,Operations,Referral,88 Lakeview Plaza,client-riverstone,Riverstone Health Group
+2104,contact-avery-cole,Avery,Cole,avery.cole@helio.example,(555) 410-4411,Head of Product,Product,Inbound,540 Mission Street,client-helio,Helio Commerce Labs

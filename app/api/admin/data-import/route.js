@@ -5,6 +5,12 @@ import { createRecordId } from '@/lib/record-id';
 import { withApiLogging } from '@/lib/api-logging';
 import { AccessControlError, getActingUser } from '@/lib/access-control';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { parseCsvText, normalizeHeaderKey } from '@/lib/data-import-csv';
+import {
+	GENERIC_IMPORT_ENTITY_OPTIONS,
+	getGenericImportProfile,
+	mapGenericImportRow
+} from '@/lib/generic-import-profiles';
 import { normalizeCandidateSourceValue } from '@/app/constants/candidate-source-options';
 import { normalizeContactSourceValue } from '@/app/constants/contact-source-options';
 import { toJobOrderStatusValue } from '@/lib/job-order-options';
@@ -14,6 +20,20 @@ import {
 	normalizeCustomFieldSelectOptions,
 	normalizeCustomFieldType
 } from '@/lib/custom-fields';
+import {
+	isAllowedCandidateAttachmentContentType,
+	isAllowedCandidateAttachmentFileName
+} from '@/lib/candidate-attachment-options';
+import { deriveResumeSearchTextFromBuffer } from '@/lib/candidate-resume-search';
+import {
+	buildCandidateAttachmentStorageKey,
+	uploadObjectBuffer
+} from '@/lib/object-storage';
+import {
+	BULLHORN_CANDIDATE_FILES_MANIFEST_LEGACY_NAMES,
+	BULLHORN_CANDIDATE_FILES_MANIFEST_NAME
+} from '@/lib/bullhorn-export';
+import { getBullhornOperationsEnabled, getZohoRecruitOperationsEnabled } from '@/lib/integration-operations';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +41,11 @@ const SUPPORTED_IMPORT_ENTITY_KEYS = Object.freeze([
 	'customFieldDefinitions',
 	'clients',
 	'contacts',
+	'contactNotes',
 	'candidates',
+	'candidateNotes',
+	'candidateEducations',
+	'candidateWorkExperiences',
 	'jobOrders',
 	'submissions',
 	'interviews',
@@ -29,11 +53,32 @@ const SUPPORTED_IMPORT_ENTITY_KEYS = Object.freeze([
 ]);
 const SUPPORTED_SOURCE_TYPES = Object.freeze([
 	'hire_gnome_export',
+	'generic_csv',
+	'generic_csv_manual',
+	'generic_csv_zip',
 	'bullhorn_csv',
-	'zoho_recruit_csv'
+	'bullhorn_csv_manual',
+	'bullhorn_csv_zip',
+	'zoho_recruit_csv',
+	'zoho_recruit_manual',
+	'zoho_recruit_zip'
 ]);
-const BULLHORN_IMPORT_PROFILES = Object.freeze(['clients', 'contacts', 'candidates', 'jobOrders']);
-const ZOHO_IMPORT_PROFILES = Object.freeze(['clients', 'contacts', 'candidates', 'jobOrders']);
+const GENERIC_IMPORT_PROFILES = Object.freeze(GENERIC_IMPORT_ENTITY_OPTIONS.map((option) => option.value));
+const BULLHORN_IMPORT_PROFILES = Object.freeze([
+	'customFieldDefinitions',
+	'clients',
+	'contacts',
+	'contactNotes',
+	'candidates',
+	'candidateNotes',
+	'candidateEducations',
+	'candidateWorkExperiences',
+	'jobOrders',
+	'submissions',
+	'interviews',
+	'placements'
+]);
+const ZOHO_IMPORT_PROFILES = Object.freeze(['clients', 'contacts', 'candidates', 'jobOrders', 'submissions', 'interviews', 'placements']);
 const VALID_CANDIDATE_STATUSES = new Set([
 	'new',
 	'in_review',
@@ -91,8 +136,31 @@ function parseSourceType(value) {
 	const normalized = String(value || 'hire_gnome_export').trim().toLowerCase();
 	if (!SUPPORTED_SOURCE_TYPES.includes(normalized)) {
 		throw new ImportValidationError(
-			'Import source must be `hire_gnome_export`, `bullhorn_csv`, or `zoho_recruit_csv`.'
+			'Import source must be `hire_gnome_export`, `generic_csv`, `generic_csv_manual`, `generic_csv_zip`, `bullhorn_csv`, `bullhorn_csv_manual`, `bullhorn_csv_zip`, `zoho_recruit_csv`, `zoho_recruit_manual`, or `zoho_recruit_zip`.'
 		);
+	}
+	if (
+		(normalized === 'bullhorn_csv' || normalized === 'bullhorn_csv_manual' || normalized === 'bullhorn_csv_zip')
+		&& !getBullhornOperationsEnabled()
+	) {
+		throw new ImportValidationError('Bullhorn operations are disabled.');
+	}
+	if (
+		(normalized === 'zoho_recruit_csv' || normalized === 'zoho_recruit_manual' || normalized === 'zoho_recruit_zip')
+		&& !getZohoRecruitOperationsEnabled()
+	) {
+		throw new ImportValidationError('Zoho Recruit operations are disabled.');
+	}
+	return normalized;
+}
+
+function parseGenericEntityProfile(value) {
+	const normalized = String(value || '').trim();
+	if (!normalized) {
+		throw new ImportValidationError('Select a generic CSV profile before running import.');
+	}
+	if (!GENERIC_IMPORT_PROFILES.includes(normalized)) {
+		throw new ImportValidationError('Unsupported generic CSV profile.');
 	}
 	return normalized;
 }
@@ -148,14 +216,6 @@ function assertAtLeastOneEntity(data) {
 	}
 }
 
-function normalizeHeaderKey(value) {
-	return String(value || '')
-		.replace(/^\ufeff/, '')
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '');
-}
-
 function normalizeLookupKey(value) {
 	return String(value || '').trim().toLowerCase();
 }
@@ -170,11 +230,245 @@ function normalizeZipCode(value) {
 	return raw;
 }
 
+function normalizeImportedSkillName(value) {
+	return String(value || '').trim();
+}
+
+function normalizeImportedSkillKey(value) {
+	return normalizeImportedSkillName(value).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function uniqueImportedSkillNames(values) {
+	const seen = new Set();
+	const result = [];
+	for (const rawValue of Array.isArray(values) ? values : []) {
+		const value = normalizeImportedSkillName(rawValue);
+		if (!value) continue;
+		const key = normalizeImportedSkillKey(value);
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		result.push(value);
+	}
+	return result;
+}
+
+function splitImportedSkillNames(value) {
+	if (Array.isArray(value)) {
+		return uniqueImportedSkillNames(value);
+	}
+	return uniqueImportedSkillNames(String(value || '').split(/[,;\n|/]+/));
+}
+
+function headersContainAnyAlias(headers, aliases) {
+	const headerKeys = new Set((Array.isArray(headers) ? headers : []).map((header) => header?.key).filter(Boolean));
+	return (Array.isArray(aliases) ? aliases : []).some((alias) => headerKeys.has(normalizeHeaderKey(alias)));
+}
+
+async function resolveImportedSkillIds(tx, skillNames, skillCache) {
+	const normalizedSkillNames = uniqueImportedSkillNames(skillNames);
+	if (normalizedSkillNames.length <= 0) {
+		return [];
+	}
+
+	const ids = [];
+	for (const skillName of normalizedSkillNames) {
+		const lookupKey = normalizeImportedSkillKey(skillName);
+		if (!lookupKey) continue;
+
+		let existingId = skillCache.skillIdByKey.get(lookupKey);
+		if (!existingId) {
+			const savedSkill = await tx.skill.upsert({
+				where: { name: skillName },
+				update: { isActive: true },
+				create: {
+					recordId: createRecordId('SKL'),
+					name: skillName,
+					isActive: true
+				},
+				select: { id: true, name: true }
+			});
+			existingId = savedSkill.id;
+			skillCache.skillIdByKey.set(normalizeImportedSkillKey(savedSkill.name), savedSkill.id);
+		}
+		ids.push(existingId);
+	}
+
+	return [...new Set(ids)];
+}
+
+async function syncCandidateImportedSkills(tx, candidateId, skillIds) {
+	await tx.candidateSkill.deleteMany({
+		where: { candidateId }
+	});
+	if (!Array.isArray(skillIds) || skillIds.length <= 0) {
+		return;
+	}
+	await tx.candidateSkill.createMany({
+		data: skillIds.map((skillId) => ({
+			candidateId,
+			skillId
+		})),
+		skipDuplicates: true
+	});
+}
+
 function normalizeCustomFieldValues(value) {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 	const entries = Object.entries(value);
 	if (entries.length <= 0) return null;
 	return Object.fromEntries(entries);
+}
+
+function bullhornModuleKeyForEntity(entityKey) {
+	const moduleMap = {
+		clients: 'clients',
+		contacts: 'contacts',
+		candidates: 'candidates',
+		jobOrders: 'jobOrders',
+		submissions: 'submissions',
+		interviews: 'interviews',
+		placements: 'placements'
+	};
+	return moduleMap[entityKey] || '';
+}
+
+function stripBullhornCustomHeaderPrefix(value) {
+	return String(value || '')
+		.replace(/^custom\s*:\s*/i, '')
+		.trim();
+}
+
+function parseBullhornCustomHeaderLabel(value) {
+	const raw = stripBullhornCustomHeaderPrefix(value);
+	const match = raw.match(/^(.*?)\s*\[([a-z0-9_]+)\]\s*$/i);
+	if (match) {
+		return {
+			label: String(match[1] || '').trim() || raw,
+			fieldKey: normalizeCustomFieldKey(match[2] || '')
+		};
+	}
+	return {
+		label: raw,
+		fieldKey: ''
+	};
+}
+
+function bullhornCustomFieldTypeFromValue(value) {
+	const normalized = String(value || '').trim();
+	if (!normalized) return 'text';
+	if (['true', 'false', 'yes', 'no', '1', '0'].includes(normalized.toLowerCase())) return 'boolean';
+	if (Number.isFinite(Number(normalized.replace(/[$,%\s]/g, '').replace(/,/g, '')))) return 'number';
+	const parsedDate = new Date(normalized);
+	if (!Number.isNaN(parsedDate.getTime())) return 'date';
+	return normalized.length > 255 ? 'textarea' : 'text';
+}
+
+function bullhornImportedRecordId(prefix, sourceId, explicitRecordId = null) {
+	const normalizedRecordId = toTrimmedString(explicitRecordId);
+	if (normalizedRecordId) return normalizedRecordId;
+	const normalizedSourceId = toOptionalInt(sourceId);
+	if (Number.isInteger(normalizedSourceId) && normalizedSourceId > 0) {
+		return `BH-${prefix}-${normalizedSourceId}`;
+	}
+	return null;
+}
+
+function buildBullhornCustomFieldDefinitionIndexes(rows) {
+	const byModuleAndFieldKey = new Map();
+	const byModuleAndLabel = new Map();
+	for (const row of rows || []) {
+		const moduleKey = normalizeCustomFieldModuleKey(row?.moduleKey);
+		const fieldKey = normalizeCustomFieldKey(row?.fieldKey);
+		const label = String(row?.label || '').trim();
+		if (!moduleKey) continue;
+		if (fieldKey) {
+			byModuleAndFieldKey.set(`${moduleKey}|${fieldKey}`, row);
+		}
+		if (label) {
+			byModuleAndLabel.set(`${moduleKey}|${normalizeLookupKey(label)}`, row);
+		}
+	}
+	return { byModuleAndFieldKey, byModuleAndLabel };
+}
+
+function parseBullhornCustomFieldDefinitionRow(row) {
+	const moduleKey = normalizeCustomFieldModuleKey(
+		pickBullhornValue(row, ['module key', 'module', 'entity'])
+	);
+	const label = toTrimmedString(pickBullhornValue(row, ['label', 'field label']));
+	const fieldKey = normalizeCustomFieldKey(
+		pickBullhornValue(row, ['field key', 'key']) || label
+	);
+	if (!moduleKey || !label || !fieldKey) return null;
+	const fieldType = normalizeCustomFieldType(
+		pickBullhornValue(row, ['field type', 'type'])
+	);
+	return {
+		moduleKey,
+		fieldKey,
+		label,
+		fieldType,
+		selectOptions: normalizeCustomFieldSelectOptions(
+			pickBullhornValue(row, ['select options', 'options'])
+		),
+		helpText: toTrimmedString(
+			pickBullhornValue(row, ['help text', 'description', 'bullhorn field name'])
+		),
+		isRequired: parseBooleanFlag(pickBullhornValue(row, ['is required', 'required']), false),
+		isActive: parseBooleanFlag(pickBullhornValue(row, ['is active', 'active']), true),
+		sortOrder: toOptionalInt(pickBullhornValue(row, ['sort order', 'order']), 0)
+	};
+}
+
+function collectBullhornCustomFields({
+	entityKey,
+	row,
+	headers,
+	definitionIndexes
+}) {
+	const moduleKey = bullhornModuleKeyForEntity(entityKey);
+	if (!moduleKey || !Array.isArray(headers) || headers.length <= 0) {
+		return { customFields: null, inferredDefinitions: [] };
+	}
+
+	const values = {};
+	const inferredDefinitions = [];
+	for (const header of headers) {
+		const headerKey = String(header?.key || '').trim();
+		const headerLabel = String(header?.label || '').trim();
+		if (!headerKey || !headerLabel || !headerKey.startsWith('custom')) continue;
+		const rawValue = String(row?.[headerKey] || '').trim();
+		if (!rawValue) continue;
+
+		const parsed = parseBullhornCustomHeaderLabel(headerLabel);
+		const explicitDefinition =
+			(parsed.fieldKey && definitionIndexes.byModuleAndFieldKey.get(`${moduleKey}|${parsed.fieldKey}`)) ||
+			definitionIndexes.byModuleAndLabel.get(`${moduleKey}|${normalizeLookupKey(parsed.label)}`) ||
+			null;
+		const fieldKey = explicitDefinition?.fieldKey || parsed.fieldKey || normalizeCustomFieldKey(parsed.label);
+		if (!fieldKey) continue;
+
+		values[fieldKey] = rawValue;
+
+		if (!explicitDefinition) {
+			inferredDefinitions.push({
+				moduleKey,
+				fieldKey,
+				label: parsed.label || headerLabel,
+				fieldType: bullhornCustomFieldTypeFromValue(rawValue),
+				selectOptions: [],
+				helpText: null,
+				isRequired: false,
+				isActive: true,
+				sortOrder: 0
+			});
+		}
+	}
+
+	return {
+		customFields: Object.keys(values).length > 0 ? values : null,
+		inferredDefinitions
+	};
 }
 
 function parseBooleanFlag(value, fallback = false) {
@@ -222,6 +516,29 @@ function pickBullhornValue(row, aliases) {
 
 function pickZohoValue(row, aliases) {
 	return pickBullhornValue(row, aliases);
+}
+
+function inferCandidateAttachmentContentType(fileName) {
+	const normalizedName = String(fileName || '').trim().toLowerCase();
+	if (normalizedName.endsWith('.pdf')) return 'application/pdf';
+	if (normalizedName.endsWith('.doc')) return 'application/msword';
+	if (normalizedName.endsWith('.docx')) {
+		return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+	}
+	if (normalizedName.endsWith('.txt')) return 'text/plain';
+	if (normalizedName.endsWith('.rtf')) return 'application/rtf';
+	if (normalizedName.endsWith('.odt')) return 'application/vnd.oasis.opendocument.text';
+	if (normalizedName.endsWith('.png')) return 'image/png';
+	if (normalizedName.endsWith('.jpg') || normalizedName.endsWith('.jpeg')) return 'image/jpeg';
+	return 'application/octet-stream';
+}
+
+function normalizeImportedCandidateAttachmentContentType(fileName, contentType) {
+	const normalized = toTrimmedString(contentType).toLowerCase();
+	if (!normalized || !normalized.includes('/')) {
+		return inferCandidateAttachmentContentType(fileName);
+	}
+	return normalized;
 }
 
 function normalizeCandidateStatusValue(value) {
@@ -292,99 +609,7 @@ function normalizeCurrencyCode(value) {
 	return 'USD';
 }
 
-function parseCsvText(rawText) {
-	const allRows = [];
-	let row = [];
-	let field = '';
-	let inQuotes = false;
-
-	function pushField() {
-		row.push(field);
-		field = '';
-	}
-
-	function pushRow() {
-		if (row.length === 1 && row[0] === '') {
-			row = [];
-			return;
-		}
-		allRows.push(row);
-		row = [];
-	}
-
-	for (let i = 0; i < rawText.length; i += 1) {
-		const char = rawText[i];
-		if (inQuotes) {
-			if (char === '"') {
-				if (rawText[i + 1] === '"') {
-					field += '"';
-					i += 1;
-				} else {
-					inQuotes = false;
-				}
-			} else {
-				field += char;
-			}
-			continue;
-		}
-
-		if (char === '"') {
-			inQuotes = true;
-			continue;
-		}
-		if (char === ',') {
-			pushField();
-			continue;
-		}
-		if (char === '\n' || char === '\r') {
-			pushField();
-			pushRow();
-			if (char === '\r' && rawText[i + 1] === '\n') {
-				i += 1;
-			}
-			continue;
-		}
-		field += char;
-	}
-
-	pushField();
-	if (row.length > 1 || (row.length === 1 && row[0] !== '')) {
-		pushRow();
-	}
-
-	if (allRows.length <= 1) {
-		throw new ImportValidationError('CSV file must include a header row and at least one data row.');
-	}
-
-	const headerRow = allRows[0].map((value, index) => {
-		const normalized = String(value || '').replace(/^\ufeff/, '').trim();
-		return normalized || `column_${index + 1}`;
-	});
-	const rows = allRows
-		.slice(1)
-		.map((values) => {
-			const rawRow = {};
-			headerRow.forEach((header, index) => {
-				rawRow[header] = values[index] ?? '';
-			});
-			const normalized = {};
-			for (const [key, value] of Object.entries(rawRow)) {
-				normalized[normalizeHeaderKey(key)] = String(value ?? '').trim();
-			}
-			return normalized;
-		})
-		.filter((normalizedRow) =>
-			Object.values(normalizedRow).some((value) => String(value || '').trim() !== '')
-		);
-
-	if (rows.length <= 0) {
-		throw new ImportValidationError('CSV file contains no data rows.');
-	}
-
-	return rows;
-}
-
-function mapBullhornClientRow(row) {
+function mapBullhornClientRow(row, context = {}) {
 	const name = pickBullhornValue(row, [
 		'name',
 		'client corporation',
@@ -395,6 +620,12 @@ function mapBullhornClientRow(row) {
 		'corporation name'
 	]);
 	if (!name) return null;
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'clients',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
 	return {
 		id: toOptionalInt(
 			pickBullhornValue(row, ['id', 'client corporation id', 'client id', 'company id', 'corporation id'])
@@ -408,15 +639,22 @@ function mapBullhornClientRow(row) {
 		state: pickBullhornValue(row, ['state', 'state/province']),
 		zipCode: normalizeZipCode(pickBullhornValue(row, ['zip', 'zip code', 'postal code'])),
 		website: pickBullhornValue(row, ['website', 'url']),
-		description: pickBullhornValue(row, ['description', 'notes'])
+		description: pickBullhornValue(row, ['description', 'notes']),
+		customFields
 	};
 }
 
-function mapBullhornContactRow(row) {
+function mapBullhornContactRow(row, context = {}) {
 	const parsedName = parseDisplayName(pickBullhornValue(row, ['name', 'full name', 'contact']));
 	const firstName = pickBullhornValue(row, ['first name', 'firstname']) || parsedName.firstName;
 	const lastName = pickBullhornValue(row, ['last name', 'lastname']) || parsedName.lastName;
 	if (!firstName || !lastName) return null;
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'contacts',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
 	const sourceValue = normalizeContactSourceValue(
 		pickBullhornValue(row, ['source', 'source name', 'lead source'])
 	);
@@ -437,16 +675,36 @@ function mapBullhornContactRow(row) {
 		clientId: toOptionalInt(
 			pickBullhornValue(row, ['client corporation id', 'client id', 'company id', 'clientid'])
 		),
-		clientName: pickBullhornValue(row, ['client corporation', 'client name', 'company', 'company name'])
+		clientName: pickBullhornValue(row, ['client corporation', 'client name', 'company', 'company name']),
+		customFields
 	};
 }
 
-function mapBullhornCandidateRow(row) {
+function mapBullhornCandidateRow(row, context = {}) {
 	const parsedName = parseDisplayName(pickBullhornValue(row, ['name', 'full name', 'candidate']));
 	const firstName = pickBullhornValue(row, ['first name', 'firstname']) || parsedName.firstName;
 	const lastName = pickBullhornValue(row, ['last name', 'lastname']) || parsedName.lastName;
 	const email = pickBullhornValue(row, ['email', 'email address']);
 	if (!firstName || !lastName || !email) return null;
+	const skillAliases = [
+		'skills',
+		'skill set',
+		'primary skills',
+		'secondary skills',
+		'skill list',
+		'skillNameList',
+		'primarySkills',
+		'secondarySkills',
+		'skillList',
+		...(Array.isArray(context.candidateSkillFieldNames) ? context.candidateSkillFieldNames : [])
+	];
+	const skillValue = pickBullhornValue(row, skillAliases);
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'candidates',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
 	const sourceValue = normalizeCandidateSourceValue(
 		pickBullhornValue(row, ['source', 'source name', 'lead source'])
 	);
@@ -470,14 +728,23 @@ function mapBullhornCandidateRow(row) {
 		zipCode: normalizeZipCode(pickBullhornValue(row, ['zip', 'zip code', 'postal code'])),
 		website: pickBullhornValue(row, ['website', 'portfolio', 'url']),
 		linkedinUrl: pickBullhornValue(row, ['linkedin', 'linkedin url']),
-		skillSet: pickBullhornValue(row, ['skills', 'skill set', 'primary skills']),
-		summary: pickBullhornValue(row, ['summary', 'resume summary', 'resume text', 'notes'])
+		skillSet: skillValue,
+		parsedSkillNames: splitImportedSkillNames(skillValue),
+		hasSkillData: headersContainAnyAlias(context.headers, skillAliases),
+		summary: pickBullhornValue(row, ['summary', 'resume summary', 'resume text', 'notes']),
+		customFields
 	};
 }
 
-function mapBullhornJobOrderRow(row) {
+function mapBullhornJobOrderRow(row, context = {}) {
 	const title = pickBullhornValue(row, ['title', 'job title', 'job']);
 	if (!title) return null;
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'jobOrders',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
 	return {
 		id: toOptionalInt(pickBullhornValue(row, ['id', 'job order id', 'job id'])),
 		title,
@@ -508,11 +775,187 @@ function mapBullhornJobOrderRow(row) {
 		clientName: pickBullhornValue(row, ['client corporation', 'client name', 'company', 'company name']),
 		contactId: toOptionalInt(pickBullhornValue(row, ['contact id', 'hiring manager id'])),
 		contactEmail: pickBullhornValue(row, ['contact email', 'hiring manager email']),
-		contactName: pickBullhornValue(row, ['contact name', 'hiring manager'])
+		contactName: pickBullhornValue(row, ['contact name', 'hiring manager']),
+		customFields
+	};
+}
+
+function mapBullhornSubmissionRow(row, context = {}) {
+	const candidateId = toOptionalInt(pickBullhornValue(row, ['candidate id']));
+	const candidateEmail = pickBullhornValue(row, ['candidate email', 'email']);
+	const jobOrderId = toOptionalInt(pickBullhornValue(row, ['job order id', 'job id']));
+	const jobOrderTitle = pickBullhornValue(row, ['job order title', 'job title', 'title']);
+	if ((!candidateId && !candidateEmail) || (!jobOrderId && !jobOrderTitle)) return null;
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'submissions',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
+	return {
+		id: toOptionalInt(pickBullhornValue(row, ['id', 'submission id', 'submittal id'])),
+		candidateId,
+		candidateEmail,
+		jobOrderId,
+		jobOrderTitle,
+		status: toTrimmedString(pickBullhornValue(row, ['status', 'submission status', 'submittal status'])) || 'submitted',
+		notes: pickBullhornValue(row, ['notes', 'comment', 'submission notes', 'submittal notes']),
+		customFields
+	};
+}
+
+function mapBullhornInterviewRow(row, context = {}) {
+	const candidateId = toOptionalInt(pickBullhornValue(row, ['candidate id']));
+	const candidateEmail = pickBullhornValue(row, ['candidate email', 'email']);
+	const jobOrderId = toOptionalInt(pickBullhornValue(row, ['job order id', 'job id']));
+	const jobOrderTitle = pickBullhornValue(row, ['job order title', 'job title', 'title']);
+	if ((!candidateId && !candidateEmail) || (!jobOrderId && !jobOrderTitle)) return null;
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'interviews',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
+	return {
+		id: toOptionalInt(pickBullhornValue(row, ['id', 'interview id'])),
+		candidateId,
+		candidateEmail,
+		jobOrderId,
+		jobOrderTitle,
+		subject: pickBullhornValue(row, ['subject', 'interview subject']),
+		status: toTrimmedString(pickBullhornValue(row, ['status', 'interview status'])) || 'scheduled',
+		interviewMode: toTrimmedString(pickBullhornValue(row, ['interview mode', 'type', 'interview type'])) || 'formal',
+		interviewer: pickBullhornValue(row, ['interviewer', 'interviewer name']),
+		interviewerEmail: pickBullhornValue(row, ['interviewer email']),
+		startsAt: toOptionalDate(pickBullhornValue(row, ['starts at', 'start time', 'start date', 'scheduled start'])),
+		endsAt: toOptionalDate(pickBullhornValue(row, ['ends at', 'end time', 'end date', 'scheduled end'])),
+		location: pickBullhornValue(row, ['location']),
+		videoLink: pickBullhornValue(row, ['video link', 'meeting link']),
+		customFields
+	};
+}
+
+function mapBullhornPlacementRow(row, context = {}) {
+	const candidateId = toOptionalInt(pickBullhornValue(row, ['candidate id']));
+	const candidateEmail = pickBullhornValue(row, ['candidate email', 'email']);
+	const jobOrderId = toOptionalInt(pickBullhornValue(row, ['job order id', 'job id']));
+	const jobOrderTitle = pickBullhornValue(row, ['job order title', 'job title', 'title']);
+	if ((!candidateId && !candidateEmail) || (!jobOrderId && !jobOrderTitle)) return null;
+	const { customFields } = collectBullhornCustomFields({
+		entityKey: 'placements',
+		row,
+		headers: context.headers,
+		definitionIndexes: context.definitionIndexes || buildBullhornCustomFieldDefinitionIndexes([])
+	});
+	return {
+		id: toOptionalInt(pickBullhornValue(row, ['id', 'placement id', 'offer id'])),
+		candidateId,
+		candidateEmail,
+		jobOrderId,
+		jobOrderTitle,
+		submissionId: toOptionalInt(pickBullhornValue(row, ['submission id', 'submittal id'])),
+		status: toTrimmedString(pickBullhornValue(row, ['status', 'placement status', 'offer status'])) || 'accepted',
+		placementType: toTrimmedString(pickBullhornValue(row, ['placement type', 'type'])) || 'temp',
+		compensationType: toTrimmedString(pickBullhornValue(row, ['compensation type', 'rate type'])) || 'hourly',
+		currency: normalizeCurrencyCode(pickBullhornValue(row, ['currency'])),
+		offeredOn: toOptionalDate(pickBullhornValue(row, ['offered on', 'offer date'])),
+		expectedJoinDate: toOptionalDate(pickBullhornValue(row, ['expected join date', 'start date'])),
+		endDate: toOptionalDate(pickBullhornValue(row, ['end date'])),
+		notes: pickBullhornValue(row, ['notes']),
+		yearlyCompensation: toOptionalNumber(pickBullhornValue(row, ['yearly compensation', 'salary'])),
+		hourlyRtBillRate: toOptionalNumber(pickBullhornValue(row, ['hourly rt bill rate', 'rt bill rate'])),
+		hourlyRtPayRate: toOptionalNumber(pickBullhornValue(row, ['hourly rt pay rate', 'rt pay rate'])),
+		hourlyOtBillRate: toOptionalNumber(pickBullhornValue(row, ['hourly ot bill rate', 'ot bill rate'])),
+		hourlyOtPayRate: toOptionalNumber(pickBullhornValue(row, ['hourly ot pay rate', 'ot pay rate'])),
+		dailyBillRate: toOptionalNumber(pickBullhornValue(row, ['daily bill rate'])),
+		dailyPayRate: toOptionalNumber(pickBullhornValue(row, ['daily pay rate'])),
+		customFields
+	};
+}
+
+function mapBullhornCandidateNoteRow(row) {
+	const id = toOptionalInt(pickBullhornValue(row, ['id', 'note id']));
+	const candidateId = toOptionalInt(pickBullhornValue(row, ['candidate id']));
+	const candidateEmail = toTrimmedString(pickBullhornValue(row, ['candidate email', 'email']));
+	const content = toTrimmedString(pickBullhornValue(row, ['content', 'comments', 'note', 'body']));
+	if ((!candidateId && !candidateEmail) || !content) return null;
+	return {
+		id,
+		recordId: bullhornImportedRecordId('CandidateNote', id, pickBullhornValue(row, ['record id'])),
+		candidateId,
+		candidateEmail,
+		content,
+		noteType: toTrimmedString(pickBullhornValue(row, ['note type', 'action'])) || 'bullhorn',
+		createdAt: toOptionalDate(pickBullhornValue(row, ['created at', 'date added', 'created'])),
+		updatedAt: toOptionalDate(pickBullhornValue(row, ['updated at', 'date last modified', 'modified at']))
+	};
+}
+
+function mapBullhornCandidateEducationRow(row) {
+	const id = toOptionalInt(pickBullhornValue(row, ['id', 'education id']));
+	const candidateId = toOptionalInt(pickBullhornValue(row, ['candidate id']));
+	const candidateEmail = toTrimmedString(pickBullhornValue(row, ['candidate email', 'email']));
+	const schoolName = toTrimmedString(pickBullhornValue(row, ['school name', 'school']));
+	if ((!candidateId && !candidateEmail) || !schoolName) return null;
+	return {
+		id,
+		recordId: bullhornImportedRecordId('CandidateEducation', id, pickBullhornValue(row, ['record id'])),
+		candidateId,
+		candidateEmail,
+		schoolName,
+		degree: toTrimmedString(pickBullhornValue(row, ['degree'])),
+		fieldOfStudy: toTrimmedString(pickBullhornValue(row, ['field of study', 'major'])),
+		startDate: toOptionalDate(pickBullhornValue(row, ['start date'])),
+		endDate: toOptionalDate(pickBullhornValue(row, ['end date'])),
+		isCurrent: parseBooleanFlag(pickBullhornValue(row, ['is current']), false),
+		description: toTrimmedString(pickBullhornValue(row, ['description', 'comments']))
+	};
+}
+
+function mapBullhornCandidateWorkExperienceRow(row) {
+	const id = toOptionalInt(pickBullhornValue(row, ['id', 'work experience id', 'work history id']));
+	const candidateId = toOptionalInt(pickBullhornValue(row, ['candidate id']));
+	const candidateEmail = toTrimmedString(pickBullhornValue(row, ['candidate email', 'email']));
+	const companyName = toTrimmedString(pickBullhornValue(row, ['company name', 'company']));
+	if ((!candidateId && !candidateEmail) || !companyName) return null;
+	return {
+		id,
+		recordId: bullhornImportedRecordId('CandidateWorkExperience', id, pickBullhornValue(row, ['record id'])),
+		candidateId,
+		candidateEmail,
+		companyName,
+		title: toTrimmedString(pickBullhornValue(row, ['title'])),
+		location: toTrimmedString(pickBullhornValue(row, ['location'])),
+		startDate: toOptionalDate(pickBullhornValue(row, ['start date'])),
+		endDate: toOptionalDate(pickBullhornValue(row, ['end date'])),
+		isCurrent: parseBooleanFlag(pickBullhornValue(row, ['is current']), false),
+		description: toTrimmedString(pickBullhornValue(row, ['description', 'comments']))
+	};
+}
+
+function mapBullhornContactNoteRow(row) {
+	const id = toOptionalInt(pickBullhornValue(row, ['id', 'note id']));
+	const contactId = toOptionalInt(pickBullhornValue(row, ['contact id']));
+	const contactEmail = toTrimmedString(pickBullhornValue(row, ['contact email', 'email']));
+	const content = toTrimmedString(pickBullhornValue(row, ['content', 'comments', 'note', 'body']));
+	if ((!contactId && !contactEmail) || !content) return null;
+	return {
+		id,
+		recordId: bullhornImportedRecordId('ContactNote', id, pickBullhornValue(row, ['record id'])),
+		contactId,
+		contactEmail,
+		content,
+		noteType: toTrimmedString(pickBullhornValue(row, ['note type', 'action'])) || 'bullhorn',
+		createdAt: toOptionalDate(pickBullhornValue(row, ['created at', 'date added', 'created'])),
+		updatedAt: toOptionalDate(pickBullhornValue(row, ['updated at', 'date last modified', 'modified at']))
 	};
 }
 
 const BULLHORN_PROFILE_MAP = Object.freeze({
+	customFieldDefinitions: {
+		entityKey: 'customFieldDefinitions',
+		mapRow: parseBullhornCustomFieldDefinitionRow
+	},
 	clients: {
 		entityKey: 'clients',
 		mapRow: mapBullhornClientRow
@@ -521,13 +964,41 @@ const BULLHORN_PROFILE_MAP = Object.freeze({
 		entityKey: 'contacts',
 		mapRow: mapBullhornContactRow
 	},
+	contactNotes: {
+		entityKey: 'contactNotes',
+		mapRow: mapBullhornContactNoteRow
+	},
 	candidates: {
 		entityKey: 'candidates',
 		mapRow: mapBullhornCandidateRow
 	},
+	candidateNotes: {
+		entityKey: 'candidateNotes',
+		mapRow: mapBullhornCandidateNoteRow
+	},
+	candidateEducations: {
+		entityKey: 'candidateEducations',
+		mapRow: mapBullhornCandidateEducationRow
+	},
+	candidateWorkExperiences: {
+		entityKey: 'candidateWorkExperiences',
+		mapRow: mapBullhornCandidateWorkExperienceRow
+	},
 	jobOrders: {
 		entityKey: 'jobOrders',
 		mapRow: mapBullhornJobOrderRow
+	},
+	submissions: {
+		entityKey: 'submissions',
+		mapRow: mapBullhornSubmissionRow
+	},
+	interviews: {
+		entityKey: 'interviews',
+		mapRow: mapBullhornInterviewRow
+	},
+	placements: {
+		entityKey: 'placements',
+		mapRow: mapBullhornPlacementRow
 	}
 });
 
@@ -656,6 +1127,78 @@ function mapZohoJobOrderRow(row) {
 	};
 }
 
+function mapZohoSubmissionRow(row) {
+	const candidateId = toOptionalInt(pickZohoValue(row, ['candidate id']));
+	const candidateEmail = pickZohoValue(row, ['candidate email', 'email']);
+	const jobOrderId = toOptionalInt(pickZohoValue(row, ['job opening id', 'job order id', 'job id']));
+	const jobOrderTitle = pickZohoValue(row, ['posting title', 'job opening name', 'job title', 'title']);
+	if ((!candidateId && !candidateEmail) || (!jobOrderId && !jobOrderTitle)) return null;
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'submission id'])),
+		candidateId,
+		candidateEmail,
+		jobOrderId,
+		jobOrderTitle,
+		status: toTrimmedString(pickZohoValue(row, ['submission status', 'status'])) || 'submitted',
+		notes: pickZohoValue(row, ['notes', 'submission notes', 'comments'])
+	};
+}
+
+function mapZohoInterviewRow(row) {
+	const candidateId = toOptionalInt(pickZohoValue(row, ['candidate id']));
+	const candidateEmail = pickZohoValue(row, ['candidate email', 'email']);
+	const jobOrderId = toOptionalInt(pickZohoValue(row, ['job opening id', 'job order id', 'job id']));
+	const jobOrderTitle = pickZohoValue(row, ['posting title', 'job opening name', 'job title', 'title']);
+	if ((!candidateId && !candidateEmail) || (!jobOrderId && !jobOrderTitle)) return null;
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'interview id'])),
+		candidateId,
+		candidateEmail,
+		jobOrderId,
+		jobOrderTitle,
+		subject: pickZohoValue(row, ['subject', 'interview subject']),
+		status: toTrimmedString(pickZohoValue(row, ['interview status', 'status'])) || 'scheduled',
+		interviewMode: toTrimmedString(pickZohoValue(row, ['interview type', 'type'])) || 'formal',
+		interviewer: pickZohoValue(row, ['interviewer', 'interviewer name']),
+		interviewerEmail: pickZohoValue(row, ['interviewer email']),
+		startsAt: toOptionalDate(pickZohoValue(row, ['start time', 'start date', 'starts at'])),
+		endsAt: toOptionalDate(pickZohoValue(row, ['end time', 'end date', 'ends at'])),
+		location: pickZohoValue(row, ['location']),
+		videoLink: pickZohoValue(row, ['meeting link', 'video link'])
+	};
+}
+
+function mapZohoPlacementRow(row) {
+	const candidateId = toOptionalInt(pickZohoValue(row, ['candidate id']));
+	const candidateEmail = pickZohoValue(row, ['candidate email', 'email']);
+	const jobOrderId = toOptionalInt(pickZohoValue(row, ['job opening id', 'job order id', 'job id']));
+	const jobOrderTitle = pickZohoValue(row, ['posting title', 'job opening name', 'job title', 'title']);
+	if ((!candidateId && !candidateEmail) || (!jobOrderId && !jobOrderTitle)) return null;
+	return {
+		id: toOptionalInt(pickZohoValue(row, ['id', 'placement id', 'offer id'])),
+		candidateId,
+		candidateEmail,
+		jobOrderId,
+		jobOrderTitle,
+		submissionId: toOptionalInt(pickZohoValue(row, ['submission id'])),
+		status: toTrimmedString(pickZohoValue(row, ['placement status', 'offer status', 'status'])) || 'accepted',
+		placementType: toTrimmedString(pickZohoValue(row, ['placement type', 'type'])) || 'temp',
+		compensationType: toTrimmedString(pickZohoValue(row, ['rate type', 'compensation type'])) || 'hourly',
+		currency: normalizeCurrencyCode(pickZohoValue(row, ['currency'])),
+		offeredOn: toOptionalDate(pickZohoValue(row, ['offer date', 'offered on'])),
+		expectedJoinDate: toOptionalDate(pickZohoValue(row, ['start date', 'expected join date'])),
+		endDate: toOptionalDate(pickZohoValue(row, ['end date'])),
+		notes: pickZohoValue(row, ['notes']),
+		yearlyCompensation: toOptionalNumber(pickZohoValue(row, ['salary', 'yearly compensation'])),
+		hourlyRtBillRate: toOptionalNumber(pickZohoValue(row, ['rt bill rate', 'hourly rt bill rate'])),
+		hourlyRtPayRate: toOptionalNumber(pickZohoValue(row, ['rt pay rate', 'hourly rt pay rate'])),
+		hourlyOtBillRate: toOptionalNumber(pickZohoValue(row, ['ot bill rate', 'hourly ot bill rate'])),
+		hourlyOtPayRate: toOptionalNumber(pickZohoValue(row, ['ot pay rate', 'hourly ot pay rate'])),
+		dailyBillRate: toOptionalNumber(pickZohoValue(row, ['daily bill rate'])),
+		dailyPayRate: toOptionalNumber(pickZohoValue(row, ['daily pay rate']))
+	};
+}
+
 const ZOHO_PROFILE_MAP = Object.freeze({
 	clients: {
 		entityKey: 'clients',
@@ -672,6 +1215,18 @@ const ZOHO_PROFILE_MAP = Object.freeze({
 	jobOrders: {
 		entityKey: 'jobOrders',
 		mapRow: mapZohoJobOrderRow
+	},
+	submissions: {
+		entityKey: 'submissions',
+		mapRow: mapZohoSubmissionRow
+	},
+	interviews: {
+		entityKey: 'interviews',
+		mapRow: mapZohoInterviewRow
+	},
+	placements: {
+		entityKey: 'placements',
+		mapRow: mapZohoPlacementRow
 	}
 });
 
@@ -752,6 +1307,150 @@ async function parseUploadedHireGnomeImportFile(file) {
 	return parseJsonImport(rawText);
 }
 
+function parseGenericMapping(value) {
+	if (!value) {
+		throw new ImportValidationError('Map at least one CSV column before importing.');
+	}
+	let parsed;
+	try {
+		parsed = JSON.parse(String(value));
+	} catch {
+		throw new ImportValidationError('Generic CSV mapping payload is invalid.');
+	}
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		throw new ImportValidationError('Generic CSV mapping payload is invalid.');
+	}
+	const normalized = {};
+	for (const [headerKey, fieldKey] of Object.entries(parsed)) {
+		const normalizedHeader = normalizeHeaderKey(headerKey);
+		const normalizedField = String(fieldKey || '').trim();
+		if (!normalizedHeader || !normalizedField) continue;
+		normalized[normalizedHeader] = normalizedField;
+	}
+	if (Object.keys(normalized).length <= 0) {
+		throw new ImportValidationError('Map at least one CSV column before importing.');
+	}
+	return normalized;
+}
+
+function parseGenericBatchManifest(value) {
+	if (!value) {
+		throw new ImportValidationError('Add at least one generic CSV file before importing.');
+	}
+	let parsed;
+	try {
+		parsed = JSON.parse(String(value));
+	} catch {
+		throw new ImportValidationError('Generic CSV batch payload is invalid.');
+	}
+	if (!Array.isArray(parsed) || parsed.length <= 0) {
+		throw new ImportValidationError('Add at least one generic CSV file before importing.');
+	}
+	return parsed.map((entry) => {
+		const id = String(entry?.id || '').trim();
+		const entity = parseGenericEntityProfile(entry?.entity);
+		const mapping = parseGenericMapping(JSON.stringify(entry?.mapping || {}));
+		const fileField = String(entry?.fileField || `genericFile:${id}`).trim();
+		if (!id || !fileField) {
+			throw new ImportValidationError('Generic CSV batch payload is invalid.');
+		}
+		return { id, entity, mapping, fileField };
+	});
+}
+
+function parseBullhornBatchManifest(value) {
+	if (!value) {
+		throw new ImportValidationError('Add at least one Bullhorn CSV file before importing.');
+	}
+	let parsed;
+	try {
+		parsed = JSON.parse(String(value));
+	} catch {
+		throw new ImportValidationError('Bullhorn batch payload is invalid.');
+	}
+	if (!Array.isArray(parsed) || parsed.length <= 0) {
+		throw new ImportValidationError('Add at least one Bullhorn CSV file before importing.');
+	}
+	return parsed.map((entry) => {
+		const id = String(entry?.id || '').trim();
+		const entity = parseBullhornEntityProfile(entry?.entity);
+		const fileField = String(entry?.fileField || `bullhornFile:${id}`).trim();
+		if (!id || !fileField) {
+			throw new ImportValidationError('Bullhorn batch payload is invalid.');
+		}
+		return { id, entity, fileField };
+	});
+}
+
+function parseZohoBatchManifest(value) {
+	if (!value) {
+		throw new ImportValidationError('Add at least one Zoho Recruit CSV file before importing.');
+	}
+	let parsed;
+	try {
+		parsed = JSON.parse(String(value));
+	} catch {
+		throw new ImportValidationError('Zoho Recruit batch payload is invalid.');
+	}
+	if (!Array.isArray(parsed) || parsed.length <= 0) {
+		throw new ImportValidationError('Add at least one Zoho Recruit CSV file before importing.');
+	}
+	return parsed.map((entry) => {
+		const id = String(entry?.id || '').trim();
+		const entity = parseZohoEntityProfile(entry?.entity);
+		const fileField = String(entry?.fileField || `zohoFile:${id}`).trim();
+		if (!id || !fileField) {
+			throw new ImportValidationError('Zoho Recruit batch payload is invalid.');
+		}
+		return { id, entity, fileField };
+	});
+}
+
+async function parseUploadedGenericCsvEntries(entries, formData) {
+	if (!Array.isArray(entries) || entries.length <= 0) {
+		throw new ImportValidationError('Add at least one generic CSV file before importing.');
+	}
+
+	const normalized = createEmptyImportData();
+	for (const entry of entries) {
+		const file = formData.get(entry.fileField);
+		if (!file || typeof file.arrayBuffer !== 'function') {
+			throw new ImportValidationError(`Upload a CSV file for ${entry.entity}.`);
+		}
+		const profile = getGenericImportProfile(entry.entity);
+		if (!profile) {
+			throw new ImportValidationError('Unsupported generic CSV profile.');
+		}
+		const buffer = Buffer.from(await file.arrayBuffer());
+		if (!buffer || buffer.length <= 0) {
+			throw new ImportValidationError(`Import file for ${entry.entity} is empty.`);
+		}
+		const fileName = String(file.name || '').toLowerCase();
+		const contentType = String(file.type || '').toLowerCase();
+		if (!fileName.endsWith('.csv') && !contentType.includes('csv')) {
+			throw new ImportValidationError(`Generic import for ${entry.entity} must use a CSV file.`);
+		}
+
+		let csvRows;
+		try {
+			({ rows: csvRows } = parseCsvText(buffer.toString('utf8')));
+		} catch (error) {
+			throw new ImportValidationError(error?.message || 'Failed to parse CSV file.');
+		}
+		for (const row of csvRows) {
+			const mapped = mapGenericImportRow(entry.entity, row, entry.mapping);
+			if (!mapped) continue;
+			normalized[entry.entity].push(mapped);
+		}
+	}
+
+	assertAtLeastOneEntity(normalized);
+	return {
+		format: 'csv',
+		data: normalized
+	};
+}
+
 async function parseUploadedBullhornCsvFile(file, bullhornProfile) {
 	if (!file || typeof file.arrayBuffer !== 'function') {
 		throw new ImportValidationError('Upload a CSV file to import.');
@@ -773,11 +1472,41 @@ async function parseUploadedBullhornCsvFile(file, bullhornProfile) {
 	}
 
 	const normalized = createEmptyImportData();
-	const csvRows = parseCsvText(buffer.toString('utf8'));
-	for (const row of csvRows) {
-		const mapped = profile.mapRow(row);
-		if (!mapped) continue;
-		normalized[profile.entityKey].push(mapped);
+	let csvRows;
+	let parsedHeaders;
+	try {
+		({ rows: csvRows, headers: parsedHeaders } = parseCsvText(buffer.toString('utf8')));
+	} catch (error) {
+		throw new ImportValidationError(error?.message || 'Failed to parse CSV file.');
+	}
+	if (bullhornProfile === 'customFieldDefinitions') {
+		for (const row of csvRows) {
+			const mapped = profile.mapRow(row);
+			if (!mapped) continue;
+			normalized.customFieldDefinitions.push(mapped);
+		}
+	} else {
+		const explicitDefinitionIndexes = buildBullhornCustomFieldDefinitionIndexes([]);
+		const inferredDefinitions = new Map();
+		for (const row of csvRows) {
+			const mapped = profile.mapRow(row, {
+				headers: parsedHeaders,
+				definitionIndexes: explicitDefinitionIndexes
+			});
+			if (!mapped) continue;
+			normalized[profile.entityKey].push(mapped);
+			const collected = collectBullhornCustomFields({
+				entityKey: profile.entityKey,
+				row,
+				headers: parsedHeaders,
+				definitionIndexes: explicitDefinitionIndexes
+			});
+			for (const definition of collected.inferredDefinitions) {
+				const key = `${definition.moduleKey}|${definition.fieldKey}`;
+				if (!inferredDefinitions.has(key)) inferredDefinitions.set(key, definition);
+			}
+		}
+		normalized.customFieldDefinitions.push(...inferredDefinitions.values());
 	}
 
 	assertAtLeastOneEntity(normalized);
@@ -785,6 +1514,182 @@ async function parseUploadedBullhornCsvFile(file, bullhornProfile) {
 		format: 'csv',
 		data: normalized
 	};
+}
+
+async function parseUploadedBullhornCsvEntries(entries, formData) {
+	if (!Array.isArray(entries) || entries.length <= 0) {
+		throw new ImportValidationError('Add at least one Bullhorn CSV file before importing.');
+	}
+
+	const normalized = createEmptyImportData();
+	const parsedEntries = [];
+	for (const entry of entries) {
+		const file = formData.get(entry.fileField);
+		if (!file || typeof file.arrayBuffer !== 'function') {
+			throw new ImportValidationError(`Upload a CSV file for ${entry.entity}.`);
+		}
+		const profile = BULLHORN_PROFILE_MAP[entry.entity];
+		if (!profile) {
+			throw new ImportValidationError('Unsupported Bullhorn CSV profile.');
+		}
+
+		const buffer = Buffer.from(await file.arrayBuffer());
+		if (!buffer || buffer.length <= 0) {
+			throw new ImportValidationError(`Import file for ${entry.entity} is empty.`);
+		}
+
+		const fileName = String(file.name || '').toLowerCase();
+		const contentType = String(file.type || '').toLowerCase();
+		if (!fileName.endsWith('.csv') && !contentType.includes('csv')) {
+			throw new ImportValidationError(`Bullhorn import for ${entry.entity} must use a CSV file.`);
+		}
+
+		let csvRows;
+		let headers;
+		try {
+			({ rows: csvRows, headers } = parseCsvText(buffer.toString('utf8')));
+		} catch (error) {
+			throw new ImportValidationError(error?.message || 'Failed to parse CSV file.');
+		}
+		parsedEntries.push({
+			entry,
+			profile,
+			headers,
+			rows: csvRows
+		});
+	}
+
+	for (const parsedEntry of parsedEntries.filter((item) => item.profile.entityKey === 'customFieldDefinitions')) {
+		for (const row of parsedEntry.rows) {
+			const mapped = parsedEntry.profile.mapRow(row);
+			if (!mapped) continue;
+			normalized.customFieldDefinitions.push(mapped);
+		}
+	}
+
+	const definitionIndexes = buildBullhornCustomFieldDefinitionIndexes(normalized.customFieldDefinitions);
+	const inferredDefinitions = new Map();
+	for (const parsedEntry of parsedEntries.filter((item) => item.profile.entityKey !== 'customFieldDefinitions')) {
+		for (const row of parsedEntry.rows) {
+			const mapped = parsedEntry.profile.mapRow(row, {
+				headers: parsedEntry.headers,
+				definitionIndexes
+			});
+			if (!mapped) continue;
+			normalized[parsedEntry.profile.entityKey].push(mapped);
+			const collected = collectBullhornCustomFields({
+				entityKey: parsedEntry.profile.entityKey,
+				row,
+				headers: parsedEntry.headers,
+				definitionIndexes
+			});
+			for (const definition of collected.inferredDefinitions) {
+				const key = `${definition.moduleKey}|${definition.fieldKey}`;
+				if (!definitionIndexes.byModuleAndFieldKey.has(key) && !inferredDefinitions.has(key)) {
+					inferredDefinitions.set(key, definition);
+				}
+			}
+		}
+	}
+
+	normalized.customFieldDefinitions.push(...inferredDefinitions.values());
+
+	assertAtLeastOneEntity(normalized);
+	return {
+		format: 'csv',
+		data: normalized
+	};
+}
+
+async function parseBullhornCandidateFilesFromZip(zipFile) {
+	if (!zipFile || typeof zipFile.arrayBuffer !== 'function') return [];
+	const buffer = Buffer.from(await zipFile.arrayBuffer());
+	if (!buffer || buffer.length <= 0) return [];
+
+	const zip = await JSZip.loadAsync(buffer);
+	const manifestEntry =
+		zip.file(BULLHORN_CANDIDATE_FILES_MANIFEST_NAME) ||
+		BULLHORN_CANDIDATE_FILES_MANIFEST_LEGACY_NAMES
+			.map((fileName) => zip.file(fileName))
+			.find(Boolean);
+	if (!manifestEntry) return [];
+
+	let manifestRows;
+	try {
+		({ rows: manifestRows } = parseCsvText(await manifestEntry.async('string')));
+	} catch (error) {
+		throw new ImportValidationError(error?.message || 'Failed to parse Bullhorn candidate files manifest.');
+	}
+
+	const attachments = [];
+	for (const row of manifestRows) {
+		const zipPath = toTrimmedString(row?.[normalizeHeaderKey('ZIP Path')]);
+		const fileName = toTrimmedString(row?.[normalizeHeaderKey('File Name')]);
+		if (!zipPath || !fileName) continue;
+		if (!isAllowedCandidateAttachmentFileName(fileName)) continue;
+		const zipFileEntry = zip.file(zipPath);
+		if (!zipFileEntry) continue;
+		const contentType = normalizeImportedCandidateAttachmentContentType(
+			fileName,
+			row?.[normalizeHeaderKey('Content Type')]
+		);
+		if (!isAllowedCandidateAttachmentContentType(fileName, contentType)) continue;
+
+		const fileBuffer = await zipFileEntry.async('nodebuffer');
+		if (!fileBuffer || fileBuffer.length <= 0) continue;
+
+		attachments.push({
+			candidateId: toOptionalInt(row?.[normalizeHeaderKey('Candidate ID')]),
+			candidateEmail: toTrimmedString(row?.[normalizeHeaderKey('Candidate Email')]),
+			fileName,
+			contentType,
+			description: toTrimmedString(row?.[normalizeHeaderKey('Description')]),
+			isResume: parseBooleanFlag(row?.[normalizeHeaderKey('Is Resume')], false),
+			buffer: fileBuffer
+		});
+	}
+
+	return attachments;
+}
+
+async function parseBullhornCandidateAttachmentsFromFormData(manifestValue, formData) {
+	if (!manifestValue) return [];
+	let manifest;
+	try {
+		manifest = JSON.parse(String(manifestValue || '[]'));
+	} catch {
+		throw new ImportValidationError('Bullhorn candidate attachment manifest is invalid.');
+	}
+	if (!Array.isArray(manifest) || manifest.length <= 0) return [];
+
+	const attachments = [];
+	for (const item of manifest) {
+		const fileField = toTrimmedString(item?.fileField);
+		const uploadedFile = fileField ? formData.get(fileField) : null;
+		if (!uploadedFile || typeof uploadedFile.arrayBuffer !== 'function') continue;
+		const fileName = toTrimmedString(item?.fileName) || toTrimmedString(uploadedFile?.name);
+		if (!fileName) continue;
+		const contentType = normalizeImportedCandidateAttachmentContentType(
+			fileName,
+			item?.contentType || uploadedFile?.type
+		);
+		if (!isAllowedCandidateAttachmentFileName(fileName)) continue;
+		if (!isAllowedCandidateAttachmentContentType(fileName, contentType)) continue;
+		const buffer = Buffer.from(await uploadedFile.arrayBuffer());
+		if (!buffer || buffer.length <= 0) continue;
+
+		attachments.push({
+			candidateId: toOptionalInt(item?.candidateId),
+			candidateEmail: toTrimmedString(item?.candidateEmail),
+			fileName,
+			contentType,
+			description: toTrimmedString(item?.description),
+			isResume: parseBooleanFlag(item?.isResume, false),
+			buffer
+		});
+	}
+
+	return attachments;
 }
 
 async function parseUploadedZohoCsvFile(file, zohoProfile) {
@@ -808,11 +1713,63 @@ async function parseUploadedZohoCsvFile(file, zohoProfile) {
 	}
 
 	const normalized = createEmptyImportData();
-	const csvRows = parseCsvText(buffer.toString('utf8'));
+	let csvRows;
+	try {
+		({ rows: csvRows } = parseCsvText(buffer.toString('utf8')));
+	} catch (error) {
+		throw new ImportValidationError(error?.message || 'Failed to parse CSV file.');
+	}
 	for (const row of csvRows) {
 		const mapped = profile.mapRow(row);
 		if (!mapped) continue;
 		normalized[profile.entityKey].push(mapped);
+	}
+
+	assertAtLeastOneEntity(normalized);
+	return {
+		format: 'csv',
+		data: normalized
+	};
+}
+
+async function parseUploadedZohoCsvEntries(entries, formData) {
+	if (!Array.isArray(entries) || entries.length <= 0) {
+		throw new ImportValidationError('Add at least one Zoho Recruit CSV file before importing.');
+	}
+
+	const normalized = createEmptyImportData();
+	for (const entry of entries) {
+		const file = formData.get(entry.fileField);
+		if (!file || typeof file.arrayBuffer !== 'function') {
+			throw new ImportValidationError(`Upload a CSV file for ${entry.entity}.`);
+		}
+		const profile = ZOHO_PROFILE_MAP[entry.entity];
+		if (!profile) {
+			throw new ImportValidationError('Unsupported Zoho Recruit CSV profile.');
+		}
+
+		const buffer = Buffer.from(await file.arrayBuffer());
+		if (!buffer || buffer.length <= 0) {
+			throw new ImportValidationError(`Import file for ${entry.entity} is empty.`);
+		}
+
+		const fileName = String(file.name || '').toLowerCase();
+		const contentType = String(file.type || '').toLowerCase();
+		if (!fileName.endsWith('.csv') && !contentType.includes('csv')) {
+			throw new ImportValidationError(`Zoho Recruit import for ${entry.entity} must use a CSV file.`);
+		}
+
+		let csvRows;
+		try {
+			({ rows: csvRows } = parseCsvText(buffer.toString('utf8')));
+		} catch (error) {
+			throw new ImportValidationError(error?.message || 'Failed to parse CSV file.');
+		}
+		for (const row of csvRows) {
+			const mapped = profile.mapRow(row);
+			if (!mapped) continue;
+			normalized[profile.entityKey].push(mapped);
+		}
 	}
 
 	assertAtLeastOneEntity(normalized);
@@ -827,11 +1784,834 @@ function buildPreviewSummary(data) {
 		customFieldDefinitions: data.customFieldDefinitions.length,
 		clients: data.clients.length,
 		contacts: data.contacts.length,
+		contactNotes: data.contactNotes.length,
 		candidates: data.candidates.length,
+		candidateNotes: data.candidateNotes.length,
+		candidateEducations: data.candidateEducations.length,
+		candidateWorkExperiences: data.candidateWorkExperiences.length,
 		jobOrders: data.jobOrders.length,
 		submissions: data.submissions.length,
 		interviews: data.interviews.length,
 		placements: data.placements.length
+	};
+}
+
+function createEmptyPreviewEntity() {
+	return {
+		incoming: 0,
+		create: 0,
+		update: 0,
+		skip: 0,
+		warnings: [],
+		rows: []
+	};
+}
+
+function createEmptyPreviewDetails() {
+	return {
+		customFieldDefinitions: createEmptyPreviewEntity(),
+		clients: createEmptyPreviewEntity(),
+		contacts: createEmptyPreviewEntity(),
+		contactNotes: createEmptyPreviewEntity(),
+		candidates: createEmptyPreviewEntity(),
+		candidateNotes: createEmptyPreviewEntity(),
+		candidateEducations: createEmptyPreviewEntity(),
+		candidateWorkExperiences: createEmptyPreviewEntity(),
+		jobOrders: createEmptyPreviewEntity(),
+		submissions: createEmptyPreviewEntity(),
+		interviews: createEmptyPreviewEntity(),
+		placements: createEmptyPreviewEntity()
+	};
+}
+
+function previewRowLabel(entityKey, row) {
+	switch (entityKey) {
+		case 'customFieldDefinitions':
+			return toTrimmedString(row?.label) || 'Unnamed custom field';
+		case 'clients':
+			return toTrimmedString(row?.name) || 'Unnamed client';
+		case 'contacts':
+			return [toTrimmedString(row?.firstName), toTrimmedString(row?.lastName)].filter(Boolean).join(' ') || 'Unnamed contact';
+		case 'contactNotes':
+			return [toTrimmedString(row?.contactFirstName), toTrimmedString(row?.contactLastName)].filter(Boolean).join(' ') || toTrimmedString(row?.contactEmail) || 'Contact note';
+		case 'candidates':
+			return [toTrimmedString(row?.firstName), toTrimmedString(row?.lastName)].filter(Boolean).join(' ') || toTrimmedString(row?.email) || 'Unnamed candidate';
+		case 'candidateNotes':
+			return toTrimmedString(row?.candidateEmail) || 'Candidate note';
+		case 'candidateEducations':
+			return toTrimmedString(row?.schoolName) || 'Candidate education';
+		case 'candidateWorkExperiences':
+			return toTrimmedString(row?.companyName) || 'Candidate work experience';
+		case 'jobOrders':
+			return toTrimmedString(row?.title) || 'Untitled job order';
+		case 'submissions':
+			return toTrimmedString(row?.jobOrderTitle) || toTrimmedString(row?.jobOrderExternalId) || 'Submission';
+		case 'interviews':
+			return toTrimmedString(row?.subject) || toTrimmedString(row?.jobOrderTitle) || 'Interview';
+		case 'placements':
+			return toTrimmedString(row?.jobOrderTitle) || toTrimmedString(row?.submissionExternalId) || 'Placement';
+		default:
+			return 'Record';
+	}
+}
+
+function pushPreviewWarning(details, entityKey, message) {
+	const bucket = details[entityKey];
+	if (!bucket) return;
+	if (bucket.warnings.length < 20) {
+		bucket.warnings.push(message);
+	}
+}
+
+function pushPreviewRow(details, entityKey, row) {
+	const bucket = details[entityKey];
+	if (!bucket) return;
+	if (bucket.rows.length < 20) {
+		bucket.rows.push(row);
+	}
+}
+
+function describeImportMatchReason(reason) {
+	switch (String(reason || '').trim()) {
+		case 'record_id':
+			return 'record ID';
+		case 'module_field_key':
+			return 'module + field key';
+		case 'name':
+			return 'name';
+		case 'email':
+			return 'email';
+		case 'client_name':
+			return 'client + name';
+		case 'client_title':
+			return 'client + title';
+		case 'candidate_job':
+			return 'candidate + job order';
+		default:
+			return '';
+	}
+}
+
+function buildImportRow(action, label, note, matchReason = '') {
+	return {
+		label,
+		action,
+		note,
+		matchReason: describeImportMatchReason(matchReason)
+	};
+}
+
+async function buildImportPreview(db, data, actingUser) {
+	const summary = buildPreviewSummary(data);
+	const details = createEmptyPreviewDetails();
+	const sourceClientIdToRecordId = sourceIdRecordIdMap(data.clients);
+	const sourceContactIdToRecordId = sourceIdRecordIdMap(data.contacts);
+	const sourceCandidateIdToRecordId = sourceIdRecordIdMap(data.candidates);
+	const sourceJobOrderIdToRecordId = sourceIdRecordIdMap(data.jobOrders);
+	const sourceSubmissionIdToRecordId = sourceIdRecordIdMap(data.submissions);
+	const sourceClientExternalIdToRecordId = sourceExternalIdRecordIdMap(data.clients);
+	const sourceContactExternalIdToRecordId = sourceExternalIdRecordIdMap(data.contacts);
+	const sourceCandidateExternalIdToRecordId = sourceExternalIdRecordIdMap(data.candidates);
+	const sourceJobOrderExternalIdToRecordId = sourceExternalIdRecordIdMap(data.jobOrders);
+	const sourceSubmissionExternalIdToRecordId = sourceExternalIdRecordIdMap(data.submissions);
+	for (const [entityKey, count] of Object.entries(summary)) {
+		if (details[entityKey]) {
+			details[entityKey].incoming = Number(count || 0);
+		}
+	}
+
+	const clientIdBySourceId = new Map();
+	const clientIdByRecordId = new Map();
+	const clientIdByExternalId = new Map();
+	const clientIdByName = new Map();
+	const contactIdBySourceId = new Map();
+	const contactIdByRecordId = new Map();
+	const contactIdByExternalId = new Map();
+	const contactIdByEmail = new Map();
+	const contactIdByClientName = new Map();
+	const candidateIdBySourceId = new Map();
+	const candidateIdByRecordId = new Map();
+	const candidateIdByExternalId = new Map();
+	const candidateIdByEmail = new Map();
+	const jobOrderIdBySourceId = new Map();
+	const jobOrderIdByRecordId = new Map();
+	const jobOrderIdByExternalId = new Map();
+	const jobOrderIdByTitle = new Map();
+	const submissionIdBySourceId = new Map();
+	const submissionIdByRecordId = new Map();
+	const submissionIdByExternalId = new Map();
+	let syntheticId = -1;
+	const nextSyntheticId = () => syntheticId--;
+
+	function cacheClient({ id, recordId, externalId, name }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) clientIdByRecordId.set(recordId, id);
+		if (externalId) clientIdByExternalId.set(externalId, id);
+		const nameKey = normalizeLookupKey(name);
+		if (nameKey && !clientIdByName.has(nameKey)) clientIdByName.set(nameKey, id);
+	}
+
+	function cacheContact({ id, recordId, externalId, email, firstName, lastName, clientId }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) contactIdByRecordId.set(recordId, id);
+		if (externalId) contactIdByExternalId.set(externalId, id);
+		const emailKey = normalizeLookupKey(email);
+		if (emailKey && !contactIdByEmail.has(emailKey)) contactIdByEmail.set(emailKey, id);
+		const byClientKey = contactByClientNameKey(clientId, firstName, lastName);
+		if (byClientKey && !contactIdByClientName.has(byClientKey)) contactIdByClientName.set(byClientKey, id);
+	}
+
+	function cacheCandidate({ id, recordId, externalId, email }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) candidateIdByRecordId.set(recordId, id);
+		if (externalId) candidateIdByExternalId.set(externalId, id);
+		const emailKey = normalizeLookupKey(email);
+		if (emailKey && !candidateIdByEmail.has(emailKey)) candidateIdByEmail.set(emailKey, id);
+	}
+
+	function cacheJobOrder({ id, recordId, externalId, title }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) jobOrderIdByRecordId.set(recordId, id);
+		if (externalId) jobOrderIdByExternalId.set(externalId, id);
+		const titleKey = normalizeLookupKey(title);
+		if (titleKey && !jobOrderIdByTitle.has(titleKey)) jobOrderIdByTitle.set(titleKey, id);
+	}
+
+	function cacheSubmission({ id, recordId, externalId }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) submissionIdByRecordId.set(recordId, id);
+		if (externalId) submissionIdByExternalId.set(externalId, id);
+	}
+
+	function resolveClientIdFromRow(row) {
+		const bySource = resolveTargetIdFromSource({
+			sourceId: row?.clientId,
+			externalId: row?.clientExternalId,
+			sourceIdToRecordId: sourceClientIdToRecordId,
+			externalIdToRecordId: sourceClientExternalIdToRecordId,
+			targetIdBySourceId: clientIdBySourceId,
+			targetIdByExternalId: clientIdByExternalId,
+			targetIdByRecordId: clientIdByRecordId
+		});
+		if (bySource) return bySource;
+		const clientRecordId = toTrimmedString(row?.clientRecordId);
+		if (clientRecordId && clientIdByRecordId.has(clientRecordId)) return clientIdByRecordId.get(clientRecordId);
+		const clientName = toTrimmedString(row?.clientName) || toTrimmedString(row?.client);
+		if (clientName) {
+			const key = normalizeLookupKey(clientName);
+			if (key && clientIdByName.has(key)) return clientIdByName.get(key);
+		}
+		return null;
+	}
+
+	function resolveContactIdFromRow(row, clientId) {
+		const bySource = resolveTargetIdFromSource({
+			sourceId: row?.contactId,
+			externalId: row?.contactExternalId,
+			sourceIdToRecordId: sourceContactIdToRecordId,
+			externalIdToRecordId: sourceContactExternalIdToRecordId,
+			targetIdBySourceId: contactIdBySourceId,
+			targetIdByExternalId: contactIdByExternalId,
+			targetIdByRecordId: contactIdByRecordId
+		});
+		if (bySource) return bySource;
+		const contactRecordId = toTrimmedString(row?.contactRecordId);
+		if (contactRecordId && contactIdByRecordId.has(contactRecordId)) return contactIdByRecordId.get(contactRecordId);
+		const contactEmail = toTrimmedString(row?.contactEmail);
+		if (contactEmail) {
+			const key = normalizeLookupKey(contactEmail);
+			if (key && contactIdByEmail.has(key)) return contactIdByEmail.get(key);
+		}
+		const parsed = parseDisplayName(row?.contactName);
+		const firstName = toTrimmedString(row?.contactFirstName) || parsed.firstName;
+		const lastName = toTrimmedString(row?.contactLastName) || parsed.lastName;
+		const byClientKey = contactByClientNameKey(clientId, firstName, lastName);
+		if (byClientKey && contactIdByClientName.has(byClientKey)) return contactIdByClientName.get(byClientKey);
+		return null;
+	}
+
+	const existingClients = await db.client.findMany({ select: { id: true, recordId: true, name: true } });
+	for (const existingClient of existingClients) cacheClient(existingClient);
+
+	const existingContacts = await db.contact.findMany({
+		select: { id: true, recordId: true, email: true, firstName: true, lastName: true, clientId: true }
+	});
+	for (const existingContact of existingContacts) cacheContact(existingContact);
+
+	const existingCandidates = await db.candidate.findMany({ select: { id: true, recordId: true, email: true } });
+	for (const existingCandidate of existingCandidates) cacheCandidate(existingCandidate);
+
+	const existingJobOrders = await db.jobOrder.findMany({ select: { id: true, recordId: true, title: true } });
+	for (const existingJobOrder of existingJobOrders) cacheJobOrder(existingJobOrder);
+
+	const existingSubmissions = await db.submission.findMany({ select: { id: true, recordId: true } });
+	for (const existingSubmission of existingSubmissions) cacheSubmission(existingSubmission);
+
+	for (const row of data.customFieldDefinitions) {
+		details.customFieldDefinitions.incoming += 1;
+		const moduleKey = normalizeCustomFieldModuleKey(row?.moduleKey);
+		const label = toTrimmedString(row?.label);
+		const fieldKey = normalizeCustomFieldKey(row?.fieldKey || label);
+		if (!moduleKey || !label || !fieldKey) {
+			details.customFieldDefinitions.skip += 1;
+			pushPreviewWarning(details, 'customFieldDefinitions', `Skip "${label || 'Unnamed field'}": missing module, label, or field key.`);
+			pushPreviewRow(details, 'customFieldDefinitions', { label: label || 'Unnamed field', action: 'skip', note: 'Missing module, label, or field key.' });
+			continue;
+		}
+		const fieldType = normalizeCustomFieldType(row?.fieldType);
+		const selectOptions = normalizeCustomFieldSelectOptions(row?.selectOptions);
+		if (fieldType === 'select' && selectOptions.length <= 0) {
+			details.customFieldDefinitions.skip += 1;
+			pushPreviewWarning(details, 'customFieldDefinitions', `Skip "${label}": select fields require options.`);
+			pushPreviewRow(details, 'customFieldDefinitions', { label, action: 'skip', note: 'Select field requires options.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await db.customFieldDefinition.findUnique({ where: { recordId }, select: { id: true } });
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await db.customFieldDefinition.findUnique({
+				where: { moduleKey_fieldKey: { moduleKey, fieldKey } },
+				select: { id: true }
+			});
+			if (existing) matchReason = 'module_field_key';
+		}
+		if (existing) details.customFieldDefinitions.update += 1;
+		else details.customFieldDefinitions.create += 1;
+		pushPreviewRow(
+			details,
+			'customFieldDefinitions',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Will update existing field definition matched by ${describeImportMatchReason(matchReason)}.` : 'Will create new field definition.',
+				matchReason
+			)
+		);
+	}
+
+	for (const row of data.clients) {
+		details.clients.incoming += 1;
+		const name = toTrimmedString(row?.name);
+		const label = previewRowLabel('clients', row);
+		if (!name) {
+			details.clients.skip += 1;
+			pushPreviewWarning(details, 'clients', 'Skip client row: missing name.');
+			pushPreviewRow(details, 'clients', { label, action: 'skip', note: 'Missing client name.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await db.client.findUnique({ where: { recordId }, select: { id: true, recordId: true } });
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await db.client.findFirst({ where: { name }, select: { id: true, recordId: true } });
+			if (existing) matchReason = 'name';
+		}
+		const id = existing?.id || nextSyntheticId();
+		const externalId = toTrimmedString(row?.externalId);
+		if (existing) details.clients.update += 1;
+		else details.clients.create += 1;
+		cacheClient({ id, recordId: existing?.recordId || recordId || `preview-client-${Math.abs(id)}`, externalId, name });
+		if (Number.isInteger(toOptionalInt(row?.id))) clientIdBySourceId.set(toOptionalInt(row?.id), id);
+		pushPreviewRow(
+			details,
+			'clients',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Will update existing client matched by ${describeImportMatchReason(matchReason)}.` : 'Will create new client.',
+				matchReason
+			)
+		);
+	}
+
+	for (const row of data.contacts) {
+		details.contacts.incoming += 1;
+		const firstName = toTrimmedString(row?.firstName);
+		const lastName = toTrimmedString(row?.lastName);
+		const label = previewRowLabel('contacts', row);
+		if (!firstName || !lastName) {
+			details.contacts.skip += 1;
+			pushPreviewWarning(details, 'contacts', `Skip ${label}: missing first or last name.`);
+			pushPreviewRow(details, 'contacts', { label, action: 'skip', note: 'Missing first or last name.' });
+			continue;
+		}
+		const clientId = resolveClientIdFromRow(row);
+		if (!clientId) {
+			details.contacts.skip += 1;
+			pushPreviewWarning(details, 'contacts', `Skip ${label}: related client could not be resolved.`);
+			pushPreviewRow(details, 'contacts', { label, action: 'skip', note: 'Related client could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const email = toTrimmedString(row?.email);
+		const contactMatchClauses = [{ firstName, lastName }];
+		if (email) contactMatchClauses.unshift({ email });
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await db.contact.findUnique({ where: { recordId }, select: { id: true, recordId: true } });
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing && email) {
+			existing = await db.contact.findFirst({
+				where: { clientId, email },
+				select: { id: true, recordId: true }
+			});
+			if (existing) matchReason = 'email';
+		}
+		if (!existing) {
+			existing = await db.contact.findFirst({
+				where: { clientId, firstName, lastName },
+				select: { id: true, recordId: true }
+			});
+			if (existing) matchReason = 'client_name';
+		}
+		const id = existing?.id || nextSyntheticId();
+		const externalId = toTrimmedString(row?.externalId);
+		if (existing) details.contacts.update += 1;
+		else details.contacts.create += 1;
+		cacheContact({ id, recordId: existing?.recordId || recordId || `preview-contact-${Math.abs(id)}`, externalId, email, firstName, lastName, clientId });
+		if (Number.isInteger(toOptionalInt(row?.id))) contactIdBySourceId.set(toOptionalInt(row?.id), id);
+		pushPreviewRow(
+			details,
+			'contacts',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Will update existing contact matched by ${describeImportMatchReason(matchReason)}.` : 'Will create and link to resolved client.',
+				matchReason
+			)
+		);
+	}
+
+	for (const row of data.contactNotes) {
+		details.contactNotes.incoming += 1;
+		const label = previewRowLabel('contactNotes', row);
+		const contactId = resolveTargetIdFromSource({
+			sourceId: row?.contactId,
+			externalId: row?.contactExternalId,
+			sourceIdToRecordId: sourceContactIdToRecordId,
+			externalIdToRecordId: sourceContactExternalIdToRecordId,
+			targetIdBySourceId: contactIdBySourceId,
+			targetIdByExternalId: contactIdByExternalId,
+			targetIdByRecordId: contactIdByRecordId
+		}) || (toTrimmedString(row?.contactEmail) ? contactIdByEmail.get(normalizeLookupKey(row?.contactEmail)) : null);
+		if (!contactId) {
+			details.contactNotes.skip += 1;
+			pushPreviewWarning(details, 'contactNotes', `Skip ${label}: related contact could not be resolved.`);
+			pushPreviewRow(details, 'contactNotes', { label, action: 'skip', note: 'Related contact could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existing = recordId
+			? await db.contactNote.findUnique({ where: { recordId }, select: { id: true } })
+			: null;
+		if (existing) details.contactNotes.update += 1;
+		else details.contactNotes.create += 1;
+		pushPreviewRow(
+			details,
+			'contactNotes',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? 'Will update existing contact note matched by record ID.' : 'Will create and link to resolved contact.',
+				existing ? 'record_id' : ''
+			)
+		);
+	}
+
+	for (const row of data.candidates) {
+		details.candidates.incoming += 1;
+		const email = toTrimmedString(row?.email);
+		const firstName = toTrimmedString(row?.firstName);
+		const lastName = toTrimmedString(row?.lastName);
+		const label = previewRowLabel('candidates', row);
+		if (!email || !firstName || !lastName) {
+			details.candidates.skip += 1;
+			pushPreviewWarning(details, 'candidates', `Skip ${label}: missing first name, last name, or email.`);
+			pushPreviewRow(details, 'candidates', { label, action: 'skip', note: 'Missing first name, last name, or email.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existingCandidateClauses = [{ email }];
+		if (recordId) {
+			existingCandidateClauses.unshift({ recordId });
+		}
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await db.candidate.findUnique({
+				where: { recordId },
+				select: { id: true, recordId: true }
+			});
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await db.candidate.findFirst({
+				where: { email },
+				select: { id: true, recordId: true }
+			});
+			if (existing) matchReason = 'email';
+		}
+		const id = existing?.id || nextSyntheticId();
+		const externalId = toTrimmedString(row?.externalId);
+		if (existing) details.candidates.update += 1;
+		else details.candidates.create += 1;
+		cacheCandidate({ id, recordId: existing?.recordId || recordId || `preview-candidate-${Math.abs(id)}`, externalId, email });
+		if (Number.isInteger(toOptionalInt(row?.id))) candidateIdBySourceId.set(toOptionalInt(row?.id), id);
+		pushPreviewRow(
+			details,
+			'candidates',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Will update existing candidate matched by ${describeImportMatchReason(matchReason)}.` : 'Will create new candidate.',
+				matchReason
+			)
+		);
+	}
+
+	for (const row of data.candidateNotes) {
+		details.candidateNotes.incoming += 1;
+		const label = previewRowLabel('candidateNotes', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		if (!candidateId) {
+			details.candidateNotes.skip += 1;
+			pushPreviewWarning(details, 'candidateNotes', `Skip ${label}: related candidate could not be resolved.`);
+			pushPreviewRow(details, 'candidateNotes', { label, action: 'skip', note: 'Related candidate could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existing = recordId
+			? await db.candidateNote.findUnique({ where: { recordId }, select: { id: true } })
+			: null;
+		if (existing) details.candidateNotes.update += 1;
+		else details.candidateNotes.create += 1;
+		pushPreviewRow(
+			details,
+			'candidateNotes',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? 'Will update existing candidate note matched by record ID.' : 'Will create and link to resolved candidate.',
+				existing ? 'record_id' : ''
+			)
+		);
+	}
+
+	for (const row of data.candidateEducations) {
+		details.candidateEducations.incoming += 1;
+		const label = previewRowLabel('candidateEducations', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		if (!candidateId) {
+			details.candidateEducations.skip += 1;
+			pushPreviewWarning(details, 'candidateEducations', `Skip ${label}: related candidate could not be resolved.`);
+			pushPreviewRow(details, 'candidateEducations', { label, action: 'skip', note: 'Related candidate could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existing = recordId
+			? await db.candidateEducation.findUnique({ where: { recordId }, select: { id: true } })
+			: null;
+		if (existing) details.candidateEducations.update += 1;
+		else details.candidateEducations.create += 1;
+		pushPreviewRow(
+			details,
+			'candidateEducations',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? 'Will update existing education row matched by record ID.' : 'Will create and link to resolved candidate.',
+				existing ? 'record_id' : ''
+			)
+		);
+	}
+
+	for (const row of data.candidateWorkExperiences) {
+		details.candidateWorkExperiences.incoming += 1;
+		const label = previewRowLabel('candidateWorkExperiences', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		if (!candidateId) {
+			details.candidateWorkExperiences.skip += 1;
+			pushPreviewWarning(details, 'candidateWorkExperiences', `Skip ${label}: related candidate could not be resolved.`);
+			pushPreviewRow(details, 'candidateWorkExperiences', { label, action: 'skip', note: 'Related candidate could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existing = recordId
+			? await db.candidateWorkExperience.findUnique({ where: { recordId }, select: { id: true } })
+			: null;
+		if (existing) details.candidateWorkExperiences.update += 1;
+		else details.candidateWorkExperiences.create += 1;
+		pushPreviewRow(
+			details,
+			'candidateWorkExperiences',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? 'Will update existing work history row matched by record ID.' : 'Will create and link to resolved candidate.',
+				existing ? 'record_id' : ''
+			)
+		);
+	}
+
+	for (const row of data.jobOrders) {
+		details.jobOrders.incoming += 1;
+		const title = toTrimmedString(row?.title);
+		const label = previewRowLabel('jobOrders', row);
+		if (!title) {
+			details.jobOrders.skip += 1;
+			pushPreviewWarning(details, 'jobOrders', 'Skip job order row: missing title.');
+			pushPreviewRow(details, 'jobOrders', { label, action: 'skip', note: 'Missing title.' });
+			continue;
+		}
+		const clientId = resolveClientIdFromRow(row);
+		if (!clientId) {
+			details.jobOrders.skip += 1;
+			pushPreviewWarning(details, 'jobOrders', `Skip ${label}: related client could not be resolved.`);
+			pushPreviewRow(details, 'jobOrders', { label, action: 'skip', note: 'Related client could not be resolved.' });
+			continue;
+		}
+		const contactId = resolveContactIdFromRow(row, clientId);
+		const recordId = toTrimmedString(row?.recordId);
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await db.jobOrder.findUnique({ where: { recordId }, select: { id: true, recordId: true } });
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await db.jobOrder.findFirst({ where: { clientId, title }, select: { id: true, recordId: true } });
+			if (existing) matchReason = 'client_title';
+		}
+		const id = existing?.id || nextSyntheticId();
+		const externalId = toTrimmedString(row?.externalId);
+		if (existing) details.jobOrders.update += 1;
+		else details.jobOrders.create += 1;
+		cacheJobOrder({ id, recordId: existing?.recordId || recordId || `preview-job-${Math.abs(id)}`, externalId, title });
+		if (Number.isInteger(toOptionalInt(row?.id))) jobOrderIdBySourceId.set(toOptionalInt(row?.id), id);
+		const note = contactId
+			? (existing ? 'Will update and keep resolved client/contact links.' : 'Will create and link to resolved client/contact.')
+			: (existing ? 'Will update and link to resolved client. Contact was not resolved.' : 'Will create and link to resolved client. Contact was not resolved.');
+		if (!contactId) pushPreviewWarning(details, 'jobOrders', `${label}: hiring contact was not resolved. Job order can still import without it.`);
+		pushPreviewRow(
+			details,
+			'jobOrders',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing
+					? `${note} Matched by ${describeImportMatchReason(matchReason)}.`
+					: note,
+				matchReason
+			)
+		);
+	}
+
+	for (const row of data.submissions) {
+		details.submissions.incoming += 1;
+		const label = previewRowLabel('submissions', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		const jobOrderId = resolveTargetIdFromSource({
+			sourceId: row?.jobOrderId,
+			externalId: row?.jobOrderExternalId,
+			sourceIdToRecordId: sourceJobOrderIdToRecordId,
+			externalIdToRecordId: sourceJobOrderExternalIdToRecordId,
+			targetIdBySourceId: jobOrderIdBySourceId,
+			targetIdByExternalId: jobOrderIdByExternalId,
+			targetIdByRecordId: jobOrderIdByRecordId
+		}) || (toTrimmedString(row?.jobOrderTitle) ? jobOrderIdByTitle.get(normalizeLookupKey(row?.jobOrderTitle)) : null);
+		if (!candidateId || !jobOrderId) {
+			details.submissions.skip += 1;
+			pushPreviewWarning(details, 'submissions', `Skip ${label}: related candidate or job order could not be resolved.`);
+			pushPreviewRow(details, 'submissions', { label, action: 'skip', note: 'Related candidate or job order could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existingSubmissionClauses = [{ AND: [{ candidateId }, { jobOrderId }] }];
+		if (recordId) {
+			existingSubmissionClauses.unshift({ recordId });
+		}
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await db.submission.findFirst({
+				where: { recordId },
+				select: { id: true }
+			});
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await db.submission.findFirst({
+				where: { AND: [{ candidateId }, { jobOrderId }] },
+				select: { id: true }
+			});
+			if (existing) matchReason = 'candidate_job';
+		}
+		const id = existing?.id || nextSyntheticId();
+		const externalId = toTrimmedString(row?.externalId);
+		if (existing) details.submissions.update += 1;
+		else details.submissions.create += 1;
+		cacheSubmission({ id, recordId: recordId || `preview-submission-${Math.abs(id)}`, externalId });
+		if (Number.isInteger(toOptionalInt(row?.id))) submissionIdBySourceId.set(toOptionalInt(row?.id), id);
+		pushPreviewRow(
+			details,
+			'submissions',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing
+					? `Will update existing submission matched by ${describeImportMatchReason(matchReason)}.`
+					: 'Will create and link to resolved candidate/job order.',
+				matchReason
+			)
+		);
+	}
+
+	for (const row of data.interviews) {
+		details.interviews.incoming += 1;
+		const label = previewRowLabel('interviews', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		const jobOrderId = resolveTargetIdFromSource({
+			sourceId: row?.jobOrderId,
+			externalId: row?.jobOrderExternalId,
+			sourceIdToRecordId: sourceJobOrderIdToRecordId,
+			externalIdToRecordId: sourceJobOrderExternalIdToRecordId,
+			targetIdBySourceId: jobOrderIdBySourceId,
+			targetIdByExternalId: jobOrderIdByExternalId,
+			targetIdByRecordId: jobOrderIdByRecordId
+		}) || (toTrimmedString(row?.jobOrderTitle) ? jobOrderIdByTitle.get(normalizeLookupKey(row?.jobOrderTitle)) : null);
+		if (!candidateId || !jobOrderId) {
+			details.interviews.skip += 1;
+			pushPreviewWarning(details, 'interviews', `Skip ${label}: related candidate or job order could not be resolved.`);
+			pushPreviewRow(details, 'interviews', { label, action: 'skip', note: 'Related candidate or job order could not be resolved.' });
+			continue;
+		}
+		const recordId = toTrimmedString(row?.recordId);
+		const existing = recordId ? await db.interview.findUnique({ where: { recordId }, select: { id: true } }) : null;
+		if (existing) details.interviews.update += 1;
+		else details.interviews.create += 1;
+		pushPreviewRow(
+			details,
+			'interviews',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? 'Will update existing interview matched by record ID.' : 'Will create and link to resolved candidate/job order.',
+				existing ? 'record_id' : ''
+			)
+		);
+	}
+
+	for (const row of data.placements) {
+		details.placements.incoming += 1;
+		const label = previewRowLabel('placements', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		const jobOrderId = resolveTargetIdFromSource({
+			sourceId: row?.jobOrderId,
+			externalId: row?.jobOrderExternalId,
+			sourceIdToRecordId: sourceJobOrderIdToRecordId,
+			externalIdToRecordId: sourceJobOrderExternalIdToRecordId,
+			targetIdBySourceId: jobOrderIdBySourceId,
+			targetIdByExternalId: jobOrderIdByExternalId,
+			targetIdByRecordId: jobOrderIdByRecordId
+		}) || (toTrimmedString(row?.jobOrderTitle) ? jobOrderIdByTitle.get(normalizeLookupKey(row?.jobOrderTitle)) : null);
+		if (!candidateId || !jobOrderId) {
+			details.placements.skip += 1;
+			pushPreviewWarning(details, 'placements', `Skip ${label}: related candidate or job order could not be resolved.`);
+			pushPreviewRow(details, 'placements', { label, action: 'skip', note: 'Related candidate or job order could not be resolved.' });
+			continue;
+		}
+		const submissionId = resolveTargetIdFromSource({
+			sourceId: row?.submissionId,
+			externalId: row?.submissionExternalId,
+			sourceIdToRecordId: sourceSubmissionIdToRecordId,
+			externalIdToRecordId: sourceSubmissionExternalIdToRecordId,
+			targetIdBySourceId: submissionIdBySourceId,
+			targetIdByExternalId: submissionIdByExternalId,
+			targetIdByRecordId: submissionIdByRecordId
+		});
+		const recordId = toTrimmedString(row?.recordId);
+		const existing = recordId ? await db.offer.findUnique({ where: { recordId }, select: { id: true } }) : null;
+		if (existing) details.placements.update += 1;
+		else details.placements.create += 1;
+		if (!submissionId && (toTrimmedString(row?.submissionExternalId) || toTrimmedString(row?.submissionId) || toTrimmedString(row?.submissionRecordId))) {
+			pushPreviewWarning(details, 'placements', `${label}: submission could not be resolved. Placement can still import without it.`);
+		}
+		pushPreviewRow(
+			details,
+			'placements',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing
+					? `Will update existing placement matched by record ID. ${submissionId ? 'Resolved submission will stay linked if present.' : 'Submission was not resolved.'}`
+					: (submissionId ? 'Will link to candidate, job order, and resolved submission.' : 'Will link to candidate and job order. Submission was not resolved.'),
+				existing ? 'record_id' : ''
+			)
+		);
+	}
+
+	return {
+		summary,
+		details
 	};
 }
 
@@ -843,10 +2623,21 @@ function sourceIdRecordIdMap(rows) {
 	);
 }
 
+function sourceExternalIdRecordIdMap(rows) {
+	return new Map(
+		rows
+			.map((row) => [toTrimmedString(row?.externalId), toTrimmedString(row?.recordId)])
+			.filter(([externalId]) => Boolean(externalId))
+	);
+}
+
 function resolveTargetIdFromSource({
 	sourceId,
+	externalId,
 	sourceIdToRecordId,
+	externalIdToRecordId,
 	targetIdBySourceId,
+	targetIdByExternalId,
 	targetIdByRecordId
 }) {
 	const normalizedSourceId = toOptionalInt(sourceId);
@@ -855,6 +2646,16 @@ function resolveTargetIdFromSource({
 	}
 	if (Number.isInteger(normalizedSourceId) && sourceIdToRecordId.has(normalizedSourceId)) {
 		const recordId = sourceIdToRecordId.get(normalizedSourceId);
+		if (recordId && targetIdByRecordId.has(recordId)) {
+			return targetIdByRecordId.get(recordId);
+		}
+	}
+	const normalizedExternalId = toTrimmedString(externalId);
+	if (normalizedExternalId && targetIdByExternalId.has(normalizedExternalId)) {
+		return targetIdByExternalId.get(normalizedExternalId);
+	}
+	if (normalizedExternalId && externalIdToRecordId.has(normalizedExternalId)) {
+		const recordId = externalIdToRecordId.get(normalizedExternalId);
 		if (recordId && targetIdByRecordId.has(recordId)) {
 			return targetIdByRecordId.get(recordId);
 		}
@@ -868,7 +2669,11 @@ async function importData(tx, data, actingUser) {
 			customFieldDefinitions: 0,
 			clients: 0,
 			contacts: 0,
+			contactNotes: 0,
 			candidates: 0,
+			candidateNotes: 0,
+			candidateEducations: 0,
+			candidateWorkExperiences: 0,
 			jobOrders: 0,
 			submissions: 0,
 			interviews: 0,
@@ -878,7 +2683,11 @@ async function importData(tx, data, actingUser) {
 			customFieldDefinitions: 0,
 			clients: 0,
 			contacts: 0,
+			contactNotes: 0,
 			candidates: 0,
+			candidateNotes: 0,
+			candidateEducations: 0,
+			candidateWorkExperiences: 0,
 			jobOrders: 0,
 			submissions: 0,
 			interviews: 0,
@@ -888,13 +2697,22 @@ async function importData(tx, data, actingUser) {
 			customFieldDefinitions: 0,
 			clients: 0,
 			contacts: 0,
+			contactNotes: 0,
 			candidates: 0,
+			candidateNotes: 0,
+			candidateEducations: 0,
+			candidateWorkExperiences: 0,
 			jobOrders: 0,
 			submissions: 0,
 			interviews: 0,
 			placements: 0
 		},
-		errors: []
+		details: createEmptyPreviewDetails(),
+		errors: [],
+		_attachmentContext: {
+			candidateIdBySourceId: {},
+			candidateIdByEmail: {}
+		}
 	};
 
 	const sourceClientIdToRecordId = sourceIdRecordIdMap(data.clients);
@@ -902,25 +2720,42 @@ async function importData(tx, data, actingUser) {
 	const sourceCandidateIdToRecordId = sourceIdRecordIdMap(data.candidates);
 	const sourceJobOrderIdToRecordId = sourceIdRecordIdMap(data.jobOrders);
 	const sourceSubmissionIdToRecordId = sourceIdRecordIdMap(data.submissions);
+	const sourceClientExternalIdToRecordId = sourceExternalIdRecordIdMap(data.clients);
+	const sourceContactExternalIdToRecordId = sourceExternalIdRecordIdMap(data.contacts);
+	const sourceCandidateExternalIdToRecordId = sourceExternalIdRecordIdMap(data.candidates);
+	const sourceJobOrderExternalIdToRecordId = sourceExternalIdRecordIdMap(data.jobOrders);
+	const sourceSubmissionExternalIdToRecordId = sourceExternalIdRecordIdMap(data.submissions);
 
 	const clientIdBySourceId = new Map();
 	const clientIdByRecordId = new Map();
+	const clientIdByExternalId = new Map();
 	const clientIdByName = new Map();
 	const contactIdBySourceId = new Map();
 	const contactIdByRecordId = new Map();
+	const contactIdByExternalId = new Map();
 	const contactIdByEmail = new Map();
 	const contactIdByClientName = new Map();
 	const candidateIdBySourceId = new Map();
 	const candidateIdByRecordId = new Map();
+	const candidateIdByExternalId = new Map();
+	const candidateIdByEmail = new Map();
 	const jobOrderIdBySourceId = new Map();
 	const jobOrderIdByRecordId = new Map();
+	const jobOrderIdByExternalId = new Map();
+	const jobOrderIdByTitle = new Map();
 	const submissionIdBySourceId = new Map();
 	const submissionIdByRecordId = new Map();
+	const submissionIdByExternalId = new Map();
 
 	function pushError(message) {
 		if (summary.errors.length < 200) {
 			summary.errors.push(message);
 		}
+	}
+
+	function pushEntityWarning(entityKey, message) {
+		pushPreviewWarning(summary.details, entityKey, message);
+		pushError(message);
 	}
 
 	function cacheClient({ id, recordId, name }) {
@@ -949,11 +2784,55 @@ async function importData(tx, data, actingUser) {
 		}
 	}
 
+	function cacheCandidate({ id, recordId, externalId, email }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) {
+			candidateIdByRecordId.set(recordId, id);
+		}
+		if (externalId) {
+			candidateIdByExternalId.set(externalId, id);
+		}
+		const emailKey = normalizeLookupKey(email);
+		if (emailKey && !candidateIdByEmail.has(emailKey)) {
+			candidateIdByEmail.set(emailKey, id);
+		}
+		if (emailKey) {
+			summary._attachmentContext.candidateIdByEmail[emailKey] = id;
+		}
+	}
+
+	function cacheJobOrder({ id, recordId, externalId, title }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) {
+			jobOrderIdByRecordId.set(recordId, id);
+		}
+		if (externalId) {
+			jobOrderIdByExternalId.set(externalId, id);
+		}
+		const titleKey = normalizeLookupKey(title);
+		if (titleKey && !jobOrderIdByTitle.has(titleKey)) {
+			jobOrderIdByTitle.set(titleKey, id);
+		}
+	}
+
+	function cacheSubmission({ id, recordId, externalId }) {
+		if (!Number.isInteger(id)) return;
+		if (recordId) {
+			submissionIdByRecordId.set(recordId, id);
+		}
+		if (externalId) {
+			submissionIdByExternalId.set(externalId, id);
+		}
+	}
+
 	function resolveClientIdFromRow(row) {
 		const bySource = resolveTargetIdFromSource({
 			sourceId: row?.clientId,
+			externalId: row?.clientExternalId,
 			sourceIdToRecordId: sourceClientIdToRecordId,
+			externalIdToRecordId: sourceClientExternalIdToRecordId,
 			targetIdBySourceId: clientIdBySourceId,
+			targetIdByExternalId: clientIdByExternalId,
 			targetIdByRecordId: clientIdByRecordId
 		});
 		if (bySource) return bySource;
@@ -977,8 +2856,11 @@ async function importData(tx, data, actingUser) {
 	function resolveContactIdFromRow(row, clientId) {
 		const bySource = resolveTargetIdFromSource({
 			sourceId: row?.contactId,
+			externalId: row?.contactExternalId,
 			sourceIdToRecordId: sourceContactIdToRecordId,
+			externalIdToRecordId: sourceContactExternalIdToRecordId,
 			targetIdBySourceId: contactIdBySourceId,
+			targetIdByExternalId: contactIdByExternalId,
 			targetIdByRecordId: contactIdByRecordId
 		});
 		if (bySource) return bySource;
@@ -1009,11 +2891,12 @@ async function importData(tx, data, actingUser) {
 
 	for (const row of data.customFieldDefinitions) {
 		const moduleKey = normalizeCustomFieldModuleKey(row?.moduleKey);
-		const label = toTrimmedString(row?.label);
+		const label = toTrimmedString(row?.label) || previewRowLabel('customFieldDefinitions', row);
 		const fieldKey = normalizeCustomFieldKey(row?.fieldKey || label);
 		if (!moduleKey || !label || !fieldKey) {
 			summary.skipped.customFieldDefinitions += 1;
-			pushError('Skipped custom field definition row with missing module, label, or field key.');
+			pushEntityWarning('customFieldDefinitions', `Skipped ${label || 'custom field definition'}: missing module, label, or field key.`);
+			pushPreviewRow(summary.details, 'customFieldDefinitions', buildImportRow('skip', label || 'Unnamed custom field', 'Missing module, label, or field key.'));
 			continue;
 		}
 
@@ -1021,7 +2904,8 @@ async function importData(tx, data, actingUser) {
 		const selectOptions = normalizeCustomFieldSelectOptions(row?.selectOptions);
 		if (fieldType === 'select' && selectOptions.length <= 0) {
 			summary.skipped.customFieldDefinitions += 1;
-			pushError(`Skipped custom field definition "${label}": select fields require options.`);
+			pushEntityWarning('customFieldDefinitions', `Skipped ${label}: select fields require options.`);
+			pushPreviewRow(summary.details, 'customFieldDefinitions', buildImportRow('skip', label, 'Select field requires options.'));
 			continue;
 		}
 
@@ -1044,6 +2928,7 @@ async function importData(tx, data, actingUser) {
 				select: { id: true }
 			});
 		const existing = existingByRecordId || existingByKey;
+		const matchReason = existingByRecordId ? 'record_id' : existingByKey ? 'module_field_key' : '';
 
 		const payload = {
 			moduleKey,
@@ -1064,6 +2949,7 @@ async function importData(tx, data, actingUser) {
 				data: payload
 			});
 			summary.updated.customFieldDefinitions += 1;
+			pushPreviewRow(summary.details, 'customFieldDefinitions', buildImportRow('update', label, `Updated existing field definition matched by ${describeImportMatchReason(matchReason)}.`, matchReason));
 		} else {
 			await tx.customFieldDefinition.create({
 				data: {
@@ -1072,6 +2958,7 @@ async function importData(tx, data, actingUser) {
 				}
 			});
 			summary.created.customFieldDefinitions += 1;
+			pushPreviewRow(summary.details, 'customFieldDefinitions', buildImportRow('create', label, 'Created new field definition.'));
 		}
 	}
 
@@ -1100,23 +2987,76 @@ async function importData(tx, data, actingUser) {
 		cacheContact(existingContact);
 	}
 
+	const existingCandidates = await tx.candidate.findMany({
+		select: {
+			id: true,
+			recordId: true,
+			email: true
+		}
+	});
+	for (const existingCandidate of existingCandidates) {
+		cacheCandidate(existingCandidate);
+	}
+
+	const existingSkills = await tx.skill.findMany({
+		select: {
+			id: true,
+			name: true
+		}
+	});
+	const skillCache = {
+		skillIdByKey: new Map(
+			existingSkills.map((skill) => [normalizeImportedSkillKey(skill.name), skill.id])
+		)
+	};
+
+	const existingJobOrders = await tx.jobOrder.findMany({
+		select: {
+			id: true,
+			recordId: true,
+			title: true
+		}
+	});
+	for (const existingJobOrder of existingJobOrders) {
+		cacheJobOrder(existingJobOrder);
+	}
+
+	const existingSubmissions = await tx.submission.findMany({
+		select: {
+			id: true,
+			recordId: true
+		}
+	});
+	for (const existingSubmission of existingSubmissions) {
+		cacheSubmission(existingSubmission);
+	}
+
 	for (const row of data.clients) {
 		const name = toTrimmedString(row?.name);
+		const label = previewRowLabel('clients', row);
 		if (!name) {
 			summary.skipped.clients += 1;
-			pushError('Skipped client row with missing `name`.');
+			pushEntityWarning('clients', 'Skipped client row with missing `name`.');
+			pushPreviewRow(summary.details, 'clients', buildImportRow('skip', label, 'Missing client name.'));
 			continue;
 		}
 		const recordId = toTrimmedString(row?.recordId);
-		const existing = recordId
-			? await tx.client.findUnique({
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await tx.client.findUnique({
 				where: { recordId },
 				select: { id: true, recordId: true }
-			})
-			: await tx.client.findFirst({
+			});
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await tx.client.findFirst({
 				where: { name },
 				select: { id: true, recordId: true }
 			});
+			if (existing) matchReason = 'name';
+		}
 		const createdRecordId = recordId || createRecordId('Client');
 		const payload = {
 			name,
@@ -1150,10 +3090,24 @@ async function importData(tx, data, actingUser) {
 
 		if (existing) summary.updated.clients += 1;
 		else summary.created.clients += 1;
+		pushPreviewRow(
+			summary.details,
+			'clients',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Updated existing client matched by ${describeImportMatchReason(matchReason)}.` : 'Created new client.',
+				matchReason
+			)
+		);
 
 		const sourceId = toOptionalInt(row?.id);
+		const externalId = toTrimmedString(row?.externalId);
 		if (Number.isInteger(sourceId)) {
 			clientIdBySourceId.set(sourceId, saved.id);
+		}
+		if (externalId) {
+			clientIdByExternalId.set(externalId, saved.id);
 		}
 		const mappedRecordId = existing?.recordId || saved.recordId || createdRecordId;
 		if (mappedRecordId) {
@@ -1169,16 +3123,19 @@ async function importData(tx, data, actingUser) {
 	for (const row of data.contacts) {
 		const firstName = toTrimmedString(row?.firstName);
 		const lastName = toTrimmedString(row?.lastName);
+		const label = previewRowLabel('contacts', row);
 		if (!firstName || !lastName) {
 			summary.skipped.contacts += 1;
-			pushError('Skipped contact row with missing first or last name.');
+			pushEntityWarning('contacts', `Skipped ${label}: missing first or last name.`);
+			pushPreviewRow(summary.details, 'contacts', buildImportRow('skip', label, 'Missing first or last name.'));
 			continue;
 		}
 
 		const clientId = resolveClientIdFromRow(row);
 		if (!clientId) {
 			summary.skipped.contacts += 1;
-			pushError(`Skipped contact ${firstName} ${lastName}: related client could not be resolved.`);
+			pushEntityWarning('contacts', `Skipped ${label}: related client could not be resolved.`);
+			pushPreviewRow(summary.details, 'contacts', buildImportRow('skip', label, 'Related client could not be resolved.'));
 			continue;
 		}
 
@@ -1188,18 +3145,29 @@ async function importData(tx, data, actingUser) {
 		if (email) {
 			contactMatchClauses.unshift({ email });
 		}
-		const existing = recordId
-			? await tx.contact.findUnique({
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await tx.contact.findUnique({
 				where: { recordId },
 				select: { id: true, recordId: true }
-			})
-			: await tx.contact.findFirst({
-				where: {
-					clientId,
-					OR: contactMatchClauses
-				},
+			});
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing && email) {
+			existing = await tx.contact.findFirst({
+				where: { clientId, email },
 				select: { id: true, recordId: true }
 			});
+			if (existing) matchReason = 'email';
+		}
+		if (!existing) {
+			existing = await tx.contact.findFirst({
+				where: { clientId, firstName, lastName },
+				select: { id: true, recordId: true }
+			});
+			if (existing) matchReason = 'client_name';
+		}
 		const createdRecordId = recordId || createRecordId('Contact');
 		const payload = {
 			firstName,
@@ -1234,10 +3202,24 @@ async function importData(tx, data, actingUser) {
 
 		if (existing) summary.updated.contacts += 1;
 		else summary.created.contacts += 1;
+		pushPreviewRow(
+			summary.details,
+			'contacts',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Updated existing contact matched by ${describeImportMatchReason(matchReason)}.` : 'Created contact and linked it to the resolved client.',
+				matchReason
+			)
+		);
 
 		const sourceId = toOptionalInt(row?.id);
+		const externalId = toTrimmedString(row?.externalId);
 		if (Number.isInteger(sourceId)) {
 			contactIdBySourceId.set(sourceId, saved.id);
+		}
+		if (externalId) {
+			contactIdByExternalId.set(externalId, saved.id);
 		}
 		const mappedRecordId = existing?.recordId || saved.recordId || createdRecordId;
 		if (mappedRecordId) {
@@ -1253,23 +3235,87 @@ async function importData(tx, data, actingUser) {
 		});
 	}
 
+	for (const row of data.contactNotes) {
+		const label = previewRowLabel('contactNotes', row);
+		const contactId = resolveTargetIdFromSource({
+			sourceId: row?.contactId,
+			externalId: row?.contactExternalId,
+			sourceIdToRecordId: sourceContactIdToRecordId,
+			externalIdToRecordId: sourceContactExternalIdToRecordId,
+			targetIdBySourceId: contactIdBySourceId,
+			targetIdByExternalId: contactIdByExternalId,
+			targetIdByRecordId: contactIdByRecordId
+		}) || (toTrimmedString(row?.contactEmail) ? contactIdByEmail.get(normalizeLookupKey(row?.contactEmail)) : null);
+		if (!contactId) {
+			summary.skipped.contactNotes += 1;
+			pushEntityWarning('contactNotes', `Skipped ${label}: related contact could not be resolved.`);
+			pushPreviewRow(summary.details, 'contactNotes', buildImportRow('skip', label, 'Related contact could not be resolved.'));
+			continue;
+		}
+
+		const recordId = toTrimmedString(row?.recordId) || createRecordId('ContactNote');
+		const existing = await tx.contactNote.findUnique({
+			where: { recordId },
+			select: { id: true }
+		});
+		const payload = {
+			noteType: toTrimmedString(row?.noteType) || 'bullhorn',
+			content: toTrimmedString(row?.content),
+			contactId,
+			createdByUserId: actingUser.id
+		};
+		if (!payload.content) {
+			summary.skipped.contactNotes += 1;
+			pushEntityWarning('contactNotes', `Skipped ${label}: missing note content.`);
+			pushPreviewRow(summary.details, 'contactNotes', buildImportRow('skip', label, 'Missing note content.'));
+			continue;
+		}
+
+		if (existing) {
+			await tx.contactNote.update({
+				where: { id: existing.id },
+				data: payload
+			});
+			summary.updated.contactNotes += 1;
+			pushPreviewRow(summary.details, 'contactNotes', buildImportRow('update', label, 'Updated existing contact note matched by record ID.', 'record_id'));
+		} else {
+			await tx.contactNote.create({
+				data: {
+					recordId,
+					createdAt: row?.createdAt || undefined,
+					...payload
+				}
+			});
+			summary.created.contactNotes += 1;
+			pushPreviewRow(summary.details, 'contactNotes', buildImportRow('create', label, 'Created contact note and linked it to the resolved contact.'));
+		}
+	}
+
 	for (const row of data.candidates) {
 		const email = toTrimmedString(row?.email);
 		const firstName = toTrimmedString(row?.firstName);
 		const lastName = toTrimmedString(row?.lastName);
+		const label = previewRowLabel('candidates', row);
 		if (!email || !firstName || !lastName) {
 			summary.skipped.candidates += 1;
-			pushError('Skipped candidate row with missing firstName, lastName, or email.');
+			pushEntityWarning('candidates', `Skipped ${label}: missing first name, last name, or email.`);
+			pushPreviewRow(summary.details, 'candidates', buildImportRow('skip', label, 'Missing first name, last name, or email.'));
 			continue;
 		}
 
 		const recordId = toTrimmedString(row?.recordId) || createRecordId('Candidate');
-		const existing = await tx.candidate.findFirst({
-			where: {
-				OR: [{ recordId }, { email }]
-			},
+		let existing = await tx.candidate.findFirst({
+			where: { recordId },
 			select: { id: true }
 		});
+		let matchReason = existing ? 'record_id' : '';
+		if (!existing) {
+			existing = await tx.candidate.findFirst({
+				where: { email },
+				select: { id: true }
+			});
+			if (existing) matchReason = 'email';
+		}
 		const payload = {
 			firstName,
 			lastName,
@@ -1293,6 +3339,12 @@ async function importData(tx, data, actingUser) {
 			ownerId: actingUser.id,
 			divisionId: actingUser.divisionId || null
 		};
+		const importedSkillNames = splitImportedSkillNames(
+			Array.isArray(row?.parsedSkillNames) && row.parsedSkillNames.length > 0
+				? row.parsedSkillNames
+				: row?.skillSet
+		);
+		const hasImportedSkillData = row?.hasSkillData === true || importedSkillNames.length > 0;
 
 		const saved = existing
 			? await tx.candidate.update({
@@ -1310,26 +3362,229 @@ async function importData(tx, data, actingUser) {
 
 		if (existing) summary.updated.candidates += 1;
 		else summary.created.candidates += 1;
+		pushPreviewRow(
+			summary.details,
+			'candidates',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Updated existing candidate matched by ${describeImportMatchReason(matchReason)}.` : 'Created new candidate.',
+				matchReason
+			)
+		);
 
 		const sourceId = toOptionalInt(row?.id);
+		const externalId = toTrimmedString(row?.externalId);
 		if (Number.isInteger(sourceId)) {
 			candidateIdBySourceId.set(sourceId, saved.id);
+			summary._attachmentContext.candidateIdBySourceId[String(sourceId)] = saved.id;
 		}
-		candidateIdByRecordId.set(recordId, saved.id);
+		cacheCandidate({
+			id: saved.id,
+			recordId,
+			externalId,
+			email
+		});
+
+		if (hasImportedSkillData) {
+			const importedSkillIds = await resolveImportedSkillIds(tx, importedSkillNames, skillCache);
+			await syncCandidateImportedSkills(tx, saved.id, importedSkillIds);
+		}
+	}
+
+	for (const row of data.candidateNotes) {
+		const label = previewRowLabel('candidateNotes', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		if (!candidateId) {
+			summary.skipped.candidateNotes += 1;
+			pushEntityWarning('candidateNotes', `Skipped ${label}: related candidate could not be resolved.`);
+			pushPreviewRow(summary.details, 'candidateNotes', buildImportRow('skip', label, 'Related candidate could not be resolved.'));
+			continue;
+		}
+
+		const recordId = toTrimmedString(row?.recordId) || createRecordId('CandidateNote');
+		const existing = await tx.candidateNote.findUnique({
+			where: { recordId },
+			select: { id: true }
+		});
+		const payload = {
+			noteType: toTrimmedString(row?.noteType) || 'bullhorn',
+			content: toTrimmedString(row?.content),
+			candidateId,
+			createdByUserId: actingUser.id
+		};
+		if (!payload.content) {
+			summary.skipped.candidateNotes += 1;
+			pushEntityWarning('candidateNotes', `Skipped ${label}: missing note content.`);
+			pushPreviewRow(summary.details, 'candidateNotes', buildImportRow('skip', label, 'Missing note content.'));
+			continue;
+		}
+
+		if (existing) {
+			await tx.candidateNote.update({
+				where: { id: existing.id },
+				data: payload
+			});
+			summary.updated.candidateNotes += 1;
+			pushPreviewRow(summary.details, 'candidateNotes', buildImportRow('update', label, 'Updated existing candidate note matched by record ID.', 'record_id'));
+		} else {
+			await tx.candidateNote.create({
+				data: {
+					recordId,
+					createdAt: row?.createdAt || undefined,
+					...payload
+				}
+			});
+			summary.created.candidateNotes += 1;
+			pushPreviewRow(summary.details, 'candidateNotes', buildImportRow('create', label, 'Created candidate note and linked it to the resolved candidate.'));
+		}
+	}
+
+	for (const row of data.candidateEducations) {
+		const label = previewRowLabel('candidateEducations', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		if (!candidateId) {
+			summary.skipped.candidateEducations += 1;
+			pushEntityWarning('candidateEducations', `Skipped ${label}: related candidate could not be resolved.`);
+			pushPreviewRow(summary.details, 'candidateEducations', buildImportRow('skip', label, 'Related candidate could not be resolved.'));
+			continue;
+		}
+
+		const schoolName = toTrimmedString(row?.schoolName);
+		if (!schoolName) {
+			summary.skipped.candidateEducations += 1;
+			pushEntityWarning('candidateEducations', `Skipped ${label}: missing school name.`);
+			pushPreviewRow(summary.details, 'candidateEducations', buildImportRow('skip', label, 'Missing school name.'));
+			continue;
+		}
+
+		const recordId = toTrimmedString(row?.recordId) || createRecordId('CandidateEducation');
+		const existing = await tx.candidateEducation.findUnique({
+			where: { recordId },
+			select: { id: true }
+		});
+		const payload = {
+			schoolName,
+			degree: toTrimmedString(row?.degree),
+			fieldOfStudy: toTrimmedString(row?.fieldOfStudy),
+			startDate: toOptionalDate(row?.startDate),
+			endDate: toOptionalDate(row?.endDate),
+			isCurrent: parseBooleanFlag(row?.isCurrent, false),
+			description: toTrimmedString(row?.description),
+			candidateId
+		};
+
+		if (existing) {
+			await tx.candidateEducation.update({
+				where: { id: existing.id },
+				data: payload
+			});
+			summary.updated.candidateEducations += 1;
+			pushPreviewRow(summary.details, 'candidateEducations', buildImportRow('update', label, 'Updated existing candidate education matched by record ID.', 'record_id'));
+		} else {
+			await tx.candidateEducation.create({
+				data: {
+					recordId,
+					...payload
+				}
+			});
+			summary.created.candidateEducations += 1;
+			pushPreviewRow(summary.details, 'candidateEducations', buildImportRow('create', label, 'Created candidate education and linked it to the resolved candidate.'));
+		}
+	}
+
+	for (const row of data.candidateWorkExperiences) {
+		const label = previewRowLabel('candidateWorkExperiences', row);
+		const candidateId = resolveTargetIdFromSource({
+			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
+			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
+			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
+			targetIdByRecordId: candidateIdByRecordId
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
+		if (!candidateId) {
+			summary.skipped.candidateWorkExperiences += 1;
+			pushEntityWarning('candidateWorkExperiences', `Skipped ${label}: related candidate could not be resolved.`);
+			pushPreviewRow(summary.details, 'candidateWorkExperiences', buildImportRow('skip', label, 'Related candidate could not be resolved.'));
+			continue;
+		}
+
+		const companyName = toTrimmedString(row?.companyName);
+		if (!companyName) {
+			summary.skipped.candidateWorkExperiences += 1;
+			pushEntityWarning('candidateWorkExperiences', `Skipped ${label}: missing company name.`);
+			pushPreviewRow(summary.details, 'candidateWorkExperiences', buildImportRow('skip', label, 'Missing company name.'));
+			continue;
+		}
+
+		const recordId = toTrimmedString(row?.recordId) || createRecordId('CandidateWorkExperience');
+		const existing = await tx.candidateWorkExperience.findUnique({
+			where: { recordId },
+			select: { id: true }
+		});
+		const payload = {
+			companyName,
+			title: toTrimmedString(row?.title),
+			location: toTrimmedString(row?.location),
+			startDate: toOptionalDate(row?.startDate),
+			endDate: toOptionalDate(row?.endDate),
+			isCurrent: parseBooleanFlag(row?.isCurrent, false),
+			description: toTrimmedString(row?.description),
+			candidateId
+		};
+
+		if (existing) {
+			await tx.candidateWorkExperience.update({
+				where: { id: existing.id },
+				data: payload
+			});
+			summary.updated.candidateWorkExperiences += 1;
+			pushPreviewRow(summary.details, 'candidateWorkExperiences', buildImportRow('update', label, 'Updated existing candidate work history matched by record ID.', 'record_id'));
+		} else {
+			await tx.candidateWorkExperience.create({
+				data: {
+					recordId,
+					...payload
+				}
+			});
+			summary.created.candidateWorkExperiences += 1;
+			pushPreviewRow(summary.details, 'candidateWorkExperiences', buildImportRow('create', label, 'Created candidate work history and linked it to the resolved candidate.'));
+		}
 	}
 
 	for (const row of data.jobOrders) {
 		const title = toTrimmedString(row?.title);
+		const label = previewRowLabel('jobOrders', row);
 		if (!title) {
 			summary.skipped.jobOrders += 1;
-			pushError('Skipped job order row with missing `title`.');
+			pushEntityWarning('jobOrders', `Skipped ${label}: missing title.`);
+			pushPreviewRow(summary.details, 'jobOrders', buildImportRow('skip', label, 'Missing title.'));
 			continue;
 		}
 
 		const clientId = resolveClientIdFromRow(row);
 		if (!clientId) {
 			summary.skipped.jobOrders += 1;
-			pushError(`Skipped job order "${title}": related client could not be resolved.`);
+			pushEntityWarning('jobOrders', `Skipped ${label}: related client could not be resolved.`);
+			pushPreviewRow(summary.details, 'jobOrders', buildImportRow('skip', label, 'Related client could not be resolved.'));
 			continue;
 		}
 
@@ -1337,18 +3592,25 @@ async function importData(tx, data, actingUser) {
 
 		const recordId = toTrimmedString(row?.recordId);
 		const openings = toOptionalInt(row?.openings, 1);
-		const existing = recordId
-			? await tx.jobOrder.findUnique({
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await tx.jobOrder.findUnique({
 				where: { recordId },
 				select: { id: true, recordId: true }
-			})
-			: await tx.jobOrder.findFirst({
+			});
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await tx.jobOrder.findFirst({
 				where: {
 					clientId,
 					title
 				},
 				select: { id: true, recordId: true }
 			});
+			if (existing) matchReason = 'client_title';
+		}
 		const createdRecordId = recordId || createRecordId('JobOrder');
 		const payload = {
 			title,
@@ -1388,44 +3650,79 @@ async function importData(tx, data, actingUser) {
 
 		if (existing) summary.updated.jobOrders += 1;
 		else summary.created.jobOrders += 1;
+		pushPreviewRow(
+			summary.details,
+			'jobOrders',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Updated existing job order matched by ${describeImportMatchReason(matchReason)}.` : 'Created job order and linked resolved client/contact.',
+				matchReason
+			)
+		);
 
 		const sourceId = toOptionalInt(row?.id);
+		const externalId = toTrimmedString(row?.externalId);
 		if (Number.isInteger(sourceId)) {
 			jobOrderIdBySourceId.set(sourceId, saved.id);
 		}
-		const mappedRecordId = existing?.recordId || saved.recordId || createdRecordId;
-		if (mappedRecordId) {
-			jobOrderIdByRecordId.set(mappedRecordId, saved.id);
+		if (externalId) {
+			jobOrderIdByExternalId.set(externalId, saved.id);
 		}
+		const mappedRecordId = existing?.recordId || saved.recordId || createdRecordId;
+		cacheJobOrder({
+			id: saved.id,
+			recordId: mappedRecordId,
+			externalId,
+			title
+		});
 	}
 
 	for (const row of data.submissions) {
+		const label = previewRowLabel('submissions', row);
 		const candidateId = resolveTargetIdFromSource({
 			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
 			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
 			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
 			targetIdByRecordId: candidateIdByRecordId
-		});
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
 		const jobOrderId = resolveTargetIdFromSource({
 			sourceId: row?.jobOrderId,
+			externalId: row?.jobOrderExternalId,
 			sourceIdToRecordId: sourceJobOrderIdToRecordId,
+			externalIdToRecordId: sourceJobOrderExternalIdToRecordId,
 			targetIdBySourceId: jobOrderIdBySourceId,
+			targetIdByExternalId: jobOrderIdByExternalId,
 			targetIdByRecordId: jobOrderIdByRecordId
-		});
+		}) || (toTrimmedString(row?.jobOrderTitle) ? jobOrderIdByTitle.get(normalizeLookupKey(row?.jobOrderTitle)) : null);
 
 		if (!candidateId || !jobOrderId) {
 			summary.skipped.submissions += 1;
-			pushError('Skipped submission row: related candidate or job order could not be resolved.');
+			pushEntityWarning('submissions', `Skipped ${label}: related candidate or job order could not be resolved.`);
+			pushPreviewRow(summary.details, 'submissions', buildImportRow('skip', label, 'Related candidate or job order could not be resolved.'));
 			continue;
 		}
 
 		const recordId = toTrimmedString(row?.recordId) || createRecordId('Submission');
-		const existing = await tx.submission.findFirst({
-			where: {
-				OR: [{ recordId }, { AND: [{ candidateId }, { jobOrderId }] }]
-			},
-			select: { id: true }
-		});
+		let existing = null;
+		let matchReason = '';
+		if (recordId) {
+			existing = await tx.submission.findFirst({
+				where: { recordId },
+				select: { id: true }
+			});
+			if (existing) matchReason = 'record_id';
+		}
+		if (!existing) {
+			existing = await tx.submission.findFirst({
+				where: { AND: [{ candidateId }, { jobOrderId }] },
+				select: { id: true }
+			});
+			if (existing) matchReason = 'candidate_job';
+		}
 		const payload = {
 			status: toTrimmedString(row?.status) || 'submitted',
 			notes: toTrimmedString(row?.notes),
@@ -1451,30 +3748,53 @@ async function importData(tx, data, actingUser) {
 
 		if (existing) summary.updated.submissions += 1;
 		else summary.created.submissions += 1;
+		pushPreviewRow(
+			summary.details,
+			'submissions',
+			buildImportRow(
+				existing ? 'update' : 'create',
+				label,
+				existing ? `Updated existing submission matched by ${describeImportMatchReason(matchReason)}.` : 'Created submission and linked resolved candidate/job order.',
+				matchReason
+			)
+		);
 
 		const sourceId = toOptionalInt(row?.id);
+		const externalId = toTrimmedString(row?.externalId);
 		if (Number.isInteger(sourceId)) {
 			submissionIdBySourceId.set(sourceId, saved.id);
 		}
-		submissionIdByRecordId.set(recordId, saved.id);
+		cacheSubmission({
+			id: saved.id,
+			recordId,
+			externalId
+		});
 	}
 
 	for (const row of data.interviews) {
+		const label = previewRowLabel('interviews', row);
 		const candidateId = resolveTargetIdFromSource({
 			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
 			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
 			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
 			targetIdByRecordId: candidateIdByRecordId
-		});
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
 		const jobOrderId = resolveTargetIdFromSource({
 			sourceId: row?.jobOrderId,
+			externalId: row?.jobOrderExternalId,
 			sourceIdToRecordId: sourceJobOrderIdToRecordId,
+			externalIdToRecordId: sourceJobOrderExternalIdToRecordId,
 			targetIdBySourceId: jobOrderIdBySourceId,
+			targetIdByExternalId: jobOrderIdByExternalId,
 			targetIdByRecordId: jobOrderIdByRecordId
-		});
+		}) || (toTrimmedString(row?.jobOrderTitle) ? jobOrderIdByTitle.get(normalizeLookupKey(row?.jobOrderTitle)) : null);
 		if (!candidateId || !jobOrderId) {
 			summary.skipped.interviews += 1;
-			pushError('Skipped interview row: related candidate or job order could not be resolved.');
+			pushEntityWarning('interviews', `Skipped ${label}: related candidate or job order could not be resolved.`);
+			pushPreviewRow(summary.details, 'interviews', buildImportRow('skip', label, 'Related candidate or job order could not be resolved.'));
 			continue;
 		}
 
@@ -1504,6 +3824,7 @@ async function importData(tx, data, actingUser) {
 				data: payload
 			});
 			summary.updated.interviews += 1;
+			pushPreviewRow(summary.details, 'interviews', buildImportRow('update', label, 'Updated existing interview matched by record ID.', 'record_id'));
 		} else {
 			await tx.interview.create({
 				data: {
@@ -1512,32 +3833,44 @@ async function importData(tx, data, actingUser) {
 				}
 			});
 			summary.created.interviews += 1;
+			pushPreviewRow(summary.details, 'interviews', buildImportRow('create', label, 'Created interview and linked resolved candidate/job order.'));
 		}
 	}
 
 	for (const row of data.placements) {
+		const label = previewRowLabel('placements', row);
 		const candidateId = resolveTargetIdFromSource({
 			sourceId: row?.candidateId,
+			externalId: row?.candidateExternalId,
 			sourceIdToRecordId: sourceCandidateIdToRecordId,
+			externalIdToRecordId: sourceCandidateExternalIdToRecordId,
 			targetIdBySourceId: candidateIdBySourceId,
+			targetIdByExternalId: candidateIdByExternalId,
 			targetIdByRecordId: candidateIdByRecordId
-		});
+		}) || (toTrimmedString(row?.candidateEmail) ? candidateIdByEmail.get(normalizeLookupKey(row?.candidateEmail)) : null);
 		const jobOrderId = resolveTargetIdFromSource({
 			sourceId: row?.jobOrderId,
+			externalId: row?.jobOrderExternalId,
 			sourceIdToRecordId: sourceJobOrderIdToRecordId,
+			externalIdToRecordId: sourceJobOrderExternalIdToRecordId,
 			targetIdBySourceId: jobOrderIdBySourceId,
+			targetIdByExternalId: jobOrderIdByExternalId,
 			targetIdByRecordId: jobOrderIdByRecordId
-		});
+		}) || (toTrimmedString(row?.jobOrderTitle) ? jobOrderIdByTitle.get(normalizeLookupKey(row?.jobOrderTitle)) : null);
 		if (!candidateId || !jobOrderId) {
 			summary.skipped.placements += 1;
-			pushError('Skipped placement row: related candidate or job order could not be resolved.');
+			pushEntityWarning('placements', `Skipped ${label}: related candidate or job order could not be resolved.`);
+			pushPreviewRow(summary.details, 'placements', buildImportRow('skip', label, 'Related candidate or job order could not be resolved.'));
 			continue;
 		}
 
 		const submissionId = resolveTargetIdFromSource({
 			sourceId: row?.submissionId,
+			externalId: row?.submissionExternalId,
 			sourceIdToRecordId: sourceSubmissionIdToRecordId,
+			externalIdToRecordId: sourceSubmissionExternalIdToRecordId,
 			targetIdBySourceId: submissionIdBySourceId,
+			targetIdByExternalId: submissionIdByExternalId,
 			targetIdByRecordId: submissionIdByRecordId
 		});
 		const recordId = toTrimmedString(row?.recordId) || createRecordId('Offer');
@@ -1573,6 +3906,7 @@ async function importData(tx, data, actingUser) {
 				data: payload
 			});
 			summary.updated.placements += 1;
+			pushPreviewRow(summary.details, 'placements', buildImportRow('update', label, 'Updated existing placement matched by record ID.', 'record_id'));
 		} else {
 			await tx.offer.create({
 				data: {
@@ -1581,6 +3915,151 @@ async function importData(tx, data, actingUser) {
 				}
 			});
 			summary.created.placements += 1;
+			pushPreviewRow(summary.details, 'placements', buildImportRow('create', label, 'Created placement and linked resolved candidate/job order/submission.'));
+		}
+	}
+
+	return summary;
+}
+
+async function importCandidateAttachments(db, candidateAttachments, actingUser, attachmentContext = null) {
+	const summary = {
+		created: 0,
+		skipped: 0,
+		errors: []
+	};
+
+	if (!Array.isArray(candidateAttachments) || candidateAttachments.length <= 0) {
+		return summary;
+	}
+
+	const candidateIdBySourceId = new Map(
+		Object.entries(attachmentContext?.candidateIdBySourceId || {})
+			.map(([key, value]) => [Number(key), Number(value)])
+			.filter(([sourceId, candidateId]) => Number.isInteger(sourceId) && Number.isInteger(candidateId))
+	);
+	const candidateIdByEmail = new Map(
+		Object.entries(attachmentContext?.candidateIdByEmail || {})
+			.map(([key, value]) => [normalizeLookupKey(key), Number(value)])
+			.filter(([emailKey, candidateId]) => Boolean(emailKey) && Number.isInteger(candidateId))
+	);
+
+	const candidateEmails = Array.from(
+		new Set(candidateAttachments.map((item) => normalizeLookupKey(item?.candidateEmail)).filter(Boolean))
+	);
+	const candidates = candidateEmails.length > 0
+		? await db.candidate.findMany({
+			where: {
+				email: {
+					in: candidateAttachments.map((item) => toTrimmedString(item?.candidateEmail)).filter(Boolean)
+				}
+			},
+			select: { id: true, email: true }
+		})
+		: [];
+	for (const candidate of candidates) {
+		const emailKey = normalizeLookupKey(candidate.email);
+		if (emailKey && !candidateIdByEmail.has(emailKey)) {
+			candidateIdByEmail.set(emailKey, candidate.id);
+		}
+	}
+
+	for (const attachment of candidateAttachments) {
+		const sourceCandidateId = toOptionalInt(attachment?.candidateId);
+		const emailKey = normalizeLookupKey(attachment?.candidateEmail);
+		const candidateId =
+			(Number.isInteger(sourceCandidateId) ? candidateIdBySourceId.get(sourceCandidateId) : null)
+			|| (emailKey ? candidateIdByEmail.get(emailKey) : null);
+		if (!candidateId) {
+			summary.skipped += 1;
+			if (summary.errors.length < 200) {
+				summary.errors.push(
+					`Skipped candidate attachment "${attachment?.fileName || 'Unnamed file'}": candidate could not be resolved by Bullhorn candidate ID or email.`
+				);
+			}
+			continue;
+		}
+
+		const fileName = toTrimmedString(attachment?.fileName);
+		if (!fileName || !isAllowedCandidateAttachmentFileName(fileName)) {
+			summary.skipped += 1;
+			continue;
+		}
+		const contentType = toTrimmedString(attachment?.contentType) || 'application/octet-stream';
+		if (!isAllowedCandidateAttachmentContentType(fileName, contentType)) {
+			summary.skipped += 1;
+			continue;
+		}
+
+		const existing = await db.candidateAttachment.findFirst({
+			where: {
+				candidateId,
+				fileName
+			},
+			select: { id: true }
+		});
+		if (existing) {
+			summary.skipped += 1;
+			continue;
+		}
+
+		try {
+			const storageKey = buildCandidateAttachmentStorageKey(candidateId, fileName);
+			const uploaded = await uploadObjectBuffer({
+				key: storageKey,
+				body: attachment.buffer,
+				contentType
+			});
+			const resumeSearchText = attachment.isResume
+				? await deriveResumeSearchTextFromBuffer({
+					buffer: attachment.buffer,
+					fileName,
+					contentType
+				})
+				: '';
+
+			await db.$transaction(async (tx) => {
+				if (attachment.isResume) {
+					await tx.candidateAttachment.updateMany({
+						where: {
+							candidateId,
+							isResume: true
+						},
+						data: { isResume: false }
+					});
+				}
+
+				await tx.candidateAttachment.create({
+					data: {
+						recordId: createRecordId('CandidateAttachment'),
+						candidateId,
+						fileName,
+						isResume: Boolean(attachment.isResume),
+						contentType,
+						sizeBytes: Number(attachment.buffer?.length || 0),
+						storageProvider: uploaded.storageProvider,
+						storageBucket: uploaded.storageBucket,
+						storageKey: uploaded.storageKey,
+						uploadedByUserId: actingUser?.id || null
+					}
+				});
+
+				if (attachment.isResume) {
+					await tx.candidate.update({
+						where: { id: candidateId },
+						data: { resumeSearchText: resumeSearchText || null }
+					});
+				}
+			});
+
+			summary.created += 1;
+		} catch (error) {
+			summary.skipped += 1;
+			if (summary.errors.length < 200) {
+				summary.errors.push(
+					`Skipped candidate attachment "${fileName}": ${error?.message || 'upload failed.'}`
+				);
+			}
 		}
 	}
 
@@ -1597,16 +4076,39 @@ function handleError(error) {
 	return NextResponse.json({ error: 'Failed to import data.' }, { status: 500 });
 }
 
-async function postAdmin_data_importHandler(req) {
-	const actingUser = await getActingUser(req, { allowFallback: false });
+export async function runAdminDataImportWithFormData({ req, actingUser, formData, throttleKey = 'admin.data_import.post' }) {
 	if (actingUser?.role !== 'ADMINISTRATOR') {
 		throw new AccessControlError('Only administrators can import data.', 403);
 	}
 
-	const formData = await req.formData();
 	const mode = parseMode(formData.get('mode'));
 	const file = formData.get('file');
 	const sourceType = parseSourceType(formData.get('sourceType'));
+	const isGenericCsvSource =
+		sourceType === 'generic_csv' ||
+		sourceType === 'generic_csv_manual' ||
+		sourceType === 'generic_csv_zip';
+	const isBullhornBatchSource =
+		sourceType === 'bullhorn_csv_manual' ||
+		sourceType === 'bullhorn_csv_zip';
+	const isZohoBatchSource =
+		sourceType === 'zoho_recruit_manual' ||
+		sourceType === 'zoho_recruit_zip';
+	const genericBatch = isGenericCsvSource && formData.get('genericBatch')
+		? parseGenericBatchManifest(formData.get('genericBatch'))
+		: null;
+	const genericEntity = isGenericCsvSource && !genericBatch
+		? parseGenericEntityProfile(formData.get('genericEntity'))
+		: null;
+	const genericMapping = isGenericCsvSource && !genericBatch
+		? parseGenericMapping(formData.get('genericMapping'))
+		: null;
+	const bullhornBatch = isBullhornBatchSource && formData.get('bullhornBatch')
+		? parseBullhornBatchManifest(formData.get('bullhornBatch'))
+		: null;
+	const zohoBatch = isZohoBatchSource && formData.get('zohoBatch')
+		? parseZohoBatchManifest(formData.get('zohoBatch'))
+		: null;
 	const bullhornEntity = sourceType === 'bullhorn_csv'
 		? parseBullhornEntityProfile(formData.get('bullhornEntity'))
 		: null;
@@ -1614,18 +4116,48 @@ async function postAdmin_data_importHandler(req) {
 		? parseZohoEntityProfile(formData.get('zohoEntity'))
 		: null;
 	let parsedImport;
-	if (sourceType === 'bullhorn_csv') {
+	let candidateAttachments = [];
+	if (isGenericCsvSource) {
+		parsedImport = genericBatch
+			? await parseUploadedGenericCsvEntries(genericBatch, formData)
+			: await parseUploadedGenericCsvEntries(
+				[
+					{
+						id: 'legacy',
+						entity: genericEntity,
+						mapping: genericMapping,
+						fileField: 'file'
+					}
+				],
+				formData
+			);
+	} else if (isBullhornBatchSource) {
+		parsedImport = await parseUploadedBullhornCsvEntries(bullhornBatch, formData);
+		if (sourceType === 'bullhorn_csv_zip') {
+			if (formData.get('bullhornCandidateAttachments')) {
+				candidateAttachments = await parseBullhornCandidateAttachmentsFromFormData(
+					formData.get('bullhornCandidateAttachments'),
+					formData
+				);
+			} else if (formData.get('bullhornZipFile')) {
+				candidateAttachments = await parseBullhornCandidateFilesFromZip(formData.get('bullhornZipFile'));
+			}
+		}
+	} else if (sourceType === 'bullhorn_csv') {
 		parsedImport = await parseUploadedBullhornCsvFile(file, bullhornEntity);
+	} else if (isZohoBatchSource) {
+		parsedImport = await parseUploadedZohoCsvEntries(zohoBatch, formData);
 	} else if (sourceType === 'zoho_recruit_csv') {
 		parsedImport = await parseUploadedZohoCsvFile(file, zohoEntity);
 	} else {
 		parsedImport = await parseUploadedHireGnomeImportFile(file);
 	}
-	const preview = buildPreviewSummary(parsedImport.data);
+	const preview = await buildImportPreview(prisma, parsedImport.data, actingUser);
 	if (mode === 'preview') {
 		return NextResponse.json({
 			mode,
 			sourceType,
+			genericEntity,
 			bullhornEntity,
 			zohoEntity,
 			format: parsedImport.format,
@@ -1633,20 +4165,45 @@ async function postAdmin_data_importHandler(req) {
 		});
 	}
 
-	const mutationThrottleResponse = await enforceMutationThrottle(req, 'admin.data_import.post');
-	if (mutationThrottleResponse) {
-		return mutationThrottleResponse;
+	if (throttleKey) {
+		const mutationThrottleResponse = await enforceMutationThrottle(req, throttleKey);
+		if (mutationThrottleResponse) {
+			return mutationThrottleResponse;
+		}
 	}
 
 	const imported = await prisma.$transaction((tx) => importData(tx, parsedImport.data, actingUser));
+	const attachmentContext = imported?._attachmentContext || null;
+	// Keep response payload clean; this is only needed for same-request attachment resolution.
+	delete imported._attachmentContext;
+	if (candidateAttachments.length > 0) {
+		imported.files = {
+			candidateAttachments: await importCandidateAttachments(prisma, candidateAttachments, actingUser, attachmentContext)
+		};
+		if (Array.isArray(imported.files.candidateAttachments?.errors) && imported.files.candidateAttachments.errors.length > 0) {
+			imported.errors = [...(imported.errors || []), ...imported.files.candidateAttachments.errors];
+		}
+	}
 	return NextResponse.json({
 		mode,
 		sourceType,
+		genericEntity,
 		bullhornEntity,
 		zohoEntity,
 		format: parsedImport.format,
 		preview,
 		result: imported
+	});
+}
+
+async function postAdmin_data_importHandler(req) {
+	const actingUser = await getActingUser(req, { allowFallback: false });
+	const formData = await req.formData();
+	return runAdminDataImportWithFormData({
+		req,
+		actingUser,
+		formData,
+		throttleKey: 'admin.data_import.post'
 	});
 }
 

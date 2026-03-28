@@ -1,0 +1,4 @@
+ID,Record ID,Candidate ID,Candidate Email,Company Name,Title,Location,Start Date,End Date,Is Current,Description
+4301,BH-CandidateWorkExperience-4301,3001,sophia.gray@example.com,Helix BioLabs,Nurse Case Manager,"Austin, TX",2021-02-01,2026-03-01,false,Led care coordination across high-volume patient caseloads.
+4302,BH-CandidateWorkExperience-4302,3002,marcus.reed@example.com,Northline Capital,Senior Data Analyst,"Chicago, IL",2020-01-06,2026-02-28,false,Owned executive reporting and financial analytics dashboards.
+4303,BH-CandidateWorkExperience-4303,3003,amelia.bailey@example.com,BrightPath Telecom,Product Manager,"Chicago, IL",2019-04-01,2026-03-01,false,Managed roadmap delivery and operations-facing product releases.

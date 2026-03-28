@@ -342,6 +342,7 @@ async function postCandidatesHandler(req) {
 
 				await tx.candidateAttachment.create({
 					data: {
+						recordId: createRecordId('CandidateAttachment'),
 						candidateId: createdCandidate.id,
 						fileName: attachmentFileName,
 						isResume: true,

@@ -1,0 +1,4 @@
+ID,Account Name,Industry,Status,Phone,Billing Street,Billing City,Billing State,Billing Code,Website,Description
+5001,Pioneer Clinical Group,Healthcare,Active,(555) 338-4400,900 Market Street,Denver,CO,80202,https://pioneerclinical.example,Regional clinical staffing client
+5002,Atlas Revenue Partners,Financial Services,Active,(555) 338-5500,210 Union Square,Chicago,IL,60605,https://atlasrevenue.example,Revenue operations and finance advisory firm
+5003,North Peak Product Co,Technology,Prospect,(555) 338-6600,77 Summit Avenue,Austin,TX,78701,https://northpeakproduct.example,Product-led SaaS company building workflow tools

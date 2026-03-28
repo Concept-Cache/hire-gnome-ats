@@ -1,0 +1,4 @@
+ID,Candidate ID,Candidate Email,Job Order ID,Job Order Title,Status,Notes,Custom: Recruiter Score [recruiter_score]
+5001,3001,sophia.gray@example.com,4001,Nurse Case Manager,Submitted,Submitted with updated resume and availability.,9
+5002,3002,marcus.reed@example.com,4002,Senior Data Analyst,Submitted,Submitted with strong reporting and finance analytics background.,8
+5003,3003,amelia.bailey@example.com,4003,Product Manager,Client Review,Client asked for a first-round interview.,10

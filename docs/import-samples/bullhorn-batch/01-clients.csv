@@ -1,0 +1,4 @@
+ID,Name,Industry,Status,Phone,Address,City,State,Zip,Website,Description,Custom: Company Tier [company_tier]
+1001,Acme Health Partners,Healthcare,Active,(555) 410-2200,400 Main Street,Dallas,TX,75201,https://acmehealth.example,Regional healthcare network,1
+1002,Northline Financial Group,Financial Services,Active,(555) 410-3300,88 Market Plaza,Chicago,IL,60601,https://northlinefinancial.example,National finance and accounting client,2
+1003,Summit Product Labs,Technology,Prospect,(555) 410-4400,120 Innovation Way,Austin,TX,78701,https://summitproductlabs.example,Product-led software company scaling GTM and product teams,3

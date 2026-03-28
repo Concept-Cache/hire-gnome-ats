@@ -1,0 +1,4 @@
+ID,Record ID,Contact ID,Contact Email,Content,Note Type,Created At,Updated At
+4401,BH-ContactNote-4401,2001,jordan.parker@acmehealth.example,"Shared updated candidate-review turnaround expectations.",comment,2026-03-09T11:20:00Z,2026-03-09T11:20:00Z
+4402,BH-ContactNote-4402,2002,megan.cho@northline.example,"Hiring team wants stronger SQL and dashboard examples in submissions.",comment,2026-03-10T09:10:00Z,2026-03-10T09:10:00Z
+4403,BH-ContactNote-4403,2003,derek.ramos@brightpath.example,"Requested product candidates with stronger analytics communication skills.",comment,2026-03-11T15:05:00Z,2026-03-11T15:05:00Z

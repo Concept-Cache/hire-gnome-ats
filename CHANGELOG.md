@@ -7,6 +7,26 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 #### Changed
 - Candidate detail now includes a timeline-aware `Suggested Next Step` card in the snapshot area, with direct action links for likely recruiter follow-up.
 - Candidate names now display as `Last, First` in candidate-linked table/list views so sorting is more natural across candidates, submissions, interviews, placements, and job-order workspace lists.
+- Added a clean generic CSV migration-batch sample under `docs/import-samples/generic-migration-batch/` for importer testing and demo walkthroughs.
+- Generic CSV migration batches now support ZIP intake in the admin UI so multi-file migrations can be loaded in one upload, and a second messy-source sample set now lives under `docs/import-samples/generic-migration-batch-messy/`.
+- Generic CSV preview now works as a tabbed safety check with per-entity create/update/skip counts and relationship warnings instead of a flat count summary.
+- Bullhorn import/export now preserves Bullhorn custom field definitions and record-level custom field values. Bullhorn API export batches now emit `00-custom-field-definitions.csv`, Bullhorn direct-import consumes that file first, and Bullhorn CSV imports can also create fallback custom field definitions from detected custom columns when no definition file is present.
+- The Bullhorn sample batch now includes custom field definitions plus example custom columns on the entity CSVs, and the downloadable Bullhorn sample ZIP was refreshed to match.
+- Bullhorn export jobs now open the finished ZIP in the normal Bullhorn ZIP import preview flow instead of applying the import immediately, so administrators can review the safety check before import.
+- Bullhorn API credentials can now be saved in admin platform settings and are reused by background Bullhorn export jobs.
+- Bullhorn export jobs can now be cancelled while queued or running, and completed/cancelled/failed jobs can still be deleted after confirmation.
+- Bullhorn exports now let administrators choose whether candidate resumes/files should be included, instead of always pulling them into every job.
+- Bullhorn migration batches now also carry candidate notes, candidate education, candidate work history, contact notes, and structured candidate skills, and the Bullhorn sample ZIP was refreshed to include those metadata CSVs alongside the candidate file manifest.
+- Bullhorn imports now use the same staged batch model as generic CSV, including ZIP/manual intake, per-file entity review, preview safety checks, and dependency-ordered apply so related clients, contacts, candidates, and job orders migrate together.
+- Bullhorn batch imports now also cover submissions, interviews, and placements, and a clean seven-file sample batch lives under `docs/import-samples/bullhorn-batch/`.
+- Bullhorn export/import now also carries candidate attachment files, including resumes, inside the Bullhorn ZIP batch, and the sample Bullhorn ZIP includes a candidate resume/file payload for migration demos.
+- Zoho Recruit imports now use the same staged batch model with ZIP/manual intake, preview safety checks, dependency-ordered apply, support for submissions/interviews/placements, and a clean seven-file sample batch under `docs/import-samples/zoho-recruit-batch/`.
+- Bullhorn and Zoho operations can now be disabled with environment variables, and the admin import/export UI hides those integrations when disabled.
+- Admin import now includes per-source sample download links in the UI, including ZIP-ready sample batches for Generic CSV, Bullhorn, Zoho Recruit, and a sample Hire Gnome export ZIP.
+- Data export now includes a Bullhorn API batch ZIP exporter with created/updated date-range filtering, a per-entity changed-row cap, automatic upstream dependency expansion, background job execution, completion notifications, and direct import from completed export jobs.
+- Bullhorn export jobs no longer duplicate the saved credential fields in the export form and now rely on Platform Settings for those values.
+- Admin settings diagnostics now includes a destructive operational-data purge flow with typed confirmation, so administrators can clear ATS records and migration artifacts while preserving users, divisions, system settings, skills, custom field definitions, and zip codes.
+- Import preview and import results now surface row-level actions plus explicit match reasons, so administrators can see why rows will update or skip before committing a migration.
 
 ## [1.5.1] - 2026-03-17
 
@@ -50,6 +70,7 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Applied the same advanced-search pattern to the contacts list so recruiters can combine structured filters like client, owner, status, note counts, job-order counts, and last-activity dates while keeping the basic search box simple.
 - Applied the same advanced-search pattern to the submissions, interviews, and placements lists so recruiters can build structured list filters there as well, while keeping the basic search box simple.
 - Placement chips now use success-style colors in timelines, dashboard recent activity, and reporting so accepted outcomes no longer read as warning/error states.
+- Added a generic CSV migration-batch import path in `Admin Area > Data Import` with multi-file entity staging, auto-suggested column mapping, template downloads, dependency-ordered apply, and relationship resolution via IDs, external IDs, record IDs, and name/email fallbacks.
 
 ## [1.5.0] - 2026-03-17
 

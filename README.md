@@ -60,13 +60,15 @@ When demo mode is enabled, authenticated demo users see a one-time welcome modal
 - Candidate and job-order match workspaces (top matches, sortable/paged)
 - Administrator-only audit trails on records plus admin diagnostics
 - Admin diagnostics includes recent inbound email webhook visibility
-- Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` output + date-range filtering (includes `customFieldDefinitions`)
+- Admin data export module with `JSON`, `NDJSON`, and `ZIP (per-entity)` Hire Gnome output + a Bullhorn API batch ZIP exporter for bounded migration samples
 - Admin data import module:
 	- Hire Gnome export re-import (`JSON`, `NDJSON`, `ZIP`)
+	- Generic CSV migration batches with per-column field mapping (`Clients`, `Contacts`, `Candidates`, `Job Orders`, `Submissions`, `Interviews`, `Placements`)
 	- Restores `customFieldDefinitions` from Hire Gnome exports before importing dependent records
-	- Bullhorn CSV profile imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
-	- Zoho Recruit CSV profile imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
-	- Built-in CSV template downloads per profile
+	- Bullhorn CSV migration batches (`Custom Fields`, `Clients`, `Contacts`, `Candidates`, `Job Orders`, `Submissions`, `Interviews`, `Placements`)
+	- Zoho Recruit CSV migration batches (`Clients`, `Contacts`, `Candidates`, `Job Orders`, `Submissions`, `Interviews`, `Placements`)
+	- Built-in CSV template downloads per profile plus auto-mapping suggestions for generic CSV headers
+	- Generic CSV, Bullhorn CSV, and Zoho Recruit CSV batches run in dependency order so related records can be linked during migration
 - Global search with cross-entity results
 - In-app notifications, unsaved-change navigation guard, archive/restore flows
 - Per-list column chooser with per-user persisted visibility/order preferences, hidden-by-default optional columns, drag-and-drop ordering, and cross-device continuity
@@ -163,9 +165,11 @@ Use `Admin Area > System Settings` for:
 - Client review portal enabled/disabled
 - Google Maps API key
 - OpenAI API key
+- Bullhorn API credentials for background export jobs
 - SMTP settings
 - Object storage settings (`s3` or local mode)
 - API error log retention days
+- Operational-data purge with typed confirmation in the `Diagnostics` tab
 
 When `DEMO_MODE` is enabled:
 - administrators can still save the full branding card
@@ -185,16 +189,33 @@ Use `Admin Area > Data Export` for:
 - Optional inclusion of audit trail and API error logs
 - Incremental date-range exports using `updatedAt` (fallback `createdAt`)
 - Export payload includes `customFieldDefinitions` so custom schema can be moved across instances
+- Bullhorn API batch ZIP export for custom field definitions, clients, contacts, contact notes, candidates (including structured candidate skills), candidate notes, candidate education, candidate work history, candidate files/resumes, job orders, submissions, interviews, and placements
+- Bullhorn export filters by created/updated date range and expands upstream dependencies so the exported batch stays importable
+- Bullhorn export keeps the run sample-sized with a per-entity changed-row limit before dependency expansion
+- Bullhorn exports now run as background jobs in the admin UI, notify the requesting user when ready, and can be downloaded or opened in the import preview flow from the completed job
+- Saved Bullhorn credentials can be managed in `Admin Area > System Settings > Platform Settings` so administrators do not have to re-enter them for each export
+- Completed, cancelled, or failed Bullhorn export jobs can be deleted from the exports screen after confirmation
 
 Submission workflows include a print-friendly `Submission Packet` from submission detail for internal review or browser PDF export. The packet compiles the recruiter write-up, primary resume link, candidate snapshot, cached match explanation, and recent interview prep/questions.
 
 Use `Admin Area > Data Import` for:
 - Source selection:
 	- Hire Gnome export (`JSON`, `NDJSON`, `ZIP`)
-	- Bullhorn CSV
-	- Zoho Recruit CSV
+	- Generic CSV migration batch with field mapping
+	- Bullhorn CSV migration batch
+	- Zoho Recruit CSV batch
 - Hire Gnome import applies `customFieldDefinitions` first, then entity records
-- Entity profile selection for CSV imports (`Clients`, `Contacts`, `Candidates`, `Job Orders`)
+- Entity profile selection for CSV imports
+- Generic CSV batch upload with per-file entity selection, auto-suggested field matches, and ordered apply
+- Bullhorn batch upload with per-file entity review and ordered apply
+- Bullhorn import/export preserves Bullhorn custom field definitions and record-level custom field values when the source includes them
+- Bullhorn import/export now also carries candidate notes, candidate education, candidate work history, contact notes, and structured candidate skills inside the batch flow
+- Bullhorn export/import now also carries candidate attachment files, including resumes, inside the ZIP batch when Bullhorn exposes downloadable candidate files
+- Zoho Recruit batch upload with per-file entity review and ordered apply
+- Generic CSV preview now acts as a safety check with per-entity create/update/skip counts, relationship warnings, row-level actions, match-reason visibility, and tabbed inspection before apply
+- Every import source type now includes an in-app sample download link, including ZIP-ready sample batches for Generic CSV, Bullhorn, Zoho Recruit, and Hire Gnome export testing
+- `docs/import-samples/bullhorn-batch/` contains a clean Bullhorn-style sample batch with `customFieldDefinitions`, the core entity CSVs, note/education/work-history metadata CSVs, and a candidate resume/file payload for ZIP/manual importer demos
+- `docs/import-samples/zoho-recruit-batch/` contains a clean seven-file Zoho Recruit-style sample batch for ZIP/manual importer demos
 - Import preview before apply
 - Profile template CSV download from the UI
 
@@ -347,6 +368,12 @@ Use `.env` for:
 | `BILLING_STRIPE_PRORATION_BEHAVIOR` | `create_prorations` | Seat-change proration behavior (`create_prorations`, `always_invoice`, `none`). |
 | `BILLING_CURRENCY` | `usd` | Fallback currency display when Stripe pricing data is unavailable. |
 
+#### External ATS Operations
+| Variable | Default | Purpose |
+|---|---|---|
+| `BULLHORN_OPERATIONS_ENABLED` | `true` | Enables Bullhorn import/export operations in both admin UI and APIs. |
+| `ZOHO_RECRUIT_OPERATIONS_ENABLED` | `true` | Enables Zoho Recruit import operations in both admin UI and APIs. |
+
 ### Legacy URL Fallbacks (Optional)
 These are not in `.env.example` and are only used as fallback link sources:
 - `APP_BASE_URL`
@@ -378,6 +405,7 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 | `npm run demo:reset` | Full DB reset + migration + realistic demo reseed |
 | `npm run demo:reset:seed-only` | Reseed demo data without full DB reset |
 | `npm run demo:reset:loop` | Run automatic periodic demo resets |
+| `npm run db:clear:operational` | Clear operational ATS data while preserving users, settings, skills, custom fields, and zip codes |
 | `npm run ci:preflight` | Env/DB/backup-path checks |
 | `npm run ci:build` | Build wrapper for CI |
 | `npm run ci:smoke` | Permission/API smoke checks |
@@ -388,7 +416,7 @@ All Node operational scripts in `scripts/` auto-load `.env` (and `.env.local` if
 - Runbook: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - Health endpoint: `GET /api/health`
 - Admin diagnostics: `Admin Area > System Settings > System Diagnostics`
-- Data export: `Admin Area > Data Export` (or `GET /api/admin/data-export`)
+- Data export: `Admin Area > Data Export` (or `GET /api/admin/data-export` for Hire Gnome snapshots, `POST /api/admin/bullhorn-export-jobs` to queue a Bullhorn export job, `GET /api/admin/bullhorn-export-jobs` to poll job status, `PATCH /api/admin/bullhorn-export-jobs/[recordId]` to cancel a queued/running Bullhorn export job, `DELETE /api/admin/bullhorn-export-jobs/[recordId]` to remove a completed, cancelled, or failed Bullhorn export job)
 - Data import: `Admin Area > Data Import` (or `POST /api/admin/data-import`)
 - Client review portal management: `Job Order Detail > Actions > Client Review Portal`
 
@@ -401,10 +429,19 @@ Data export query options:
 
 Data import form fields:
 - `mode`: `preview` | `apply`
-- `sourceType`: `hire_gnome_export` | `bullhorn_csv` | `zoho_recruit_csv`
+- `sourceType`: `hire_gnome_export` | `generic_csv` | `generic_csv_manual` | `generic_csv_zip` | `bullhorn_csv` | `bullhorn_csv_manual` | `bullhorn_csv_zip` | `zoho_recruit_csv` | `zoho_recruit_manual` | `zoho_recruit_zip`
 - `file`: upload file (`.json`, `.ndjson`, `.zip`, or `.csv` based on source)
-- `bullhornEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=bullhorn_csv`)
-- `zohoEntity`: `clients` | `contacts` | `candidates` | `jobOrders` (required when `sourceType=zoho_recruit_csv`)
+- `genericBatch`: JSON array of CSV-batch entries containing `entity`, `mapping`, and file field keys (preferred when `sourceType=generic_csv`)
+- `genericEntity`: legacy single-file generic entity selector (still accepted when `genericBatch` is not provided)
+- `genericMapping`: legacy single-file generic mapping object (still accepted when `genericBatch` is not provided)
+- `bullhornEntity`: `customFieldDefinitions` | `clients` | `contacts` | `candidates` | `jobOrders` | `submissions` | `interviews` | `placements` (required when `sourceType=bullhorn_csv`)
+- `zohoEntity`: `clients` | `contacts` | `candidates` | `jobOrders` | `submissions` | `interviews` | `placements` (required when `sourceType=zoho_recruit_csv`)
+
+Sample generic migration batch:
+- `docs/import-samples/generic-migration-batch/`
+- Includes a clean seven-file CSV set in dependency order for demos and importer testing.
+- `docs/import-samples/generic-migration-batch-messy/`
+- Includes a second seven-file batch with messier legacy column names for mapping demos.
 
 Kanban status update endpoints:
 - `PATCH /api/candidates/[id]/status` with `{ "status": "...", "reason": "..." }`

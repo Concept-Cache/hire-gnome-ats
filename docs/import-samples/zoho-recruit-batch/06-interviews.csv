@@ -1,0 +1,3 @@
+ID,Candidate ID,Candidate Email,Job Opening ID,Posting Title,Subject,Interview Status,Interview Type,Interviewer,Interviewer Email,Start Time,End Time,Location,Meeting Link
+9101,7002,amelia.bailey@example.com,8003,Senior Product Manager,Product Leadership Interview,Completed,Video,Tara Shah,tara.shah@northpeakproduct.example,2026-03-15T16:00:00Z,2026-03-15T16:45:00Z,Zoom,https://meet.example.com/prod-123
+9102,7001,marcus.reed@example.com,8001,Clinical Recruiter,Recruiter Screen,Scheduled,Phone,Elena Brooks,elena.brooks@pioneerclinical.example,2026-03-10T14:00:00Z,2026-03-10T14:30:00Z,Phone,

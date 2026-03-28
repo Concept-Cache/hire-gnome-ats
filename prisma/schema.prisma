@@ -52,6 +52,10 @@ model SystemSetting {
 	smtpPass          String?  @db.Text
 	smtpFromName      String?
 	smtpFromEmail     String?
+	bullhornUsername  String?
+	bullhornPassword  String?  @db.Text
+	bullhornClientId  String?
+	bullhornClientSecret String? @db.Text
 	objectStorageProvider String? @default("s3")
 	objectStorageRegion String? @default("us-east-1")
 	objectStorageBucket String?
@@ -108,8 +112,34 @@ model User {
 	notifications  AppNotification[]
 	archivedEntities ArchivedEntity[] @relation("ArchivedEntityByUser")
 	billingSeatSyncEvents BillingSeatSyncEvent[] @relation("BillingSeatSyncTriggeredBy")
+	bullhornExportJobs   BullhornExportJob[] @relation("BullhornExportRequestedBy")
 
 	@@index([divisionId])
+}
+
+model BullhornExportJob {
+	id                Int      @id @default(autoincrement())
+	recordId          String   @unique
+	requestedByUserId Int
+	status            String   @default("queued")
+	dateFrom          DateTime
+	dateTo            DateTime
+	sampleLimit       Int      @default(10)
+	includeFiles      Boolean  @default(false)
+	fileName          String?
+	filePath          String?
+	rowCounts         Json?
+	importResult      Json?
+	errorMessage      String?  @db.Text
+	startedAt         DateTime?
+	completedAt       DateTime?
+	importedAt        DateTime?
+	createdAt         DateTime @default(now())
+	updatedAt         DateTime @updatedAt
+	requestedByUser   User     @relation("BullhornExportRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+
+	@@index([requestedByUserId, createdAt])
+	@@index([status, createdAt])
 }
 
 model BillingSeatSyncEvent {

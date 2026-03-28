@@ -77,7 +77,7 @@ export default function AdminPage() {
 				<header className="module-header">
 					<div>
 						<h2>Admin Area</h2>
-						<p>Manage system configuration and internal access settings.</p>
+						<p>System setup, migration, access, and admin operations.</p>
 					</div>
 				</header>
 
@@ -85,7 +85,7 @@ export default function AdminPage() {
 					<article className="panel panel-spacious">
 						<div className="admin-card-section-head">
 							<h3>Platform Controls</h3>
-							<p>Core configuration, billing, and export tools.</p>
+							<p>Settings, imports, exports, and billing.</p>
 						</div>
 						<div className="metric-grid admin-metric-grid">
 							{renderAdminCard({
@@ -96,12 +96,12 @@ export default function AdminPage() {
 							{renderAdminCard({
 								href: '/admin/imports',
 								label: 'Data Import',
-								value: 'Preview + Apply'
+								value: 'Migration Console'
 							})}
 							{renderAdminCard({
 								href: '/admin/exports',
 								label: 'Data Export',
-								value: 'JSON / NDJSON / ZIP'
+								value: 'Export Center'
 							})}
 							{billingEnabled
 								? renderAdminCard({
@@ -116,7 +116,7 @@ export default function AdminPage() {
 					<article className="panel panel-spacious">
 						<div className="admin-card-section-head">
 							<h3>Access & Taxonomy</h3>
-							<p>Users, organizational structure, and skill catalog management.</p>
+							<p>Users, divisions, skills, and custom fields.</p>
 						</div>
 						<div className="metric-grid admin-metric-grid">
 							{renderAdminCard({
@@ -145,7 +145,7 @@ export default function AdminPage() {
 					<article className="panel panel-spacious">
 						<div className="admin-card-section-head">
 							<h3>Monitoring</h3>
-							<p>Operational visibility for API and runtime failures.</p>
+							<p>API, integration, and runtime errors.</p>
 						</div>
 						<div className="metric-grid admin-metric-grid">
 							{renderAdminCard({

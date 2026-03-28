@@ -1,0 +1,14 @@
+{
+  "version": "2026-03-09",
+  "format": "json_per_entity",
+  "entityOrder": [
+    "customFieldDefinitions",
+    "clients",
+    "contacts",
+    "candidates",
+    "jobOrders",
+    "submissions",
+    "interviews",
+    "placements"
+  ]
+}

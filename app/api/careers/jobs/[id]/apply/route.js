@@ -20,6 +20,7 @@ import {
 import { withInferredCityStateFromZip } from '@/lib/zip-code-lookup';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { createNotification } from '@/lib/notifications';
+import { createRecordId } from '@/lib/record-id';
 import { getPublicAppBaseUrl } from '@/lib/site-url';
 import {
 	CAREERS_APPLY_RATE_LIMIT_MAX_REQUESTS,
@@ -561,6 +562,7 @@ async function postCareerSiteApplication(req, { params }) {
 
 			resumeAttachment = await prisma.candidateAttachment.create({
 				data: {
+					recordId: createRecordId('CandidateAttachment'),
 					candidateId: candidate.id,
 					fileName: resumeFile.name,
 					isResume: true,

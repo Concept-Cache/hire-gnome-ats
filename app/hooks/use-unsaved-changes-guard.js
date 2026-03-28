@@ -71,6 +71,7 @@ export default function useUnsavedChangesGuard(currentValue, options = {}) {
 		if (typeof window === 'undefined') return undefined;
 
 		const onBeforeUnload = (event) => {
+			if (allowNextNavigationRef.current) return;
 			if (!enabled || !isDirty) return;
 			event.preventDefault();
 			event.returnValue = '';

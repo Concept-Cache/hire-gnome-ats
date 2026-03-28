@@ -1,0 +1,29 @@
+{
+  "exportVersion": "2026-03-09",
+  "exportedAt": "2026-03-26T12:00:00.000Z",
+  "exportedBy": {
+    "userId": 1,
+    "userRecordId": "USR-SAMPLE",
+    "email": "admin@sample.import",
+    "role": "ADMINISTRATOR"
+  },
+  "options": {
+    "format": "zip",
+    "includeAuditLogs": false,
+    "includeApiErrorLogs": false,
+    "dateRange": {
+      "from": null,
+      "to": null
+    }
+  },
+  "entityCounts": {
+    "customFieldDefinitions": 0,
+    "clients": 3,
+    "contacts": 4,
+    "candidates": 4,
+    "jobOrders": 3,
+    "submissions": 4,
+    "interviews": 3,
+    "placements": 1
+  }
+}

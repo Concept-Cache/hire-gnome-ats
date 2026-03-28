@@ -198,7 +198,7 @@ export function ConfirmDialogProvider({ children }) {
 				confirmLabel: String(options.confirmLabel || 'Save'),
 				cancelLabel: String(options.cancelLabel || 'Cancel'),
 				required: Boolean(options.required),
-				isDanger: false,
+				isDanger: Boolean(options.isDanger || options.destructive),
 				inputLabel: String(options.inputLabel || ''),
 				inputValue: initialValue,
 				initialValue,

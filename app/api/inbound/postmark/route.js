@@ -19,6 +19,7 @@ import {
 	buildCandidateInboundAttachmentStorageKey,
 	uploadObjectBuffer
 } from '@/lib/object-storage';
+import { createRecordId } from '@/lib/record-id';
 
 import { withApiLogging } from '@/lib/api-logging';
 
@@ -225,6 +226,7 @@ async function maybeSaveCandidateAttachment(candidateId, messageId, attachment, 
 	});
 	const saved = await prisma.candidateAttachment.create({
 		data: {
+			recordId: createRecordId('CandidateAttachment'),
 			candidateId,
 			fileName,
 			isResume: false,

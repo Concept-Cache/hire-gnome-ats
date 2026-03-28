@@ -12,6 +12,7 @@ import {
 import { deriveResumeSearchTextFromBuffer } from '@/lib/candidate-resume-search';
 import { AccessControlError, ensureScopedEntityAccess, getActingUser } from '@/lib/access-control';
 import { logCreate } from '@/lib/audit-log';
+import { createRecordId } from '@/lib/record-id';
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 
@@ -140,6 +141,7 @@ async function postCandidates_id_filesHandler(req, { params }) {
 
 			return tx.candidateAttachment.create({
 				data: {
+					recordId: createRecordId('CandidateAttachment'),
 					candidateId,
 					fileName: file.name,
 					isResume,

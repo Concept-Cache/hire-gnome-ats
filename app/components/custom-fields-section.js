@@ -55,11 +55,40 @@ function toDateInputValue(value) {
 
 function normalizeDefinitions(rows) {
 	if (!Array.isArray(rows)) return [];
-	return rows.map((row) => ({
+	const normalized = rows.map((row, index) => ({
 		...row,
 		fieldType: normalizeFieldType(row.fieldType),
-		selectOptions: normalizeSelectOptions(row.selectOptions)
+		selectOptions: normalizeSelectOptions(row.selectOptions),
+		__originalIndex: index
 	}));
+
+	normalized.sort((a, b) => {
+		const aPriority = a.fieldType === 'textarea' ? 1 : 0;
+		const bPriority = b.fieldType === 'textarea' ? 1 : 0;
+		if (aPriority !== bPriority) {
+			return aPriority - bPriority;
+		}
+		return a.__originalIndex - b.__originalIndex;
+	});
+
+	return normalized.map(({ __originalIndex, ...row }) => row);
+}
+
+function formatHintText(value) {
+	const helpText = String(value || '').trim();
+	if (!helpText) return '';
+
+	const bullhornMatch = helpText.match(/^Bullhorn field\s+(.+)$/i);
+	if (!bullhornMatch) {
+		return helpText;
+	}
+
+	const sourceValue = String(bullhornMatch[1] || '').trim();
+	if (!sourceValue) {
+		return 'Mapped from Bullhorn';
+	}
+
+	return `Mapped from ${sourceValue}`;
 }
 
 export function areRequiredCustomFieldsComplete(definitions, values) {
@@ -181,18 +210,21 @@ export default function CustomFieldsSection({
 	}
 
 	return (
-		<section className="form-section">
+		<section className="form-section custom-fields-section">
 			<h4>{title}</h4>
 			{description ? <p className="panel-subtext">{description}</p> : null}
 			<div className="form-grid-2">
 				{definitions.map((definition) => {
 					const value = fieldValues[definition.fieldKey];
 					const placeholder = String(definition.placeholder || '').trim();
-					const helpText = String(definition.helpText || '').trim();
+					const helpText = formatHintText(definition.helpText);
+					const fieldClassName =
+						definition.fieldType === 'textarea' ? 'custom-fields-item custom-fields-item-full' : 'custom-fields-item';
 
 					return (
 						<FormField
 							key={definition.id || definition.fieldKey}
+							className={fieldClassName}
 							label={definition.label || definition.fieldKey}
 							required={Boolean(definition.isRequired)}
 							hint={helpText}
