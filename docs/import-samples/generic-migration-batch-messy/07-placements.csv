@@ -1,0 +1,2 @@
+OfferID,LegacyID,CandidateExternalID,CandidateEmail,JobExternalID,JobTitle,SubmissionExternalID,Status,Type,RateType,Currency,OfferDate,StartDate,EndDate,Notes,Salary
+9401,plc-julia-revops,cnd-julia-miles,julia.miles@example.com,job-revenue-ops-manager,Revenue Operations Manager,sub-julia-revops,accepted,perm,salary,USD,2026-03-28,2026-04-21,,Accepted direct-hire placement for the revenue operations leadership opening.,142000

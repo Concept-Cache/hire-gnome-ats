@@ -1,0 +1,4 @@
+SubmissionID,LegacyID,CandidateExternalID,CandidateEmail,JobExternalID,JobTitle,Status,SubmissionNotes
+9601,sub-julia-revops,cnd-julia-miles,julia.miles@example.com,job-revenue-ops-manager,Revenue Operations Manager,submitted,Strong analytical operator with reporting and stakeholder management depth.
+9602,sub-marcus-care-mgr,cnd-marcus-cole,marcus.cole@example.com,job-care-manager,Care Management Recruiter,interview,Healthcare recruiter with direct clinical hiring experience.
+9603,sub-priya-product,cnd-priya-shah,priya.shah@example.com,job-group-product-manager,Group Product Manager,submitted,Senior product candidate with roadmap and cross-functional execution strength.

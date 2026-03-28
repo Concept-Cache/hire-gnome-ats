@@ -1,0 +1,2 @@
+ID,Candidate ID,Candidate Email,Job Order ID,Job Order Title,Submission ID,Status,Placement Type,Compensation Type,Currency,Offered On,Expected Join Date,End Date,Notes,Hourly RT Pay Rate,Hourly RT Bill Rate,Hourly OT Pay Rate,Hourly OT Bill Rate,Custom: OT 12Hr [ot_12hr]
+7001,3001,sophia.gray@example.com,4001,Nurse Case Manager,5001,Accepted,Temp,Hourly,USD,2026-03-11,2026-03-18,2026-09-18,Accepted temp placement.,50,100,75,150,165

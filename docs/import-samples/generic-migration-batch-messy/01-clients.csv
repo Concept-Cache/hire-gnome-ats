@@ -1,0 +1,4 @@
+Company ID,Legacy ID,Company,Industry,Client Status,Main Phone,Billing Street,Billing City,Billing State,Billing Code,URL,Notes
+9001,acct-northstar,Northstar Talent Advisory,Professional Services,Active + Verified,(555) 610-2200,210 Wacker Drive,Chicago,IL,60606,https://northstar.example,Legacy advisory account from spreadsheet export.
+9002,acct-cedar,The Cedar Clinic Group,Healthcare,Active,(555) 610-3300,700 West End Ave,Nashville,TN,37205,https://cedarclinic.example,Clinical services group hiring care management leaders.
+9003,acct-summit,Summit Product Studio,Technology,Prospect,(555) 610-4400,301 Congress Ave,Austin,TX,78701,https://summitstudio.example,Product and design consultancy with new SaaS hiring.

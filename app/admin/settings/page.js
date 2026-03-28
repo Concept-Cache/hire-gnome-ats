@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminGate from '@/app/components/admin-gate';
+import { useConfirmDialog } from '@/app/components/confirm-dialog';
 import FormField from '@/app/components/form-field';
 import LoadingIndicator from '@/app/components/loading-indicator';
 import { useToast } from '@/app/components/toast-provider';
@@ -34,7 +35,11 @@ const initialForm = {
 	smtpUser: '',
 	smtpPass: '',
 	smtpFromName: '',
-	smtpFromEmail: ''
+	smtpFromEmail: '',
+	bullhornUsername: '',
+	bullhornPassword: '',
+	bullhornClientId: '',
+	bullhornClientSecret: ''
 };
 
 function toDiagnosticsStatusLabel(status) {
@@ -63,6 +68,7 @@ function toInboundEventStatusClassName(status) {
 
 export default function AdminSettingsPage() {
 	const toast = useToast();
+	const { requestPrompt } = useConfirmDialog();
 	const [activeTab, setActiveTab] = useState('branding');
 	const [loading, setLoading] = useState(true);
 	const [brandingSaving, setBrandingSaving] = useState(false);
@@ -91,6 +97,7 @@ export default function AdminSettingsPage() {
 	});
 	const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);
 	const [sendingTestEmail, setSendingTestEmail] = useState(false);
+	const [purgingData, setPurgingData] = useState(false);
 
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
@@ -208,6 +215,10 @@ export default function AdminSettingsPage() {
 			|| String(form.smtpPass || '') !== String(savedForm.smtpPass || '')
 			|| String(form.smtpFromName || '') !== String(savedForm.smtpFromName || '')
 			|| String(form.smtpFromEmail || '') !== String(savedForm.smtpFromEmail || '')
+			|| String(form.bullhornUsername || '') !== String(savedForm.bullhornUsername || '')
+			|| String(form.bullhornPassword || '') !== String(savedForm.bullhornPassword || '')
+			|| String(form.bullhornClientId || '') !== String(savedForm.bullhornClientId || '')
+			|| String(form.bullhornClientSecret || '') !== String(savedForm.bullhornClientSecret || '')
 			|| String(form.objectStorageProvider || '') !== String(savedForm.objectStorageProvider || '')
 			|| String(form.objectStorageRegion || '') !== String(savedForm.objectStorageRegion || '')
 			|| String(form.objectStorageBucket || '') !== String(savedForm.objectStorageBucket || '')
@@ -233,6 +244,10 @@ export default function AdminSettingsPage() {
 			form.smtpPort,
 			form.smtpSecure,
 			form.smtpUser,
+			form.bullhornUsername,
+			form.bullhornPassword,
+			form.bullhornClientId,
+			form.bullhornClientSecret,
 			savedForm.apiErrorLogRetentionDays,
 			savedForm.googleMapsApiKey,
 			savedForm.objectStorageAccessKeyId,
@@ -249,7 +264,11 @@ export default function AdminSettingsPage() {
 			savedForm.smtpPass,
 			savedForm.smtpPort,
 			savedForm.smtpSecure,
-			savedForm.smtpUser
+			savedForm.smtpUser,
+			savedForm.bullhornUsername,
+			savedForm.bullhornPassword,
+			savedForm.bullhornClientId,
+			savedForm.bullhornClientSecret
 		]
 	);
 	const canSaveBranding = Boolean(form.siteName.trim()) && !loading && !brandingSaving;
@@ -294,7 +313,11 @@ export default function AdminSettingsPage() {
 			smtpUser: data.smtpUser ?? fallback.smtpUser ?? '',
 			smtpPass: data.smtpPass ?? fallback.smtpPass ?? '',
 			smtpFromName: data.smtpFromName ?? fallback.smtpFromName ?? data.siteName ?? fallback.siteName ?? '',
-			smtpFromEmail: data.smtpFromEmail ?? fallback.smtpFromEmail ?? ''
+			smtpFromEmail: data.smtpFromEmail ?? fallback.smtpFromEmail ?? '',
+			bullhornUsername: data.bullhornUsername ?? fallback.bullhornUsername ?? '',
+			bullhornPassword: data.bullhornPassword ?? fallback.bullhornPassword ?? '',
+			bullhornClientId: data.bullhornClientId ?? fallback.bullhornClientId ?? '',
+			bullhornClientSecret: data.bullhornClientSecret ?? fallback.bullhornClientSecret ?? ''
 		};
 	}
 
@@ -383,6 +406,10 @@ export default function AdminSettingsPage() {
 		payload.set('smtpPass', form.smtpPass);
 		payload.set('smtpFromName', form.smtpFromName);
 		payload.set('smtpFromEmail', form.smtpFromEmail);
+		payload.set('bullhornUsername', form.bullhornUsername);
+		payload.set('bullhornPassword', form.bullhornPassword);
+		payload.set('bullhornClientId', form.bullhornClientId);
+		payload.set('bullhornClientSecret', form.bullhornClientSecret);
 
 		const res = await fetch('/api/system-settings', {
 			method: 'PATCH',
@@ -516,6 +543,72 @@ export default function AdminSettingsPage() {
 			toast.error(error?.message || 'Failed to export diagnostics report.');
 		} finally {
 			setDiagnosticsExporting(false);
+		}
+	}
+
+	async function onPurgeOperationalData() {
+		if (purgingData) return;
+
+		let challenge;
+		try {
+			const res = await fetch('/api/admin/purge-data', { cache: 'no-store' });
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				toast.error(data.error || 'Failed to generate purge confirmation.');
+				return;
+			}
+			challenge = data;
+		} catch {
+			toast.error('Failed to generate purge confirmation.');
+			return;
+		}
+
+		const confirmation = await requestPrompt({
+			title: 'Purge Operational Data',
+			message: String(challenge.description || '').trim() || 'This permanently deletes operational ATS data while preserving users and core configuration.',
+			inputLabel: `Type ${challenge.word} to continue`,
+			confirmLabel: 'Purge Data',
+			cancelLabel: 'Keep Data',
+			required: true,
+			isDanger: true
+		});
+		if (!confirmation) return;
+
+		if (String(confirmation).trim().toUpperCase() !== String(challenge.word || '').trim().toUpperCase()) {
+			toast.error('The confirmation word did not match. No data was purged.');
+			return;
+		}
+
+		setPurgingData(true);
+		try {
+			const res = await fetch('/api/admin/purge-data', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					word: challenge.word,
+					token: challenge.token,
+					confirmation
+				})
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				toast.error(data.error || 'Failed to purge operational data.');
+				return;
+			}
+			const totalPurged = Array.isArray(data.summary)
+				? data.summary.reduce((sum, item) => sum + Number(item?.count || 0), 0)
+				: 0;
+			toast.success(`Purged ${totalPurged} operational records.`);
+			setDiagnosticsState((current) => ({
+				...current,
+				loaded: false,
+				result: null,
+				error: ''
+			}));
+		} catch {
+			toast.error('Failed to purge operational data.');
+		} finally {
+			setPurgingData(false);
 		}
 	}
 
@@ -837,6 +930,57 @@ export default function AdminSettingsPage() {
 							</section>
 
 							<section className="form-section">
+								<h4>Bullhorn Export</h4>
+								<p className="panel-subtext">
+									Store Bullhorn API credentials here so administrators can run background exports without re-entering them each time.
+								</p>
+								<div className="form-grid-2">
+									<FormField label="Username">
+										<input
+											value={form.bullhornUsername}
+											onChange={(event) =>
+												setForm((current) => ({ ...current, bullhornUsername: event.target.value }))
+											}
+											disabled={demoMode}
+										/>
+									</FormField>
+									<FormField label="Password">
+										<input
+											type="password"
+											autoComplete="new-password"
+											value={form.bullhornPassword}
+											onChange={(event) =>
+												setForm((current) => ({ ...current, bullhornPassword: event.target.value }))
+											}
+											disabled={demoMode}
+										/>
+									</FormField>
+								</div>
+								<div className="form-grid-2">
+									<FormField label="Client ID">
+										<input
+											value={form.bullhornClientId}
+											onChange={(event) =>
+												setForm((current) => ({ ...current, bullhornClientId: event.target.value }))
+											}
+											disabled={demoMode}
+										/>
+									</FormField>
+									<FormField label="Client Secret">
+										<input
+											type="password"
+											autoComplete="new-password"
+											value={form.bullhornClientSecret}
+											onChange={(event) =>
+												setForm((current) => ({ ...current, bullhornClientSecret: event.target.value }))
+											}
+											disabled={demoMode}
+										/>
+									</FormField>
+								</div>
+							</section>
+
+							<section className="form-section">
 								<h4>Object Storage</h4>
 								<div className="form-grid-2">
 									<FormField label="Provider">
@@ -1033,6 +1177,26 @@ export default function AdminSettingsPage() {
 											)}
 									</div>
 								) : null}
+								<hr />
+								<div className="settings-diagnostics-danger">
+									<h5>Purge Operational Data</h5>
+									<p className="panel-subtext">
+										Delete operational ATS records and migration artifacts while preserving users, divisions, system settings, skills, custom field definitions, and zip codes.
+									</p>
+									<p className="panel-subtext error">
+										This action is destructive and cannot be undone. You will have to type a confirmation word before the purge runs.
+									</p>
+									<div className="form-actions">
+										<button
+											type="button"
+											className="btn-danger"
+											onClick={onPurgeOperationalData}
+											disabled={purgingData}
+										>
+											{purgingData ? 'Purging Data...' : 'Purge Data'}
+										</button>
+									</div>
+								</div>
 							</section>
 						</article>
 						) : null}

@@ -1,0 +1,2 @@
+Candidate ID,Candidate Email,Candidate First Name,Candidate Last Name,Attachment ID,File Name,Content Type,Description,Is Resume,ZIP Path
+3001,sophia.gray@example.com,Sophia,Gray,90001,sophia-gray-resume.txt,text/plain,Primary resume,true,files/candidates/3001/90001-sophia-gray-resume.txt

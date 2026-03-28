@@ -1,0 +1,4 @@
+ID,Record ID,Candidate ID,Candidate Email,Content,Note Type,Created At,Updated At
+4101,BH-CandidateNote-4101,3001,sophia.gray@example.com,"Candidate confirmed she can interview any morning next week.",comment,2026-03-10T14:30:00Z,2026-03-10T14:30:00Z
+4102,BH-CandidateNote-4102,3002,marcus.reed@example.com,"Requested updated portfolio examples before client submission.",comment,2026-03-11T16:45:00Z,2026-03-11T16:45:00Z
+4103,BH-CandidateNote-4103,3003,amelia.bailey@example.com,"Highlighted analytics-heavy product leadership background for hiring team.",comment,2026-03-12T13:15:00Z,2026-03-12T13:15:00Z

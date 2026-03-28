@@ -28,6 +28,7 @@
 		"db:backup": "node scripts/db-backup.js --output .backups",
 		"db:backup:scheduled": "node scripts/db-backup-scheduled.js --output .backups",
 		"db:restore": "node scripts/db-restore.js",
+		"db:clear:operational": "node scripts/clear-operational-data-preserve-users.js",
 		"demo:seed": "node scripts/seed-dummy-data.js",
 		"demo:reset": "node scripts/demo-reset.js --mode=full --preserve-settings=true",
 		"demo:reset:seed-only": "node scripts/demo-reset.js --mode=seed --preserve-settings=true",

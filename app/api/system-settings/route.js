@@ -141,6 +141,18 @@ async function parseBody(req) {
 			smtpFromEmail: formData.has('smtpFromEmail')
 				? asTrimmedString(formData.get('smtpFromEmail'))
 				: undefined,
+			bullhornUsername: formData.has('bullhornUsername')
+				? asTrimmedString(formData.get('bullhornUsername'))
+				: undefined,
+			bullhornPassword: formData.has('bullhornPassword')
+				? asTrimmedString(formData.get('bullhornPassword'))
+				: undefined,
+			bullhornClientId: formData.has('bullhornClientId')
+				? asTrimmedString(formData.get('bullhornClientId'))
+				: undefined,
+			bullhornClientSecret: formData.has('bullhornClientSecret')
+				? asTrimmedString(formData.get('bullhornClientSecret'))
+				: undefined,
 			objectStorageProvider: formData.has('objectStorageProvider')
 				? asTrimmedString(formData.get('objectStorageProvider'))
 				: undefined,
@@ -181,6 +193,10 @@ async function parseBody(req) {
 				smtpPass: formData.has('smtpPass'),
 				smtpFromName: formData.has('smtpFromName'),
 				smtpFromEmail: formData.has('smtpFromEmail'),
+				bullhornUsername: formData.has('bullhornUsername'),
+				bullhornPassword: formData.has('bullhornPassword'),
+				bullhornClientId: formData.has('bullhornClientId'),
+				bullhornClientSecret: formData.has('bullhornClientSecret'),
 				objectStorageProvider: formData.has('objectStorageProvider'),
 				objectStorageRegion: formData.has('objectStorageRegion'),
 				objectStorageBucket: formData.has('objectStorageBucket'),
@@ -230,6 +246,18 @@ async function parseBody(req) {
 		smtpFromEmail: hasOwnProperty(body, 'smtpFromEmail')
 			? asTrimmedString(body?.smtpFromEmail)
 			: undefined,
+		bullhornUsername: hasOwnProperty(body, 'bullhornUsername')
+			? asTrimmedString(body?.bullhornUsername)
+			: undefined,
+		bullhornPassword: hasOwnProperty(body, 'bullhornPassword')
+			? asTrimmedString(body?.bullhornPassword)
+			: undefined,
+		bullhornClientId: hasOwnProperty(body, 'bullhornClientId')
+			? asTrimmedString(body?.bullhornClientId)
+			: undefined,
+		bullhornClientSecret: hasOwnProperty(body, 'bullhornClientSecret')
+			? asTrimmedString(body?.bullhornClientSecret)
+			: undefined,
 		objectStorageProvider: hasOwnProperty(body, 'objectStorageProvider')
 			? asTrimmedString(body?.objectStorageProvider)
 			: undefined,
@@ -270,6 +298,10 @@ async function parseBody(req) {
 			smtpPass: hasOwnProperty(body, 'smtpPass'),
 			smtpFromName: hasOwnProperty(body, 'smtpFromName'),
 			smtpFromEmail: hasOwnProperty(body, 'smtpFromEmail'),
+			bullhornUsername: hasOwnProperty(body, 'bullhornUsername'),
+			bullhornPassword: hasOwnProperty(body, 'bullhornPassword'),
+			bullhornClientId: hasOwnProperty(body, 'bullhornClientId'),
+			bullhornClientSecret: hasOwnProperty(body, 'bullhornClientSecret'),
 			objectStorageProvider: hasOwnProperty(body, 'objectStorageProvider'),
 			objectStorageRegion: hasOwnProperty(body, 'objectStorageRegion'),
 			objectStorageBucket: hasOwnProperty(body, 'objectStorageBucket'),
@@ -590,6 +622,18 @@ async function patchSystem_settingsHandler(req) {
 		smtpFromEmail: input.smtpFromEmail === undefined
 			? existing?.smtpFromEmail || null
 			: input.smtpFromEmail || null,
+		bullhornUsername: input.bullhornUsername === undefined
+			? existing?.bullhornUsername || null
+			: input.bullhornUsername || null,
+		bullhornPassword: input.bullhornPassword === undefined
+			? existing?.bullhornPassword || null
+			: input.bullhornPassword || null,
+		bullhornClientId: input.bullhornClientId === undefined
+			? existing?.bullhornClientId || null
+			: input.bullhornClientId || null,
+		bullhornClientSecret: input.bullhornClientSecret === undefined
+			? existing?.bullhornClientSecret || null
+			: input.bullhornClientSecret || null,
 		objectStorageProvider:
 			input.objectStorageProvider === undefined
 				? existing?.objectStorageProvider || 's3'

@@ -1,0 +1,4 @@
+Source ID,External ID,Candidate External ID,Candidate Email,Job Order External ID,Job Order Title,Subject,Status,Interview Mode,Interviewer,Interviewer Email,Starts At,Ends At,Location,Video Link
+6101,int-amelia-phone,cand-amelia-bailey,amelia.bailey@example.com,job-senior-data-analyst,Senior Data Analyst,Initial screening,scheduled,phone,Megan Holt,megan.holt@northpeak.example,2026-03-30T15:00:00Z,2026-03-30T15:30:00Z,Phone,
+6102,int-noah-panel,cand-noah-bennett,noah.bennett@example.com,job-clinical-recruiter,Clinical Recruiter,Final panel,scheduled,video,Kevin Sullivan,kevin.sullivan@riverstone.example,2026-03-31T18:00:00Z,2026-03-31T18:45:00Z,Video,https://meet.example.com/riverstone-final-panel
+6103,int-sophia-onsite,cand-sophia-klein,sophia.klein@example.com,job-product-manager,Senior Product Manager,Product leadership onsite,scheduled,formal,Avery Cole,avery.cole@helio.example,2026-04-02T16:00:00Z,2026-04-02T17:00:00Z,Austin HQ,

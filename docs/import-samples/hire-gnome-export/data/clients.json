@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1101,
+    "externalId": "client-north-peak",
+    "recordId": "Client-NORTHPEAK",
+    "name": "North Peak Advisory",
+    "industry": "Professional Services",
+    "status": "Active",
+    "phone": "(555) 410-2200",
+    "address": "1200 Market Street",
+    "city": "Chicago",
+    "state": "IL",
+    "zipCode": "60601",
+    "website": "https://northpeak.example",
+    "description": "Regional advisory firm expanding finance and analytics teams."
+  },
+  {
+    "id": 1102,
+    "externalId": "client-riverstone",
+    "recordId": "Client-RIVERSTONE",
+    "name": "Riverstone Health Group",
+    "industry": "Healthcare",
+    "status": "Active",
+    "phone": "(555) 410-3300",
+    "address": "88 Lakeview Plaza",
+    "city": "Nashville",
+    "state": "TN",
+    "zipCode": "37203",
+    "website": "https://riverstone.example",
+    "description": "Multi-site healthcare operator hiring clinical and operational talent."
+  },
+  {
+    "id": 1103,
+    "externalId": "client-helio",
+    "recordId": "Client-HELIO",
+    "name": "Helio Commerce Labs",
+    "industry": "Technology",
+    "status": "Prospect",
+    "phone": "(555) 410-4400",
+    "address": "540 Mission Street",
+    "city": "Austin",
+    "state": "TX",
+    "zipCode": "78701",
+    "website": "https://helio.example",
+    "description": "Commerce technology company building out product and platform hiring."
+  }
+]

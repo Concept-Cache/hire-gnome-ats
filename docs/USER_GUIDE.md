@@ -22,6 +22,7 @@ Use this sequence as your default process:
 - Full access across all divisions.
 - Can manage users, divisions, system settings, billing, and diagnostics.
 - Diagnostics also surfaces recent inbound email webhook events for troubleshooting.
+- Administrators can purge operational ATS data from `Admin Area > System Settings > Diagnostics`, with a typed confirmation word required before the purge runs.
 - Can reassign owners and divisions.
 
 ### Director
@@ -54,6 +55,23 @@ Use this sequence as your default process:
 - Detail pages: snapshot at top, editable form, workspace tabs for related records.
 - Candidate, job order, and submission detail pages now include a unified `Timeline` inside the workspace, so recent recruiting activity is visible without opening multiple screens.
 - Actions menu (`...`): context actions like archive, close, cancel, convert, and administrator-only audit access where supported.
+- `Admin Area > Data Import` now supports generic CSV, Bullhorn, and Zoho Recruit migration batches, so messy spreadsheet exports and ATS CSV exports can be staged, previewed, and applied in the correct relationship order.
+- Bullhorn migration batches now preserve `customFieldDefinitions` and record-level custom field values when the source includes them.
+- Bullhorn migration batches now also preserve candidate notes, candidate education, candidate work history, contact notes, and structured candidate skills when Bullhorn exposes them.
+- Bullhorn ZIP batches can also carry candidate attachment files, including resumes, so candidate documents can migrate with the record data instead of being rebuilt manually.
+- `Admin Area > Data Export` now also includes a Bullhorn API exporter that runs in the background, generates an import-ready Bullhorn batch ZIP from a bounded created/updated date range, and lets administrators download the finished batch or open it directly in the import preview flow from the completed job.
+- Administrators can save Bullhorn API credentials in `Admin Area > System Settings > Platform Settings` so background exports do not require re-entering credentials each time, and each export can optionally include candidate resumes/files.
+- Bullhorn background exports can be cancelled while queued or running.
+- Each import source type now includes a direct sample download in the UI so you can test the flow without building your own files first.
+- A clean demo/test batch lives in `docs/import-samples/generic-migration-batch/` if you want a ready-made set of CSV files for the generic import flow.
+- A second sample set lives in `docs/import-samples/generic-migration-batch-messy/` if you want to demo mapping with more realistic legacy column names.
+- A clean Bullhorn-style sample batch lives in `docs/import-samples/bullhorn-batch/` if you want to demo the Bullhorn ZIP/manual migration flow, including custom field definitions, note/education/work-history metadata, structured candidate skills, and values.
+- That Bullhorn sample batch now also includes a candidate resume/file payload so file migration can be demonstrated in the same ZIP flow.
+- A clean Zoho Recruit-style sample batch lives in `docs/import-samples/zoho-recruit-batch/` if you want to demo the Zoho ZIP/manual migration flow across clients, contacts, candidates, job orders, submissions, interviews, and placements.
+- A sample Hire Gnome export ZIP lives in `docs/import-samples/hire-gnome-export/` and is also linked directly from the Hire Gnome import path in the UI.
+- Generic CSV preview is now a real safety check, with tabbed per-entity creates/updates/skips, relationship warnings, row-level actions, and match reasons before you apply the import.
+- Bullhorn imports now support the same batch preview/apply flow so related clients, contacts, candidates, job orders, submissions, interviews, and placements can be migrated together instead of one file at a time.
+- Zoho Recruit imports now support the same batch preview/apply flow so related clients, contacts, candidates, job orders, submissions, interviews, and placements can be migrated together instead of one file at a time.
 
 ## Demo Environment Note
 

@@ -1,0 +1,8 @@
+Module Key,Field Key,Label,Field Type,Select Options,Help Text,Bullhorn Field Name
+clients,company_tier,Company Tier,select,"1, 2, 3",Bullhorn field customText1,customText1
+contacts,board_certification,Board Certification,select,"Family Medicine, Internal Medicine, Pediatrics",Bullhorn field customText1,customText1
+candidates,graduation_date,Graduation Date,date,,Bullhorn field customDate1,customDate1
+jobOrders,job_boards,Job Boards,select,"Indeed, LinkedIn, DocCafe",Bullhorn field customText11,customText11
+submissions,recruiter_score,Recruiter Score,number,,Bullhorn field customInt1,customInt1
+interviews,interview_feedback,Interview Feedback,textarea,,Bullhorn field customText1,customText1
+placements,ot_12hr,OT 12Hr,number,,Bullhorn field customBillRate1,customBillRate1

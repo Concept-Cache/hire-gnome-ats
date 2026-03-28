@@ -1,8 +1,8 @@
 'use client';
 
-export default function FormField({ label, required = false, children, hint = '' }) {
+export default function FormField({ label, required = false, children, hint = '', className = '' }) {
 	return (
-		<div className="form-field">
+		<div className={`form-field ${className}`.trim()}>
 			<div className="form-label-row">
 				<label className="form-label">
 					{label}

@@ -1,0 +1,3 @@
+ID,Candidate ID,Candidate Email,Job Order ID,Job Order Title,Subject,Status,Interview Mode,Interviewer,Interviewer Email,Starts At,Ends At,Location,Video Link,Custom: Interview Feedback [interview_feedback]
+6001,3001,sophia.gray@example.com,4001,Nurse Case Manager,Initial Screening,Scheduled,Phone,Jordan Parker,jordan.parker@acmehealth.example,2026-03-10T14:00:00Z,2026-03-10T14:30:00Z,Phone,,Strong communicator
+6002,3003,amelia.bailey@example.com,4003,Product Manager,Product Leadership Interview,Completed,Video,Marcus Hale,marcus.hale@summitproductlabs.example,2026-03-15T16:00:00Z,2026-03-15T16:45:00Z,Zoom,https://meet.example.com/prod-123,Clear product thinking and stakeholder management
