@@ -8,17 +8,51 @@ import { logUpdate } from '@/lib/audit-log';
 import { parseRouteId, parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
+import {
+	buildDefaultPlacementCommissionSplits,
+	getPlacementCommissionOwners,
+	toPlacementCommissionSplitCreateData
+} from '@/lib/placement-commission';
 
 import { withApiLogging } from '@/lib/api-logging';
+const placementUserSelect = { id: true, firstName: true, lastName: true };
 const offerInclude = {
-	candidate: true,
-	jobOrder: {
+	candidate: {
 		include: {
-			client: true
+			ownerUser: { select: placementUserSelect }
 		}
 	},
-	submission: { select: { id: true, status: true, createdAt: true } }
+	jobOrder: {
+		include: {
+			client: {
+				include: {
+					ownerUser: { select: placementUserSelect }
+				}
+			},
+			contact: {
+				include: {
+					ownerUser: { select: placementUserSelect }
+				}
+			}
+		}
+	},
+	submission: { select: { id: true, status: true, createdAt: true } },
+	commissionSplits: {
+		orderBy: [{ role: 'asc' }, { id: 'asc' }],
+		include: { user: { select: placementUserSelect } }
+	}
 };
+
+const ACCEPTED_PLACEMENT_MUTABLE_FIELDS = new Set([
+	'commissionSplits'
+]);
+
+function toComparableValue(value) {
+	if (value == null || value === '') return null;
+	if (value instanceof Date) return value.toISOString();
+	if (typeof value === 'object') return JSON.stringify(value);
+	return String(value);
+}
 
 function parsePlacementStartDate(value) {
 	if (!value) return null;
@@ -52,6 +86,38 @@ function handleError(error, fallbackMessage) {
 	}
 
 	return NextResponse.json({ error: fallbackMessage }, { status: 500 });
+}
+
+async function loadPlacementCommissionContext(candidateId, jobOrderId) {
+	const [candidate, jobOrder] = await Promise.all([
+		prisma.candidate.findUnique({
+			where: { id: candidateId },
+			select: { id: true, ownerId: true, ownerUser: { select: placementUserSelect } }
+		}),
+		prisma.jobOrder.findUnique({
+			where: { id: jobOrderId },
+			select: {
+				id: true,
+				client: {
+					select: { id: true, ownerId: true, ownerUser: { select: placementUserSelect } }
+				},
+				contact: {
+					select: { id: true, ownerId: true, ownerUser: { select: placementUserSelect } }
+				}
+			}
+		})
+	]);
+	return { candidate, jobOrder };
+}
+
+function resolveCommissionSplits(inputSplits, ownerContext, fallbackSplits = []) {
+	const nextSplits =
+		Array.isArray(inputSplits) && inputSplits.length > 0
+			? inputSplits
+			: fallbackSplits.length > 0
+				? fallbackSplits
+				: buildDefaultPlacementCommissionSplits(getPlacementCommissionOwners(ownerContext));
+	return toPlacementCommissionSplitCreateData(nextSplits);
 }
 
 async function getOffers_idHandler(req, { params }) {
@@ -117,18 +183,20 @@ async function patchOffers_idHandler(req, { params }) {
 					submissionId: true,
 					candidateId: true,
 					jobOrderId: true,
-					createdAt: true
+					createdAt: true,
+					commissionSplits: {
+						select: {
+							recordId: true,
+							userId: true,
+							role: true,
+							splitPercent: true,
+							commissionPercent: true
+						}
+					}
 				}
 			});
 		if (!existing) {
 			return NextResponse.json({ error: 'Placement not found.' }, { status: 404 });
-		}
-
-		if (String(existing.status || '').toLowerCase() === 'accepted') {
-			return NextResponse.json(
-				{ error: 'Accepted placements are read-only and cannot be changed.' },
-				{ status: 409 }
-			);
 		}
 
 		const body = await parseJsonBody(req);
@@ -188,13 +256,38 @@ async function patchOffers_idHandler(req, { params }) {
 				{ status: 400 }
 			);
 		}
+		const nextData = normalizeOfferData({
+			...parsed.data,
+			customFields: customFieldValidation.customFields
+		});
+		const ownerContext = await loadPlacementCommissionContext(existing.candidateId, existing.jobOrderId);
+		const commissionSplits = resolveCommissionSplits(
+			parsed.data.commissionSplits,
+			ownerContext,
+			existing.commissionSplits
+		);
+		if (String(existing.status || '').toLowerCase() === 'accepted') {
+			const changedCoreFields = Object.entries(nextData).filter(([key, value]) => {
+				if (ACCEPTED_PLACEMENT_MUTABLE_FIELDS.has(key)) return false;
+				return toComparableValue(existing[key]) !== toComparableValue(value);
+			});
+			if (changedCoreFields.length > 0) {
+				return NextResponse.json(
+					{ error: 'Accepted placements lock core placement details. Only commission tracking can be updated.' },
+					{ status: 409 }
+				);
+			}
+		}
 
 		const offer = await prisma.offer.update({
 			where: { id },
-			data: normalizeOfferData({
-				...parsed.data,
-				customFields: customFieldValidation.customFields
-			}),
+			data: {
+				...nextData,
+				commissionSplits: {
+					deleteMany: {},
+					create: commissionSplits
+				}
+			},
 			include: offerInclude
 		});
 		await logUpdate({

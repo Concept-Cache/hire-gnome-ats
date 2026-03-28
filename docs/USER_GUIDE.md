@@ -60,6 +60,7 @@ Use this sequence as your default process:
 - Bullhorn migration batches now also preserve candidate notes, candidate education, candidate work history, contact notes, and structured candidate skills when Bullhorn exposes them.
 - Bullhorn ZIP batches can also carry candidate attachment files, including resumes, so candidate documents can migrate with the record data instead of being rebuilt manually.
 - `Admin Area > Data Export` now also includes a Bullhorn API exporter that runs in the background, generates an import-ready Bullhorn batch ZIP from a bounded created/updated date range, and lets administrators download the finished batch or open it directly in the import preview flow from the completed job.
+- Bullhorn export also supports a preflight estimate so administrators can see how many changed core records fall in the selected date window before starting a background run.
 - Administrators can save Bullhorn API credentials in `Admin Area > System Settings > Platform Settings` so background exports do not require re-entering credentials each time, and each export can optionally include candidate resumes/files.
 - Bullhorn background exports can be cancelled while queued or running.
 - Each import source type now includes a direct sample download in the UI so you can test the flow without building your own files first.
@@ -303,9 +304,10 @@ Common actions:
 2. Select compensation type and placement type.
 3. Enter required compensation fields based on selected type.
 4. Set start/end dates and status.
+5. Track recruiter and sales commission splits on the placement itself, with each role totaling 100%.
 
 Status behavior:
-- `Accepted` locks the placement record read-only.
+- `Accepted` locks the core placement package, but commission tracking remains editable.
 - Actions include withdraw/cancel with confirmation and reason capture.
 - Use `Advanced Search` on the placements list when quick lookup is not enough, for example `Placement Type = Perm` plus `Compensation Type = Salary` or `Expected Join in past 30 days`.
 

@@ -332,7 +332,9 @@ export default function EntityTable({
 									{hasActions ? (
 										<td className="table-actions-cell table-skeleton-cell">
 											<div className="row-actions">
-												<span className="table-skeleton-icon" />
+												<span className="table-skeleton-action" aria-hidden="true">
+													<span className="table-skeleton-icon" />
+												</span>
 											</div>
 										</td>
 									) : null}

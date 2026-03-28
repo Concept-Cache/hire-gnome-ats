@@ -8,6 +8,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import PhoneInput from '@/app/components/phone-input';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import SaveActionButton from '@/app/components/save-action-button';
 import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -328,9 +329,12 @@ function NewClientsPageContent() {
 							}
 							onDefinitionsChange={setCustomFieldDefinitions}
 						/>
-						<button type="submit" disabled={saving || !canSave}>
-							{saving ? 'Saving...' : 'Save Client'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving || !canSave}
+							label="Save Client"
+							savingLabel="Saving Client..."
+						/>
 					</form>
 				</div>
 			</article>

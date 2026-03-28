@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import SaveActionButton from '@/app/components/save-action-button';
 import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -147,9 +148,9 @@ function NewSubmissionsPageContent() {
 						/>
 					</FormField>
 					{!selectedCandidateIsQualified ? (
-						<p className="panel-subtext error">
-							Candidate must be Qualified or beyond before submitting.
-						</p>
+						<div className="validation-chip-row">
+							<span className="chip validation-chip-invalid">Candidate Not Submission-Ready</span>
+						</div>
 					) : null}
 					<FormField label="Job Order" required>
 						<LookupTypeaheadSelect
@@ -194,9 +195,12 @@ function NewSubmissionsPageContent() {
 						}
 						onDefinitionsChange={setCustomFieldDefinitions}
 					/>
-					<button type="submit" disabled={saving || !canSave}>
-						{saving ? 'Saving...' : 'Create Submission'}
-					</button>
+					<SaveActionButton
+						saving={saving}
+						disabled={saving || !canSave}
+						label="Create Submission"
+						savingLabel="Creating Submission..."
+					/>
 				</form>
 			</article>
 			<NewRecordGuide

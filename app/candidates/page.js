@@ -352,11 +352,13 @@ export default function CandidatesPage() {
 		},
 		{ key: 'ownerName', label: 'Owner' },
 		{ key: 'sourceLabel', label: 'Source', defaultVisible: false },
+		{ key: 'skillsLabel', label: 'Skills', defaultVisible: false },
 		{ key: 'locationLabel', label: 'Location', defaultVisible: false },
 		{ key: 'divisionName', label: 'Division', defaultVisible: false },
 		{ key: 'submissionCount', label: 'Submissions', defaultVisible: false },
 		{ key: 'noteCount', label: 'Notes', defaultVisible: false },
 		{ key: 'activityCount', label: 'Activities', defaultVisible: false },
+		{ key: 'fileCount', label: 'Files', defaultVisible: false },
 		{
 			key: 'lastActivityAtLabel',
 			label: 'Last Activity Date',

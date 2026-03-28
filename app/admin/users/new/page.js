@@ -7,6 +7,7 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import { USER_ROLE_OPTIONS } from '@/app/constants/access-control-options';
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 
@@ -162,9 +163,12 @@ export default function NewUserPage() {
 								<span className="switch-hint">Can be selected as an owner.</span>
 							</span>
 						</label>
-						<button type="submit" disabled={saving}>
-							{saving ? 'Saving...' : 'Save User'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving}
+							label="Save User"
+							savingLabel="Saving User..."
+						/>
 					</form>
 				</article>
 			</section>

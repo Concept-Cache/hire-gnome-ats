@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { SKILL_CATEGORY_OPTIONS, normalizeSkillCategory } from '@/lib/skill-category-options';
@@ -112,9 +113,12 @@ export default function NewSkillPage() {
 								<span className="switch-hint">Available in candidate skill picker.</span>
 							</span>
 						</label>
-						<button type="submit" disabled={saving || !canSave}>
-							{saving ? 'Saving...' : 'Save Skill'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving || !canSave}
+							label="Save Skill"
+							savingLabel="Saving Skill..."
+						/>
 					</form>
 				</article>
 			</section>

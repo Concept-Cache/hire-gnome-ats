@@ -8,6 +8,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import RichTextEditor from '@/app/components/rich-text-editor';
+import SaveActionButton from '@/app/components/save-action-button';
 import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -344,6 +345,7 @@ function NewJobOrdersPageContent() {
 	const salaryMaxValue = parseCurrencyInput(form.salaryMax);
 	const hasSalaryRangeError =
 		salaryMinValue != null && salaryMaxValue != null && salaryMinValue > salaryMaxValue;
+	const showSalaryRangeStatus = salaryMinValue != null || salaryMaxValue != null;
 	const customFieldsComplete = areRequiredCustomFieldsComplete(
 		customFieldDefinitions,
 		form.customFields
@@ -576,7 +578,13 @@ function NewJobOrdersPageContent() {
 								/>
 							</FormField>
 						</div>
-						{hasSalaryRangeError ? <p className="panel-subtext error">Salary Min cannot exceed Salary Max.</p> : null}
+						{showSalaryRangeStatus ? (
+							<div className="validation-chip-row">
+								<span className={`chip ${hasSalaryRangeError ? 'validation-chip-invalid' : 'validation-chip-valid'}`}>
+									{hasSalaryRangeError ? 'Salary Range Invalid' : 'Salary Range OK'}
+								</span>
+							</div>
+						) : null}
 						{isAdmin ? (
 							<FormField label="Division" required>
 								<LookupTypeaheadSelect
@@ -706,9 +714,12 @@ function NewJobOrdersPageContent() {
 							}
 							onDefinitionsChange={setCustomFieldDefinitions}
 						/>
-						<button type="submit" disabled={!canSave}>
-							{saving ? 'Saving...' : 'Save Job Order'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving || !canSave}
+							label="Save Job Order"
+							savingLabel="Saving Job Order..."
+						/>
 					</form>
 				</div>
 			</article>

@@ -3025,6 +3025,23 @@ function downloadZohoCsvTemplate(entity) {
 									<p><span>Update</span><strong>{formatCount(preview.details[previewEntityTab].update)}</strong></p>
 									<p><span>Skip</span><strong>{formatCount(preview.details[previewEntityTab].skip)}</strong></p>
 								</div>
+								<div className="validation-chip-row">
+									<span
+										className={`chip ${
+											Array.isArray(preview.details[previewEntityTab].warnings) &&
+											preview.details[previewEntityTab].warnings.length > 0
+												? 'validation-chip-invalid'
+												: 'validation-chip-valid'
+										}`}
+									>
+										{Array.isArray(preview.details[previewEntityTab].warnings) &&
+										preview.details[previewEntityTab].warnings.length > 0
+											? `${preview.details[previewEntityTab].warnings.length} Warning${
+													preview.details[previewEntityTab].warnings.length === 1 ? '' : 's'
+											  }`
+											: 'No Warnings'}
+									</span>
+								</div>
 								{Array.isArray(preview.details[previewEntityTab].warnings) && preview.details[previewEntityTab].warnings.length > 0 ? (
 									<div className="import-preview-warning-list">
 										{preview.details[previewEntityTab].warnings.map((warning, index) => (
@@ -3033,9 +3050,7 @@ function downloadZohoCsvTemplate(entity) {
 											</p>
 										))}
 									</div>
-								) : (
-									<p className="panel-subtext success">No warnings for this entity in preview.</p>
-								)}
+								) : null}
 								<div className="workspace-scroll-area">
 									<ul className="workspace-list">
 										{preview.details[previewEntityTab].rows.map((row, index) => (
@@ -3147,6 +3162,23 @@ function downloadZohoCsvTemplate(entity) {
 									<p><span>Update</span><strong>{formatCount(result.details[resultEntityTab].update)}</strong></p>
 									<p><span>Skip</span><strong>{formatCount(result.details[resultEntityTab].skip)}</strong></p>
 								</div>
+								<div className="validation-chip-row">
+									<span
+										className={`chip ${
+											Array.isArray(result.details[resultEntityTab].warnings) &&
+											result.details[resultEntityTab].warnings.length > 0
+												? 'validation-chip-invalid'
+												: 'validation-chip-valid'
+										}`}
+									>
+										{Array.isArray(result.details[resultEntityTab].warnings) &&
+										result.details[resultEntityTab].warnings.length > 0
+											? `${result.details[resultEntityTab].warnings.length} Warning${
+													result.details[resultEntityTab].warnings.length === 1 ? '' : 's'
+											  }`
+											: 'No Warnings'}
+									</span>
+								</div>
 								{Array.isArray(result.details[resultEntityTab].warnings) && result.details[resultEntityTab].warnings.length > 0 ? (
 									<div className="import-preview-warning-list">
 										{result.details[resultEntityTab].warnings.map((warning, index) => (
@@ -3155,9 +3187,7 @@ function downloadZohoCsvTemplate(entity) {
 											</p>
 										))}
 									</div>
-								) : (
-									<p className="panel-subtext success">No warnings recorded for this entity in the applied import.</p>
-								)}
+								) : null}
 								<div className="workspace-scroll-area">
 									<ul className="workspace-list">
 										{result.details[resultEntityTab].rows.map((row, index) => (

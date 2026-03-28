@@ -8,6 +8,7 @@ import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import EmailChipInput from '@/app/components/email-chip-input';
+import SaveActionButton from '@/app/components/save-action-button';
 import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -288,9 +289,9 @@ function NewInterviewsPageContent() {
 						</FormField>
 					</div>
 					{!selectedCandidateIsQualified ? (
-						<p className="panel-subtext error">
-							Candidate must be Qualified or beyond before interviews can be scheduled.
-						</p>
+						<div className="validation-chip-row">
+							<span className="chip validation-chip-invalid">Candidate Not Interview-Ready</span>
+						</div>
 					) : null}
 						<div className="form-grid-2">
 							<FormField label="Interviewer" required>
@@ -413,9 +414,12 @@ function NewInterviewsPageContent() {
 						}
 						onDefinitionsChange={setCustomFieldDefinitions}
 					/>
-					<button type="submit" disabled={saving || !canSaveWithCustomFields}>
-							{saving ? 'Saving...' : 'Save Interview'}
-					</button>
+					<SaveActionButton
+						saving={saving}
+						disabled={saving || !canSaveWithCustomFields}
+						label="Save Interview"
+						savingLabel="Saving Interview..."
+					/>
 				</form>
 			</article>
 			<NewRecordGuide

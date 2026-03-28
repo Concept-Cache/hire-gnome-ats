@@ -7,9 +7,12 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import NewRecordGuide from '@/app/components/new-record-guide';
+import PlacementCommissionSplitsSection from '@/app/components/placement-commission-splits-section';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
+import { validatePlacementCommissionSplits } from '@/lib/placement-commission';
 
 const initialForm = {
 	status: 'planned',
@@ -28,6 +31,7 @@ const initialForm = {
 	endDate: '',
 	withdrawnReason: '',
 	notes: '',
+	commissionSplits: [],
 	candidateId: '',
 	jobOrderId: '',
 	customFields: {}
@@ -88,6 +92,7 @@ function NewPlacementPageContent() {
 	const [error, setError] = useState('');
 	const [saving, setSaving] = useState(false);
 	const [customFieldDefinitions, setCustomFieldDefinitions] = useState([]);
+	const [defaultsKey, setDefaultsKey] = useState('');
 	const toast = useToast();
 	useUnsavedChangesGuard(form);
 
@@ -139,12 +144,49 @@ function NewPlacementPageContent() {
 		customFieldDefinitions,
 		form.customFields
 	);
+	const commissionValidation = validatePlacementCommissionSplits(form.commissionSplits);
 
 	useEffect(() => {
 		if (form.placementType !== 'perm') return;
 		if (form.compensationType === 'salary') return;
 		setForm((current) => withCompensationType(current, 'salary'));
 	}, [form.placementType, form.compensationType]);
+
+	useEffect(() => {
+		const candidateId = String(form.candidateId || '').trim();
+		const jobOrderId = String(form.jobOrderId || '').trim();
+		if (!candidateId || !jobOrderId) {
+			setDefaultsKey('');
+			return;
+		}
+
+		const nextKey = `${candidateId}:${jobOrderId}`;
+		if (defaultsKey === nextKey) return;
+
+		let active = true;
+		async function loadCommissionDefaults() {
+			try {
+				const res = await fetch(
+					`/api/placements/commission-defaults?candidateId=${encodeURIComponent(candidateId)}&jobOrderId=${encodeURIComponent(jobOrderId)}`
+				);
+				if (!res.ok) return;
+				const data = await res.json().catch(() => ({}));
+				if (!active || !Array.isArray(data?.commissionSplits)) return;
+				setForm((current) => ({
+					...current,
+					commissionSplits: data.commissionSplits
+				}));
+				setDefaultsKey(nextKey);
+			} catch {
+				// Best-effort defaults only.
+			}
+		}
+
+		loadCommissionDefaults();
+		return () => {
+			active = false;
+		};
+	}, [defaultsKey, form.candidateId, form.jobOrderId]);
 
 	useEffect(() => {
 		if (error) {
@@ -165,6 +207,10 @@ function NewPlacementPageContent() {
 		}
 		if (!customFieldsComplete) {
 			setError('Complete all required custom fields before saving.');
+			return;
+		}
+		if (!commissionValidation.valid) {
+			setError('Recruiter and sales rep splits must each total 100%.');
 			return;
 		}
 		setSaving(true);
@@ -199,9 +245,10 @@ function NewPlacementPageContent() {
 		} finally {
 			setSaving(false);
 		}
-		}
-		return (
-			<section className="module-page">
+	}
+
+	return (
+		<section className="module-page">
 			<header className="module-header">
 				<div>
 					<Link href="/placements" className="module-back-link" aria-label="Back to List">&larr; Back</Link>
@@ -211,9 +258,10 @@ function NewPlacementPageContent() {
 			</header>
 
 			<div className="new-record-layout">
+			<form onSubmit={onSubmit} className="stack-panels">
 			<article className="panel panel-narrow">
 				<h3>Create Placement</h3>
-				<form onSubmit={onSubmit}>
+				<div className="new-placement-panel-body">
 					<FormField label="Status">
 						<select
 							value={form.status}
@@ -444,22 +492,42 @@ function NewPlacementPageContent() {
 						}
 						onDefinitionsChange={setCustomFieldDefinitions}
 					/>
-					<button
-						type="submit"
+				</div>
+			</article>
+			<article className="panel panel-narrow">
+				<h3>Commission Splits</h3>
+				<div className="new-placement-panel-body">
+					<p className="panel-subtext">
+						Track recruiter and sales rep splits. Each role must total 100% across its own rows.
+					</p>
+					<PlacementCommissionSplitsSection
+						splits={form.commissionSplits}
+						onChange={(nextSplits) =>
+							setForm((current) => ({
+								...current,
+								commissionSplits: nextSplits
+							}))
+						}
+						disabled={saving}
+					/>
+					<SaveActionButton
+						saving={saving}
 						disabled={
 							saving ||
 							!form.candidateId ||
 							!form.jobOrderId ||
 							!form.offeredOn ||
 							!form.expectedJoinDate ||
+							!commissionValidation.valid ||
 							!compensationComplete ||
 							!customFieldsComplete
 						}
-					>
-						{saving ? 'Saving...' : 'Save Placement'}
-					</button>
+						label="Save Placement"
+						savingLabel="Saving Placement..."
+					/>
+				</div>
+				</article>
 				</form>
-			</article>
 			<NewRecordGuide
 				title="Placement Setup"
 				intro="Placements are high-impact records. Compensation, dates, and status changes flow into reporting and downstream lock behavior."

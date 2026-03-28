@@ -451,6 +451,41 @@ function ensureNotBefore(value, floor, minuteOffset = 5) {
 	return target;
 }
 
+function buildSeedPlacementCommissionSplits({
+	candidateOwnerId,
+	contactOwnerId,
+	clientOwnerId,
+	isTempPlacement = false,
+	index = 0
+} = {}) {
+	const splits = [];
+	const recruiterCommissionPercent = isTempPlacement ? 10 : 15;
+	const salesCommissionPercent = isTempPlacement ? 5 : 7.5;
+	const salesUserId = contactOwnerId || clientOwnerId || null;
+
+	if (candidateOwnerId) {
+		splits.push({
+			recordId: `PCS-${randomRecordIdToken()}`,
+			userId: candidateOwnerId,
+			role: 'recruiter',
+			splitPercent: 100,
+			commissionPercent: recruiterCommissionPercent + ((index % 3) * 0.5)
+		});
+	}
+
+	if (salesUserId) {
+		splits.push({
+			recordId: `PCS-${randomRecordIdToken()}`,
+			userId: salesUserId,
+			role: 'sales_rep',
+			splitPercent: 100,
+			commissionPercent: salesCommissionPercent + ((index % 2) * 0.5)
+		});
+	}
+
+	return splits;
+}
+
 function cleanStorageSegment(value) {
 	return String(value || '')
 		.trim()
@@ -1415,6 +1450,14 @@ async function main() {
 				const offeredOn = addHours(placementCreatedAt, 4 + ((i + j) % 12));
 				const expectedJoinDate = dateDaysFromToday(10 + irregularPastOffset(i + j, 9, 4), 9, 0);
 				const placementUpdatedAt = buildAcceptedTimestamp(placementCreatedAt, (i * 11) + (j * 7), 41);
+				const hiringContact = contacts.find((contact) => contact.id === jobOrder.contactId) || null;
+				const commissionSplits = buildSeedPlacementCommissionSplits({
+					candidateOwnerId: candidate.ownerId,
+					contactOwnerId: hiringContact?.ownerId ?? null,
+					clientOwnerId: jobOrder.clientId ? clients.find((client) => client.id === jobOrder.clientId)?.ownerId : null,
+					isTempPlacement,
+					index: i + j
+				});
 				await prisma.offer.create({
 					data: {
 						submissionId: submission.id,
@@ -1432,6 +1475,12 @@ async function main() {
 						offeredOn,
 						expectedJoinDate,
 						notes: 'Placement finalized after client panel interviews and compensation alignment.',
+						commissionSplits:
+							commissionSplits.length > 0
+								? {
+									create: commissionSplits
+								}
+								: undefined,
 						createdAt: placementCreatedAt,
 						updatedAt: placementUpdatedAt
 					}

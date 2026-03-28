@@ -24,6 +24,7 @@ import {
 } from '@/app/constants/contact-source-options';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
+import { isValidEmailAddress } from '@/lib/email-validation';
 import {
 	clearRecordNavigationContext,
 	readRecordNavigationContext,
@@ -107,6 +108,9 @@ export default function ContactDetailsPage() {
 	const { requestConfirm } = useConfirmDialog();
 	const { archiveEntity } = useArchivedEntities('CONTACT');
 	const isAdmin = useIsAdministrator();
+	const hasValidEmail = !form.email.trim() || isValidEmailAddress(form.email);
+	const emailError =
+		form.email.trim() && !hasValidEmail ? 'Invalid Email Address' : '';
 	const hasValidLinkedinUrl = isValidOptionalHttpUrl(form.linkedinUrl);
 	const linkedinUrlError =
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
@@ -131,9 +135,10 @@ export default function ContactDetailsPage() {
 					form.ownerId &&
 					form.clientId &&
 					customFieldsComplete &&
+					hasValidEmail &&
 					hasValidLinkedinUrl
 			),
-		[customFieldsComplete, form, hasValidLinkedinUrl]
+		[customFieldsComplete, form, hasValidEmail, hasValidLinkedinUrl]
 	);
 	const isClientLocked = Boolean(contact?.id);
 	const contactNavigationState = useMemo(() => {
@@ -572,6 +577,11 @@ export default function ContactDetailsPage() {
 									required
 								/>
 							</FormField>
+							{emailError ? (
+								<div className="validation-chip-row">
+									<span className="chip validation-chip-invalid">{emailError}</span>
+								</div>
+							) : null}
 							<div className="detail-form-grid-2">
 								<FormField label="Phone" required>
 									<PhoneInput
