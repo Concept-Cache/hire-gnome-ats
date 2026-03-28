@@ -1128,6 +1128,7 @@ export default function JobOrderDetailsPage() {
 	const salaryMaxValue = parseCurrencyInput(form.salaryMax);
 	const hasSalaryRangeError =
 		salaryMinValue != null && salaryMaxValue != null && salaryMinValue > salaryMaxValue;
+	const showSalaryRangeStatus = salaryMinValue != null || salaryMaxValue != null;
 	const customFieldsComplete = areRequiredCustomFieldsComplete(
 		customFieldDefinitions,
 		form.customFields
@@ -1535,7 +1536,13 @@ export default function JobOrderDetailsPage() {
 									/>
 								</FormField>
 							</div>
-							{hasSalaryRangeError ? <p className="panel-subtext error">Salary Min cannot exceed Salary Max.</p> : null}
+							{showSalaryRangeStatus ? (
+								<div className="validation-chip-row">
+									<span className={`chip ${hasSalaryRangeError ? 'validation-chip-invalid' : 'validation-chip-valid'}`}>
+										{hasSalaryRangeError ? 'Salary Range Invalid' : 'Salary Range OK'}
+									</span>
+								</div>
+							) : null}
 						</section>
 
 						<section className="form-section">

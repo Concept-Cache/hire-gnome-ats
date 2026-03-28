@@ -1596,9 +1596,12 @@ export default function CandidateDetailsPage() {
 					</div>
 				</header>
 			{attachmentUploadWarning ? (
-				<p className="panel-subtext error">
-					Candidate was created, but auto-attaching the parsed resume failed. Upload the file in Workspace {'>'} Files.
-				</p>
+				<div className="validation-chip-stack">
+					<div className="validation-chip-row">
+						<span className="chip validation-chip-invalid">Resume Auto-Attach Failed</span>
+					</div>
+					<p className="panel-subtext">Upload the file in Workspace {'>'} Files.</p>
+				</div>
 			) : null}
 
 			<article className="panel candidate-hero-card">
@@ -1762,7 +1765,13 @@ export default function CandidateDetailsPage() {
 								/>
 							</FormField>
 						</div>
-						{emailError ? <p className="panel-subtext error">{emailError}</p> : null}
+						{emailError ? (
+							<div className="validation-chip-stack">
+								<div className="validation-chip-row">
+									<span className="chip validation-chip-invalid">Invalid Email Address</span>
+								</div>
+							</div>
+						) : null}
 						<FormField label="Address">
 							<AddressTypeaheadInput
 								value={editForm.address}

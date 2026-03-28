@@ -7,11 +7,13 @@ import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import PhoneInput from '@/app/components/phone-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import SaveActionButton from '@/app/components/save-action-button';
 import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { CONTACT_SOURCE_OPTIONS } from '@/app/constants/contact-source-options';
 import { fetchLookupOptionById } from '@/lib/lookup-client';
+import { isValidEmailAddress } from '@/lib/email-validation';
 import { isValidOptionalHttpUrl } from '@/lib/url-validation';
 import { fetchUnassignedDivisionOption } from '@/lib/default-division-client';
 
@@ -48,6 +50,9 @@ function NewContactsPageContent() {
 	const toast = useToast();
 	const { markAsClean } = useUnsavedChangesGuard(form);
 	const isAdmin = actingUser?.role === 'ADMINISTRATOR';
+	const hasValidEmail = !form.email.trim() || isValidEmailAddress(form.email);
+	const emailError =
+		form.email.trim() && !hasValidEmail ? 'Invalid Email Address' : '';
 	const hasValidLinkedinUrl = isValidOptionalHttpUrl(form.linkedinUrl);
 	const linkedinUrlError =
 		form.linkedinUrl.trim() && !hasValidLinkedinUrl
@@ -70,9 +75,10 @@ function NewContactsPageContent() {
 					form.clientId &&
 					(!isAdmin || form.divisionId) &&
 					customFieldsComplete &&
+					hasValidEmail &&
 					hasValidLinkedinUrl
 			),
-		[customFieldsComplete, form, hasValidLinkedinUrl, isAdmin]
+		[customFieldsComplete, form, hasValidEmail, hasValidLinkedinUrl, isAdmin]
 	);
 
 	useEffect(() => {
@@ -237,6 +243,10 @@ function NewContactsPageContent() {
 			setError('Phone is required.');
 			return;
 		}
+		if (!hasValidEmail) {
+			setError('Invalid Email Address');
+			return;
+		}
 		if (!form.source) {
 			setError('Source is required.');
 			return;
@@ -315,6 +325,11 @@ function NewContactsPageContent() {
 								required
 							/>
 						</FormField>
+						{emailError ? (
+							<div className="validation-chip-row">
+								<span className="chip validation-chip-invalid">{emailError}</span>
+							</div>
+						) : null}
 						<div className="form-grid-2">
 							<FormField label="Phone" required>
 								<PhoneInput
@@ -425,9 +440,12 @@ function NewContactsPageContent() {
 							}
 							onDefinitionsChange={setCustomFieldDefinitions}
 						/>
-						<button type="submit" disabled={saving || !canSave}>
-							{saving ? 'Saving...' : 'Save Contact'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving || !canSave}
+							label="Save Contact"
+							savingLabel="Saving Contact..."
+						/>
 					</form>
 				</div>
 			</article>

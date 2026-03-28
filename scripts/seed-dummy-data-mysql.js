@@ -3,6 +3,7 @@
 require('./load-env.cjs');
 
 const mysql = require('mysql2/promise');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const { mkdir, writeFile } = require('node:fs/promises');
 const { SKILLS_TO_SEED } = require('./seed-skills');
@@ -69,6 +70,21 @@ const JOB_ORDER_TITLES = [
 	'IT Support Manager'
 ];
 
+const RECORD_ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const RECORD_ID_RANDOM_LENGTH = 8;
+
+function randomRecordIdToken() {
+	let token = '';
+	for (let index = 0; index < RECORD_ID_RANDOM_LENGTH; index += 1) {
+		token += RECORD_ID_ALPHABET[crypto.randomInt(0, RECORD_ID_ALPHABET.length)];
+	}
+	return token;
+}
+
+function buildSeedRecordId(prefix) {
+	return `${prefix}-${randomRecordIdToken()}`;
+}
+
 function pick(list, index) {
 	return list[index % list.length];
 }
@@ -132,6 +148,41 @@ function ensureNotBefore(value, floor, minuteOffset = 5) {
 		return addMinutes(minimum, minuteOffset);
 	}
 	return target;
+}
+
+function buildSeedPlacementCommissionSplits({
+	candidateOwnerId,
+	contactOwnerId,
+	clientOwnerId,
+	isTempPlacement = false,
+	index = 0
+} = {}) {
+	const splits = [];
+	const recruiterCommissionPercent = isTempPlacement ? 10 : 15;
+	const salesCommissionPercent = isTempPlacement ? 5 : 7.5;
+	const salesUserId = contactOwnerId || clientOwnerId || null;
+
+	if (candidateOwnerId) {
+		splits.push({
+			recordId: buildSeedRecordId('PCS'),
+			userId: candidateOwnerId,
+			role: 'recruiter',
+			splitPercent: 100,
+			commissionPercent: recruiterCommissionPercent + ((index % 3) * 0.5)
+		});
+	}
+
+	if (salesUserId) {
+		splits.push({
+			recordId: buildSeedRecordId('PCS'),
+			userId: salesUserId,
+			role: 'sales_rep',
+			splitPercent: 100,
+			commissionPercent: salesCommissionPercent + ((index % 2) * 0.5)
+		});
+	}
+
+	return splits;
 }
 
 function cleanStorageSegment(value) {
@@ -630,6 +681,7 @@ async function main() {
 					id: contactId,
 					clientId: client.id,
 					divisionId: client.divisionId,
+					ownerId: owner.id,
 					firstName: `Contact${idx + 1}`,
 					lastName: `Demo${idx + 1}`,
 					email: `contact${idx + 1}@${PERSON_EMAIL_DOMAIN}`
@@ -709,7 +761,7 @@ async function main() {
 				]
 			);
 			const candidateId = result.insertId;
-			candidates.push({ id: candidateId, divisionId: division.id, createdAt });
+			candidates.push({ id: candidateId, divisionId: division.id, ownerId: owner.id, createdAt });
 
 			for (const skill of selectedSkills) {
 				await connection.query(
@@ -860,6 +912,8 @@ async function main() {
 			});
 		}
 
+		const hasOfferCommissionSplit = await tableExists(connection, 'OfferCommissionSplit');
+
 		let submissionCount = 0;
 		let interviewCount = 0;
 		let placementCount = 0;
@@ -948,6 +1002,15 @@ async function main() {
 
 				if ((i + j) % 3 === 0) {
 					const isTemp = (i + j) % 2 === 0;
+					const jobContact = contacts.find((contact) => contact.id === job.contactId) || null;
+					const jobClient = clients.find((client) => client.id === job.clientId) || null;
+					const commissionSplits = buildSeedPlacementCommissionSplits({
+						candidateOwnerId: candidate.ownerId,
+						contactOwnerId: jobContact?.ownerId ?? null,
+						clientOwnerId: jobClient?.ownerId ?? null,
+						isTempPlacement: isTemp,
+						index: i + j
+					});
 					const placementCreatedAt = ensureNotBefore(
 						buildSeedTimestamp((i * 9) + (j * 5), {
 							windowSize: 14,
@@ -960,11 +1023,12 @@ async function main() {
 						45
 					);
 					const placementUpdatedAt = addHours(placementCreatedAt, 8 + ((i + j) % 24));
-					await connection.query(
+					const [offerResult] = await connection.query(
 						`INSERT INTO \`Offer\`
-						(\`status\`, \`version\`, \`placementType\`, \`compensationType\`, \`currency\`, \`hourlyRtBillRate\`, \`hourlyRtPayRate\`, \`hourlyOtBillRate\`, \`hourlyOtPayRate\`, \`yearlyCompensation\`, \`offeredOn\`, \`expectedJoinDate\`, \`notes\`, \`submissionId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
-						VALUES (?, 1, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						(\`recordId\`, \`status\`, \`version\`, \`placementType\`, \`compensationType\`, \`currency\`, \`hourlyRtBillRate\`, \`hourlyRtPayRate\`, \`hourlyOtBillRate\`, \`hourlyOtPayRate\`, \`yearlyCompensation\`, \`offeredOn\`, \`expectedJoinDate\`, \`notes\`, \`submissionId\`, \`candidateId\`, \`jobOrderId\`, \`createdAt\`, \`updatedAt\`)
+						VALUES (?, ?, 1, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 						[
+							buildSeedRecordId('PLC'),
 							'accepted',
 							isTemp ? 'temp' : 'perm',
 							isTemp ? 'hourly' : 'salary',
@@ -983,6 +1047,26 @@ async function main() {
 							placementUpdatedAt
 						]
 					);
+					const offerId = offerResult.insertId;
+					if (hasOfferCommissionSplit && commissionSplits.length > 0) {
+						for (const split of commissionSplits) {
+							await connection.query(
+								`INSERT INTO \`OfferCommissionSplit\`
+								(\`recordId\`, \`offerId\`, \`userId\`, \`role\`, \`splitPercent\`, \`commissionPercent\`, \`createdAt\`, \`updatedAt\`)
+								VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+								[
+									split.recordId,
+									offerId,
+									split.userId,
+									split.role,
+									split.splitPercent,
+									split.commissionPercent,
+									placementCreatedAt,
+									placementUpdatedAt
+								]
+							);
+						}
+					}
 					await connection.query(
 						'UPDATE `Submission` SET `status` = ?, `updatedAt` = NOW() WHERE `id` = ?',
 						['placed', submissionId]

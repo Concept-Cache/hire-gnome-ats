@@ -8,13 +8,59 @@ import { logCreate } from '@/lib/audit-log';
 import { parseJsonBody, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
 import { validateAndNormalizeCustomFieldValues } from '@/lib/custom-fields';
+import {
+	buildDefaultPlacementCommissionSplits,
+	getPlacementCommissionOwners,
+	toPlacementCommissionSplitCreateData
+} from '@/lib/placement-commission';
 
 import { withApiLogging } from '@/lib/api-logging';
+const placementUserSelect = { id: true, firstName: true, lastName: true };
 const offerInclude = {
-	candidate: true,
-	jobOrder: { include: { client: true } },
+	candidate: { include: { ownerUser: { select: placementUserSelect } } },
+	jobOrder: {
+		include: {
+			client: { include: { ownerUser: { select: placementUserSelect } } },
+			contact: { include: { ownerUser: { select: placementUserSelect } } }
+		}
+	},
 	submission: { select: { id: true, status: true, createdAt: true } }
+	,
+	commissionSplits: {
+		orderBy: [{ role: 'asc' }, { id: 'asc' }],
+		include: { user: { select: placementUserSelect } }
+	}
 };
+
+async function loadPlacementCommissionContext(candidateId, jobOrderId) {
+	const [candidate, jobOrder] = await Promise.all([
+		prisma.candidate.findUnique({
+			where: { id: candidateId },
+			select: { id: true, ownerId: true, ownerUser: { select: placementUserSelect } }
+		}),
+		prisma.jobOrder.findUnique({
+			where: { id: jobOrderId },
+			select: {
+				id: true,
+				client: {
+					select: { id: true, ownerId: true, ownerUser: { select: placementUserSelect } }
+				},
+				contact: {
+					select: { id: true, ownerId: true, ownerUser: { select: placementUserSelect } }
+				}
+			}
+		})
+	]);
+	return { candidate, jobOrder };
+}
+
+function resolveCommissionSplits(inputSplits, ownerContext) {
+	const nextSplits =
+		Array.isArray(inputSplits) && inputSplits.length > 0
+			? inputSplits
+			: buildDefaultPlacementCommissionSplits(getPlacementCommissionOwners(ownerContext));
+	return toPlacementCommissionSplitCreateData(nextSplits);
+}
 
 function handleError(error, fallbackMessage) {
 	if (error instanceof AccessControlError) {
@@ -76,6 +122,8 @@ async function postOffersHandler(req) {
 				{ status: 400 }
 			);
 		}
+		const ownerContext = await loadPlacementCommissionContext(parsed.data.candidateId, parsed.data.jobOrderId);
+		const commissionSplits = resolveCommissionSplits(parsed.data.commissionSplits, ownerContext);
 
 		const offer = await prisma.offer.create({
 			data: normalizeOfferData({
@@ -84,12 +132,22 @@ async function postOffersHandler(req) {
 			}),
 			include: offerInclude
 		});
+		const offerWithCommission = await prisma.offer.update({
+			where: { id: offer.id },
+			data: {
+				commissionSplits: {
+					deleteMany: {},
+					create: commissionSplits
+				}
+			},
+			include: offerInclude
+		});
 		await logCreate({
 			actorUserId: actingUser?.id,
 			entityType: 'PLACEMENT',
-			entity: offer
+			entity: offerWithCommission
 		});
-		return NextResponse.json(offer, { status: 201 });
+		return NextResponse.json(offerWithCommission, { status: 201 });
 	} catch (error) {
 		return handleError(error, 'Failed to create placement.');
 	}

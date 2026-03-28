@@ -191,6 +191,7 @@ Use `Admin Area > Data Export` for:
 - Export payload includes `customFieldDefinitions` so custom schema can be moved across instances
 - Bullhorn API batch ZIP export for custom field definitions, clients, contacts, contact notes, candidates (including structured candidate skills), candidate notes, candidate education, candidate work history, candidate files/resumes, job orders, submissions, interviews, and placements
 - Bullhorn export filters by created/updated date range and expands upstream dependencies so the exported batch stays importable
+- Bullhorn export now also supports a preflight window estimate so administrators can see changed core-row counts by entity before starting a background job
 - Bullhorn export keeps the run sample-sized with a per-entity changed-row limit before dependency expansion
 - Bullhorn exports now run as background jobs in the admin UI, notify the requesting user when ready, and can be downloaded or opened in the import preview flow from the completed job
 - Saved Bullhorn credentials can be managed in `Admin Area > System Settings > Platform Settings` so administrators do not have to re-enter them for each export

@@ -34,8 +34,17 @@ Currency values are formatted during entry and in list displays.
 - End Date (optional)
 
 ## Lock Rules
-- Accepted placements become read-only.
+- Accepted placements lock the core placement package.
+- Commission split tracking remains editable after acceptance so finance and operations can adjust recruiter and sales attribution without reopening the core placement package.
 - Related submission can also be locked accordingly.
+
+## Commission Tracking
+- Recruiter rows
+- Sales rep rows
+- Split %
+- Commission % of gross margin
+
+Each role must total 100%. New placements default recruiter ownership to the candidate owner and sales ownership to the contact owner or client owner.
 
 ## Actions Menu
 Includes withdraw/cancel controls with confirmation and reason capture.
@@ -44,6 +53,7 @@ Includes withdraw/cancel controls with confirmation and reason capture.
 1. Match compensation model to actual contract type.
 2. Record reason when withdrawing or cancelling.
 3. Keep start/end dates accurate for reporting and payroll handoff.
+4. Keep recruiter and sales splits balanced at 100% per role.
 
 ## Advanced Search
 Use advanced search on the placements list when quick lookup is not enough.

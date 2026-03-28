@@ -5,13 +5,32 @@ import { getCandidateJobOrderScope } from '@/lib/related-record-scope';
 import { logCreate, logUpdate } from '@/lib/audit-log';
 import { parseRouteId, ValidationError } from '@/lib/request-validation';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import {
+	buildDefaultPlacementCommissionSplits,
+	getPlacementCommissionOwners,
+	toPlacementCommissionSplitCreateData
+} from '@/lib/placement-commission';
 
 import { withApiLogging } from '@/lib/api-logging';
+const placementUserSelect = { id: true, firstName: true, lastName: true };
 const offerInclude = {
-	candidate: true,
+	candidate: {
+		include: {
+			ownerUser: { select: placementUserSelect }
+		}
+	},
 	jobOrder: {
 		include: {
-			client: true
+			client: {
+				include: {
+					ownerUser: { select: placementUserSelect }
+				}
+			},
+			contact: {
+				include: {
+					ownerUser: { select: placementUserSelect }
+				}
+			}
 		}
 	},
 	submission: {
@@ -20,6 +39,10 @@ const offerInclude = {
 			status: true,
 			createdAt: true
 		}
+	},
+	commissionSplits: {
+		orderBy: [{ role: 'asc' }, { id: 'asc' }],
+		include: { user: { select: placementUserSelect } }
 	}
 };
 
@@ -53,7 +76,28 @@ async function findScopedSubmission(id, actingUser) {
 			jobOrderId: true,
 			jobOrder: {
 				select: {
-					employmentType: true
+					employmentType: true,
+					client: {
+						select: {
+							id: true,
+							ownerId: true,
+							ownerUser: { select: placementUserSelect }
+						}
+					},
+					contact: {
+						select: {
+							id: true,
+							ownerId: true,
+							ownerUser: { select: placementUserSelect }
+						}
+					}
+				}
+			},
+			candidate: {
+				select: {
+					id: true,
+					ownerId: true,
+					ownerUser: { select: placementUserSelect }
 				}
 			},
 			offer: {
@@ -103,6 +147,14 @@ async function postSubmissions_id_convert_to_offerHandler(req, { params }) {
 		const employmentTypeValue = String(submission.jobOrder?.employmentType || '').toLowerCase();
 		const inferredPlacementType = employmentTypeValue.includes('permanent') ? 'perm' : 'temp';
 		const inferredCompensationType = inferredPlacementType === 'perm' ? 'salary' : 'hourly';
+		const commissionSplits = toPlacementCommissionSplitCreateData(
+			buildDefaultPlacementCommissionSplits(
+				getPlacementCommissionOwners({
+					candidate: submission.candidate,
+					jobOrder: submission.jobOrder
+				})
+			)
+		);
 
 		let createdOffer;
 			try {
@@ -116,7 +168,12 @@ async function postSubmissions_id_convert_to_offerHandler(req, { params }) {
 					offeredOn: new Date(),
 					expectedJoinDate: new Date(),
 					notes: conversionNotes,
-					submissionId: submission.id
+					submissionId: submission.id,
+					commissionSplits: commissionSplits.length
+						? {
+								create: commissionSplits
+							}
+						: undefined
 				},
 				include: offerInclude
 				});

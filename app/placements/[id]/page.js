@@ -7,6 +7,7 @@ import { ArrowUpRight, ChevronLeft, ChevronRight, Lock, MoreVertical } from 'luc
 import LookupTypeaheadSelect from '@/app/components/lookup-typeahead-select';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
+import PlacementCommissionSplitsSection from '@/app/components/placement-commission-splits-section';
 import LoadingIndicator from '@/app/components/loading-indicator';
 import SaveActionButton from '@/app/components/save-action-button';
 import AuditTrailPanel from '@/app/components/audit-trail-panel';
@@ -17,6 +18,11 @@ import useIsAdministrator from '@/app/hooks/use-is-administrator';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import { formatDateTimeAt } from '@/lib/date-format';
 import { formatCurrencyInput, normalizeCurrencyInput, parseCurrencyInput } from '@/lib/currency-input';
+import {
+	buildDefaultPlacementCommissionSplits,
+	getPlacementCommissionOwners,
+	validatePlacementCommissionSplits
+} from '@/lib/placement-commission';
 import {
 	clearRecordNavigationContext,
 	readRecordNavigationContext,
@@ -36,6 +42,7 @@ const initialForm = {
 	dailyBillRate: '',
 	dailyPayRate: '',
 	yearlyCompensation: '',
+	commissionSplits: [],
 	offeredOn: '',
 	expectedJoinDate: '',
 	endDate: '',
@@ -164,6 +171,15 @@ function toForm(row) {
 						: ''
 					: formatCurrencyInput(String(row.annualSalary), row.currency || 'USD')
 				: formatCurrencyInput(String(row.yearlyCompensation), row.currency || 'USD'),
+		commissionSplits:
+			Array.isArray(row.commissionSplits) && row.commissionSplits.length > 0
+				? row.commissionSplits
+				: buildDefaultPlacementCommissionSplits(
+						getPlacementCommissionOwners({
+							candidate: row.candidate,
+							jobOrder: row.jobOrder
+						})
+					),
 		offeredOn: toDateOnly(row.offeredOn),
 		expectedJoinDate: toDateOnly(row.expectedJoinDate),
 		endDate: toDateOnly(row.endDate),
@@ -247,14 +263,14 @@ export default function PlacementDetailsPage() {
 	const { archiveEntity } = useArchivedEntities('PLACEMENT');
 	const isAdmin = useIsAdministrator();
 	const relationshipsLocked = Boolean(placement?.id);
-	const acceptedReadOnly = String(placement?.status || '').toLowerCase() === 'accepted';
+	const coreReadOnly = String(placement?.status || '').toLowerCase() === 'accepted';
 	const currentStatus = String(placement?.status || '').toLowerCase();
 	const nextStatus = String(form.status || '').toLowerCase();
 	const placementStarted = hasPlacementStarted(form.expectedJoinDate || placement?.expectedJoinDate);
-	const canWithdrawPlacement = !acceptedReadOnly && !placementStarted && nextStatus !== 'withdrawn';
-	const canCancelPlacement = !acceptedReadOnly && placementStarted && nextStatus !== 'declined';
+	const canWithdrawPlacement = !coreReadOnly && !placementStarted && nextStatus !== 'withdrawn';
+	const canCancelPlacement = !coreReadOnly && placementStarted && nextStatus !== 'declined';
 	const { markAsClean, confirmNavigation } = useUnsavedChangesGuard(form, {
-		enabled: !loading && Boolean(placement) && !acceptedReadOnly
+		enabled: !loading && Boolean(placement)
 	});
 
 	const compensationTypeOptions = useMemo(() => {
@@ -305,6 +321,17 @@ export default function PlacementDetailsPage() {
 		customFieldDefinitions,
 		form.customFields
 	);
+	const commissionValidation = validatePlacementCommissionSplits(form.commissionSplits);
+	const saveDisabled =
+		saveState.saving ||
+		!commissionValidation.valid ||
+		(!coreReadOnly &&
+			(!form.candidateId ||
+				!form.jobOrderId ||
+				!form.offeredOn ||
+				!form.expectedJoinDate ||
+				!compensationComplete ||
+				!customFieldsComplete));
 	const placementNavigationState = useMemo(() => {
 		if (!recordNavigationContext?.ids?.length || !id) return null;
 		const ids = recordNavigationContext.ids.map((value) => String(value));
@@ -404,24 +431,15 @@ export default function PlacementDetailsPage() {
 	}, [saveState.success, toast]);
 
 	async function savePlacement(nextForm, successMessage = 'Placement updated.') {
-		if (acceptedReadOnly) {
-			setSaveState({
-				saving: false,
-				error: 'Accepted placements are read-only and cannot be changed.',
-				success: ''
-			});
-			return null;
-		}
-
-		if (!nextForm.candidateId || !nextForm.jobOrderId) {
+		if (!coreReadOnly && (!nextForm.candidateId || !nextForm.jobOrderId)) {
 			setSaveState({ saving: false, error: 'Candidate and Job Order are required.', success: '' });
 			return null;
 		}
-		if (!nextForm.offeredOn || !nextForm.expectedJoinDate) {
+		if (!coreReadOnly && (!nextForm.offeredOn || !nextForm.expectedJoinDate)) {
 			setSaveState({ saving: false, error: 'Offer date and start date are required.', success: '' });
 			return null;
 		}
-		if (!customFieldsComplete) {
+		if (!coreReadOnly && !customFieldsComplete) {
 			setSaveState({ saving: false, error: 'Complete all required custom fields before saving.', success: '' });
 			return null;
 		}
@@ -492,15 +510,6 @@ export default function PlacementDetailsPage() {
 
 	async function onSave(e) {
 		e.preventDefault();
-		if (acceptedReadOnly) {
-			setSaveState({
-				saving: false,
-				error: 'Accepted placements are read-only and cannot be changed.',
-				success: ''
-			});
-			return;
-		}
-
 		if (form.status === 'withdrawn' && currentStatus !== 'withdrawn') {
 			if (placementStarted) {
 				setSaveState({
@@ -547,7 +556,7 @@ export default function PlacementDetailsPage() {
 	}
 
 	async function onWithdrawPlacement() {
-		if (acceptedReadOnly) {
+		if (coreReadOnly) {
 			setSaveState({
 				saving: false,
 				error: 'Accepted placements are read-only and cannot be changed.',
@@ -592,7 +601,7 @@ export default function PlacementDetailsPage() {
 	}
 
 	async function onCancelPlacement() {
-		if (acceptedReadOnly) {
+		if (coreReadOnly) {
 			setSaveState({
 				saving: false,
 				error: 'Accepted placements are read-only and cannot be changed.',
@@ -737,7 +746,7 @@ export default function PlacementDetailsPage() {
 							</button>
 						{actionsOpen ? (
 							<div className="actions-menu-list" role="menu" aria-label="Placement actions">
-								{acceptedReadOnly ? null : (
+								{coreReadOnly ? null : (
 									<>
 										<button
 											type="button"
@@ -842,15 +851,15 @@ export default function PlacementDetailsPage() {
 				</div>
 			</article>
 
-			<article className="panel panel-spacious">
-				<h3>Placement Details</h3>
-				<p className="panel-subtext">
-					{acceptedReadOnly
-						? 'This placement is accepted and locked for editing.'
-						: 'Edit placement details and save updates.'}
-				</p>
-				<form onSubmit={onSave} className="detail-form">
-					<fieldset className="detail-form-fieldset" disabled={saveState.saving || acceptedReadOnly}>
+			<form onSubmit={onSave} className="detail-layout detail-layout-equal detail-form">
+				<article className="panel panel-spacious">
+					<h3>Placement Details</h3>
+					<p className="panel-subtext">
+						{coreReadOnly
+							? 'This placement is accepted. Core placement details are locked.'
+							: 'Edit placement details and save updates.'}
+					</p>
+					<fieldset className="detail-form-fieldset" disabled={saveState.saving || coreReadOnly}>
 						<section className="form-section">
 							<h4>Placement Package</h4>
 							<div className="detail-form-grid-3">
@@ -888,7 +897,7 @@ export default function PlacementDetailsPage() {
 											placeholder="Search candidate"
 											label="Candidate"
 											emptyLabel="No matching candidates."
-											disabled={acceptedReadOnly}
+											disabled={coreReadOnly}
 										/>
 									)}
 								</FormField>
@@ -909,7 +918,7 @@ export default function PlacementDetailsPage() {
 											placeholder="Search job order"
 											label="Job Order"
 											emptyLabel="No matching job orders."
-											disabled={acceptedReadOnly}
+											disabled={coreReadOnly}
 										/>
 									)}
 								</FormField>
@@ -1119,7 +1128,7 @@ export default function PlacementDetailsPage() {
 									</FormField>
 								) : null}
 							</div>
-							<div className="detail-form-grid-3 detail-form-grid-half">
+							<div className="detail-form-grid-3">
 								<FormField label="Offered On" required>
 									<input
 										type="date"
@@ -1167,40 +1176,42 @@ export default function PlacementDetailsPage() {
 									}))
 								}
 								onDefinitionsChange={setCustomFieldDefinitions}
-								disabled={acceptedReadOnly}
+								disabled={coreReadOnly}
 							/>
 						</section>
 					</fieldset>
-
-					<div className="form-actions">
-						{acceptedReadOnly ? (
-							<button type="button" disabled>
-								Accepted
-							</button>
-						) : (
-							<SaveActionButton
-								saving={saveState.saving}
-								disabled={
-									saveState.saving ||
-									acceptedReadOnly ||
-									!form.candidateId ||
-									!form.jobOrderId ||
-									!form.offeredOn ||
-									!form.expectedJoinDate ||
-									!compensationComplete ||
-									!customFieldsComplete
-								}
-								label="Save Placement"
-								savingLabel="Saving Placement..."
-							/>
-						)}
+					<div className="form-actions placement-commission-form-actions">
+						<SaveActionButton
+							saving={saveState.saving}
+							disabled={saveDisabled}
+							label={coreReadOnly ? 'Save Commission' : 'Save Placement'}
+							savingLabel={coreReadOnly ? 'Saving Commission...' : 'Saving Placement...'}
+						/>
 						<span className="form-actions-meta">
 							<span>Updated:</span>
 							<strong>{formatDate(placement.updatedAt)}</strong>
 						</span>
 					</div>
-				</form>
-			</article>
+				</article>
+
+				<article className="panel panel-spacious">
+					<h3>Commission Splits</h3>
+					<p className="panel-subtext">
+						Track recruiter and sales rep splits. Each role must total 100% across its own rows.
+					</p>
+					<fieldset className="detail-form-fieldset" disabled={saveState.saving}>
+						<PlacementCommissionSplitsSection
+							splits={form.commissionSplits}
+							onChange={(nextSplits) =>
+								setForm((current) => ({
+									...current,
+									commissionSplits: nextSplits
+								}))
+							}
+						/>
+					</fieldset>
+				</article>
+			</form>
 			{isAdmin ? <AuditTrailPanel entityType="PLACEMENT" entityId={id} visible={showAuditTrail} /> : null}
 		</section>
 	);

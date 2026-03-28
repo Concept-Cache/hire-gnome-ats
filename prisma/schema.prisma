@@ -113,6 +113,7 @@ model User {
 	archivedEntities ArchivedEntity[] @relation("ArchivedEntityByUser")
 	billingSeatSyncEvents BillingSeatSyncEvent[] @relation("BillingSeatSyncTriggeredBy")
 	bullhornExportJobs   BullhornExportJob[] @relation("BullhornExportRequestedBy")
+	placementCommissionSplits OfferCommissionSplit[] @relation("PlacementCommissionSplitUser")
 
 	@@index([divisionId])
 }
@@ -860,10 +861,29 @@ model Offer {
 
 	jobOrderId Int
 	jobOrder   JobOrder @relation(fields: [jobOrderId], references: [id], onDelete: Restrict)
+	commissionSplits OfferCommissionSplit[]
 
 	@@index([candidateId, status])
 	@@index([jobOrderId, status])
 	@@index([status])
+}
+
+model OfferCommissionSplit {
+	id                Int      @id @default(autoincrement())
+	recordId          String   @unique
+	offerId           Int
+	userId            Int
+	role              String
+	splitPercent      Float
+	commissionPercent Float
+	createdAt         DateTime @default(now())
+	updatedAt         DateTime @updatedAt
+
+	offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+	user  User  @relation("PlacementCommissionSplitUser", fields: [userId], references: [id], onDelete: Restrict)
+
+	@@index([offerId, role])
+	@@index([userId, role])
 }
 
 model ZipCode {

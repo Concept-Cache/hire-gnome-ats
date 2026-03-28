@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DIVISION_ACCESS_MODE_OPTIONS } from '@/app/constants/access-control-options';
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 
@@ -87,9 +88,12 @@ export default function NewDivisionPage() {
 								))}
 							</select>
 						</FormField>
-						<button type="submit" disabled={saving}>
-							{saving ? 'Saving...' : 'Save Division'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving}
+							label="Save Division"
+							savingLabel="Saving Division..."
+						/>
 					</form>
 				</article>
 			</section>

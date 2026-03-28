@@ -9,6 +9,7 @@ import AddressTypeaheadInput from '@/app/components/address-typeahead-input';
 import FormField from '@/app/components/form-field';
 import CustomFieldsSection, { areRequiredCustomFieldsComplete } from '@/app/components/custom-fields-section';
 import SkillChipSelect from '@/app/components/skill-chip-select';
+import SaveActionButton from '@/app/components/save-action-button';
 import NewRecordGuide from '@/app/components/new-record-guide';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
@@ -885,9 +886,12 @@ function NewCandidatePageContent() {
 								}
 								onDefinitionsChange={setCustomFieldDefinitions}
 							/>
-							<button type="submit" disabled={saving || !canSaveCandidate}>
-								{saving ? 'Saving...' : 'Save Candidate'}
-							</button>
+							<SaveActionButton
+								saving={saving}
+								disabled={saving || !canSaveCandidate}
+								label="Save Candidate"
+								savingLabel="Saving Candidate..."
+							/>
 						</form>
 
 						{duplicateMatches.length > 0 ? (

@@ -27,6 +27,10 @@ This changelog captures the main recent product-facing changes shipped in Hire G
 - Bullhorn export jobs no longer duplicate the saved credential fields in the export form and now rely on Platform Settings for those values.
 - Admin settings diagnostics now includes a destructive operational-data purge flow with typed confirmation, so administrators can clear ATS records and migration artifacts while preserving users, divisions, system settings, skills, custom field definitions, and zip codes.
 - Import preview and import results now surface row-level actions plus explicit match reasons, so administrators can see why rows will update or skip before committing a migration.
+- Bullhorn export now includes a preflight window estimate so administrators can see changed core-row counts by entity before starting a background export job.
+- Placements now track recruiter and sales commission splits by user, role, split percentage, and commission % of gross margin, with 100% totals enforced per role and accepted placements still allowing commission-only edits.
+- Validation status now uses compact red/green chips in the main migration and record-edit flows where the state is binary, and contact forms now surface inline email validation before save.
+- Candidate list columns now also expose `Skills` and `Files` as optional selectable columns.
 
 ## [1.5.1] - 2026-03-17
 

@@ -18,6 +18,7 @@ import {
 	normalizePlacementAdvancedCriteria,
 	summarizePlacementAdvancedCriterion
 } from '@/lib/placement-advanced-search';
+import { summarizePlacementCommissionSplits } from '@/lib/placement-commission';
 import { saveRecordNavigationContext, withRecordNavigationQuery } from '@/lib/record-navigation-context';
 import { formatSelectValueLabel } from '@/lib/select-value-label';
 import { buildDefaultTableSortState, normalizeTableSortState } from '@/lib/table-sort';
@@ -104,6 +105,10 @@ function formatCompensation(row) {
 	return row.amount == null ? '-' : formatCurrency(row.currency, row.amount);
 }
 
+function formatCommission(row) {
+	return summarizePlacementCommissionSplits(row.commissionSplits);
+}
+
 export default function PlacementsPage() {
 	const router = useRouter();
 	const [rows, setRows] = useState([]);
@@ -147,7 +152,7 @@ export default function PlacementsPage() {
 		return activeRows.filter((row) => {
 			const matchesQuery =
 				!q ||
-				`${row.candidateSearchText} ${row.jobOrder} ${row.client} ${row.statusLabel} ${row.placementTypeLabel} ${row.compensationLabel}`
+				`${row.candidateSearchText} ${row.jobOrder} ${row.client} ${row.statusLabel} ${row.placementTypeLabel} ${row.compensationLabel} ${row.commissionLabel}`
 					.toLowerCase()
 					.includes(q);
 			return matchesQuery;
@@ -199,6 +204,7 @@ export default function PlacementsPage() {
 						statusLabel: formatSelectValueLabel(placement.status),
 						placementTypeLabel: formatPlacementType(placement.placementType),
 						compensationLabel: formatCompensation(placement),
+						commissionLabel: formatCommission(placement),
 						offeredOnLabel: formatDateTime(placement.offeredOn),
 						expectedJoinDateLabel: formatDateTime(placement.expectedJoinDate),
 						endDateLabel: formatDateTime(placement.endDate)
@@ -277,6 +283,7 @@ export default function PlacementsPage() {
 		},
 		{ key: 'placementTypeLabel', label: 'Type' },
 		{ key: 'compensationLabel', label: 'Compensation' },
+		{ key: 'commissionLabel', label: 'Commission', defaultVisible: false },
 		{ key: 'statusLabel', label: 'Status' },
 		{ key: 'offeredOnLabel', label: 'Offered On', defaultVisible: false, getSortValue: (row) => row.offeredOn || '' },
 		{ key: 'expectedJoinDateLabel', label: 'Expected Join', defaultVisible: false, getSortValue: (row) => row.expectedJoinDate || '' },

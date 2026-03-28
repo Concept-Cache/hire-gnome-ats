@@ -130,6 +130,7 @@ Formats:
 Bullhorn export:
 - Save Bullhorn API credentials in `System Settings > Platform Settings`
 - Choose `Updated From` / `Updated To`
+- Estimate changed Bullhorn core-row counts for the selected date window before starting the export job
 - Choose a per-entity changed-row sample limit
 - Choose whether candidate files/resumes should be included
 - Queue a background export job and review it from the Bullhorn export jobs list

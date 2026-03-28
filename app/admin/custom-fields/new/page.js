@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import AdminGate from '@/app/components/admin-gate';
 import FormField from '@/app/components/form-field';
+import SaveActionButton from '@/app/components/save-action-button';
 import { useToast } from '@/app/components/toast-provider';
 import useUnsavedChangesGuard from '@/app/hooks/use-unsaved-changes-guard';
 import {
@@ -232,9 +233,12 @@ export default function NewCustomFieldPage() {
 								<span className="switch-hint">Inactive fields are hidden on forms.</span>
 							</span>
 						</label>
-						<button type="submit" disabled={saving || !canSave}>
-							{saving ? 'Saving...' : 'Save Custom Field'}
-						</button>
+						<SaveActionButton
+							saving={saving}
+							disabled={saving || !canSave}
+							label="Save Custom Field"
+							savingLabel="Saving Custom Field..."
+						/>
 					</form>
 				</article>
 			</section>

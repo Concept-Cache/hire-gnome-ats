@@ -62,9 +62,12 @@ export default function AdminExportsPage() {
 	const [activeTab, setActiveTab] = useState('hire_gnome');
 	const [dataExporting, setDataExporting] = useState(false);
 	const [bullhornExporting, setBullhornExporting] = useState(false);
+	const [bullhornEstimating, setBullhornEstimating] = useState(false);
 	const [bullhornJobs, setBullhornJobs] = useState([]);
 	const [bullhornJobsLoading, setBullhornJobsLoading] = useState(true);
 	const [activeJobAction, setActiveJobAction] = useState('');
+	const [bullhornEstimate, setBullhornEstimate] = useState(null);
+	const [bullhornEstimateError, setBullhornEstimateError] = useState('');
 	const [operationFlagsLoaded, setOperationFlagsLoaded] = useState(false);
 	const [operationFlags, setOperationFlags] = useState({
 		bullhornOperationsEnabled: true,
@@ -94,12 +97,14 @@ export default function AdminExportsPage() {
 				: 'Export Data Snapshot';
 
 	const bullhornButtonLabel = bullhornExporting ? 'Starting Background Export...' : 'Start Background Export';
+	const bullhornEstimateButtonLabel = bullhornEstimating ? 'Estimating...' : 'Estimate Window';
 
 	const hasActiveBullhornJob = useMemo(
 		() => bullhornJobs.some((job) => isActiveJobStatus(job.status)),
 		[bullhornJobs]
 	);
 	const bullhornExportReady = operationFlags.bullhornOperationsEnabled && operationFlags.bullhornCredentialsConfigured;
+	const bullhornEstimateReady = bullhornExportReady && bullhornOptions.dateFrom && bullhornOptions.dateTo;
 
 	async function loadBullhornJobs({ silent = false } = {}) {
 		if (!silent) {
@@ -170,6 +175,11 @@ export default function AdminExportsPage() {
 		}, hasActiveBullhornJob ? 4000 : 12000);
 		return () => window.clearInterval(timer);
 	}, [hasActiveBullhornJob]);
+
+	useEffect(() => {
+		setBullhornEstimate(null);
+		setBullhornEstimateError('');
+	}, [bullhornOptions.dateFrom, bullhornOptions.dateTo]);
 
 	async function onExportData() {
 		if (dataExporting) return;
@@ -257,6 +267,42 @@ export default function AdminExportsPage() {
 			toast.error(error?.message || 'Failed to start Bullhorn export.');
 		} finally {
 			setBullhornExporting(false);
+		}
+	}
+
+	async function onEstimateBullhorn() {
+		if (bullhornEstimating) return;
+		setBullhornEstimateError('');
+		setBullhornEstimating(true);
+
+		try {
+			const normalizedFrom = new Date(bullhornOptions.dateFrom);
+			const normalizedTo = new Date(bullhornOptions.dateTo);
+			if (Number.isNaN(normalizedFrom.getTime())) {
+				throw new Error('Updated From is invalid.');
+			}
+			if (Number.isNaN(normalizedTo.getTime())) {
+				throw new Error('Updated To is invalid.');
+			}
+			if (normalizedFrom.getTime() > normalizedTo.getTime()) {
+				throw new Error('Updated From must be before Updated To.');
+			}
+
+			const query = new URLSearchParams({
+				dateFrom: normalizedFrom.toISOString(),
+				dateTo: normalizedTo.toISOString()
+			});
+			const res = await fetch(`/api/admin/bullhorn-export?${query.toString()}`, { cache: 'no-store' });
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				throw new Error(data.error || 'Failed to estimate Bullhorn export scope.');
+			}
+			setBullhornEstimate(data);
+		} catch (error) {
+			setBullhornEstimate(null);
+			setBullhornEstimateError(error?.message || 'Failed to estimate Bullhorn export scope.');
+		} finally {
+			setBullhornEstimating(false);
 		}
 	}
 
@@ -564,11 +610,44 @@ export default function AdminExportsPage() {
 								<p className="panel-subtext exports-section-footnote">
 									Uses the Bullhorn credentials saved in Platform Settings. The sample limit applies to changed Bullhorn rows per entity before dependency expansion. The export runs in the background and can be downloaded or imported when ready.
 								</p>
+								{bullhornEstimate ? (
+									<div className="exports-estimate-card">
+										<div className="exports-estimate-head">
+											<strong>Window Estimate</strong>
+											<span>{Number(bullhornEstimate.total || 0)} changed core rows</span>
+										</div>
+										<div className="exports-job-counts exports-estimate-counts">
+											{Object.entries(bullhornEstimate.counts || {}).map(([key, value]) => (
+												<span key={key} className="chip">
+													{key === 'jobOrders'
+														? 'Jobs'
+														: key === 'placements'
+															? 'Placements'
+															: key.charAt(0).toUpperCase() + key.slice(1)} {Number(value || 0)}
+												</span>
+											))}
+										</div>
+										<p className="panel-subtext">
+											This count is based on changed core Bullhorn records in the selected date window before dependency expansion and before the sample limit is applied.
+										</p>
+									</div>
+								) : null}
+								{bullhornEstimateError ? (
+									<p className="panel-subtext error">{bullhornEstimateError}</p>
+								) : null}
 								<div className="form-actions">
 									<button
 										type="button"
+										className="btn-secondary"
+										onClick={onEstimateBullhorn}
+										disabled={bullhornEstimating || bullhornExporting || !bullhornEstimateReady}
+									>
+										{bullhornEstimateButtonLabel}
+									</button>
+									<button
+										type="button"
 										onClick={onExportBullhorn}
-										disabled={bullhornExporting || !bullhornExportReady}
+										disabled={bullhornExporting || bullhornEstimating || !bullhornExportReady}
 									>
 										{bullhornButtonLabel}
 									</button>
