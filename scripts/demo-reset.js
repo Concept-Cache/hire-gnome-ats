@@ -7,6 +7,8 @@ const { spawnSync } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
 
 const RESET_MODE_VALUES = new Set(['full', 'seed']);
+const DEMO_SITE_NAME = 'Hire Gnome ATS';
+const DEMO_THEME_KEY = 'classic_blue';
 
 function parseArgValue(name, fallback = '') {
 	const prefix = `--${name}=`;
@@ -60,9 +62,6 @@ async function loadSystemSettingsSnapshot(enabled) {
 			orderBy: { id: 'asc' },
 			select: {
 				recordId: true,
-				siteName: true,
-				siteTitle: true,
-				themeKey: true,
 				careerSiteEnabled: true,
 				apiErrorLogRetentionDays: true,
 				googleMapsApiKey: true,
@@ -80,12 +79,7 @@ async function loadSystemSettingsSnapshot(enabled) {
 				objectStorageEndpoint: true,
 				objectStorageForcePathStyle: true,
 				objectStorageAccessKeyId: true,
-				objectStorageSecretAccessKey: true,
-				logoStorageProvider: true,
-				logoStorageBucket: true,
-				logoStorageKey: true,
-				logoContentType: true,
-				logoFileName: true
+				objectStorageSecretAccessKey: true
 			}
 		});
 		return settings || null;
@@ -130,6 +124,39 @@ async function restoreSystemSettings(snapshot) {
 	}
 }
 
+async function applyDemoBrandingDefaults() {
+	const prisma = new PrismaClient();
+	try {
+		const existing = await prisma.systemSetting.findFirst({
+			orderBy: { id: 'asc' },
+			select: { id: true }
+		});
+		if (!existing) return false;
+		await prisma.systemSetting.update({
+			where: { id: existing.id },
+			data: {
+				siteName: DEMO_SITE_NAME,
+				siteTitle: DEMO_SITE_NAME,
+				themeKey: DEMO_THEME_KEY,
+				logoStorageProvider: null,
+				logoStorageBucket: null,
+				logoStorageKey: null,
+				logoContentType: null,
+				logoFileName: null
+			}
+		});
+		return true;
+	} catch (error) {
+		if (isMissingSystemSettingsTableError(error)) {
+			console.log('[demo-reset] System settings table not available after reset; skipping branding reset.');
+			return false;
+		}
+		throw error;
+	} finally {
+		await prisma.$disconnect();
+	}
+}
+
 async function main() {
 	const options = parseOptions();
 	console.log(`[demo-reset] Starting demo reset (mode=${options.mode}, preserveSettings=${options.preserveSettings}).`);
@@ -152,6 +179,11 @@ async function main() {
 			? '[demo-reset] Restored system settings snapshot.'
 			: '[demo-reset] No system settings snapshot to restore.');
 	}
+
+	const brandingReset = await applyDemoBrandingDefaults();
+	console.log(brandingReset
+		? '[demo-reset] Reset branding to the classic blue demo defaults.'
+		: '[demo-reset] No system settings record available for branding reset.');
 
 	console.log('[demo-reset] Completed successfully.');
 }
