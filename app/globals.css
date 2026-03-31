@@ -790,17 +790,19 @@ p {
 }
 
 .brand-block {
-	padding: 0.9rem;
-	border-radius: 14px;
-	background: #f4f8fc;
-	border: 1px solid #ccd9ea;
-	box-shadow: 0 4px 12px rgba(9, 31, 59, 0.18);
+	padding: 0.65rem 0.75rem;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(217, 232, 255, 0.22);
+	backdrop-filter: blur(4px);
 	color: var(--ink);
 	margin-bottom: 1rem;
 }
 
 .brand-link {
-	display: block;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	text-decoration: none;
 }
 
@@ -808,7 +810,7 @@ p {
 	display: block;
 	width: 100%;
 	height: auto;
-	max-height: 104px;
+	max-height: 76px;
 	object-fit: contain;
 }
 
