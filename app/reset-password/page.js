@@ -84,7 +84,11 @@ function ResetPasswordPageContent() {
 	return (
 		<section className="auth-page">
 			<article className="auth-card">
-				<Link href="/" className="auth-brand-link" aria-label={`${branding.siteName} home`}>
+				<Link
+					href="/"
+					className={branding.hasCustomLogo ? 'auth-brand-link' : 'auth-brand-link brand-plaque'}
+					aria-label={`${branding.siteName} home`}
+				>
 					<img src={branding.logoUrl} alt={branding.siteName} className="auth-brand-logo" />
 				</Link>
 				<h1>Reset Password</h1>

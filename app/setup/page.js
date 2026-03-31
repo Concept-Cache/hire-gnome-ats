@@ -193,10 +193,12 @@ export default function SetupPage() {
 		);
 	}
 
+	const useDefaultBrandPlaque = !logoPreviewUrl && !branding.hasCustomLogo;
+
 	return (
 		<section className="auth-page">
 			<article className="auth-card setup-card">
-				<div className="auth-brand-link">
+				<div className={useDefaultBrandPlaque ? 'auth-brand-link brand-plaque' : 'auth-brand-link'}>
 					<img src={logoPreviewUrl || branding.logoUrl} alt={form.siteName || branding.siteName} className="auth-brand-logo" />
 				</div>
 				<h1>Initial Setup</h1>
