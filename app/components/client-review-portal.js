@@ -133,8 +133,13 @@ export default function ClientReviewPortal({ initialData, token }) {
 		<section className="client-portal-page">
 			<div className="client-portal-shell">
 				<header className="client-portal-hero">
-					<div className="client-portal-brand">
-						<img src={portalData?.branding?.logoUrl || '/branding/hire-gnome.png'} alt={portalData?.branding?.siteName || 'Hire Gnome ATS'} />
+					<div className={portalData?.branding?.hasCustomLogo ? 'client-portal-brand with-logo' : 'client-portal-brand'}>
+						{portalData?.branding?.hasCustomLogo ? (
+							<img
+								src={portalData?.branding?.logoUrl || '/branding/hire-gnome.png'}
+								alt={portalData?.branding?.siteName || 'Hire Gnome ATS'}
+							/>
+						) : null}
 						<div>
 							<p className="client-portal-kicker">Client Review Portal</p>
 							<h1>{portalData?.portal?.jobOrder?.title || 'Submitted Candidates'}</h1>

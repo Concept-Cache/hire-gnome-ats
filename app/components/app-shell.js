@@ -294,10 +294,12 @@ export default function AppShell({ children }) {
 		return (
 			<ToastProvider>
 				<div className="career-public-shell">
-					<header className="career-public-topbar">
-						<Link href="/careers" className="career-public-brand" aria-label={`${branding.siteName} Careers`}>
-							<img src={branding.logoUrl} alt={branding.siteName} className="career-public-brand-logo" />
-						</Link>
+					<header className={branding.hasCustomLogo ? 'career-public-topbar' : 'career-public-topbar no-brand'}>
+						{branding.hasCustomLogo ? (
+							<Link href="/careers" className="career-public-brand" aria-label={`${branding.siteName} Careers`}>
+								<img src={branding.logoUrl} alt={branding.siteName} className="career-public-brand-logo" />
+							</Link>
+						) : null}
 						<nav className="career-public-quick-links" aria-label="Career quick filters">
 							{CAREER_QUICK_LINKS.map((item) => {
 								const isActive =
