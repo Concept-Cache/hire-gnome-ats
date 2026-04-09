@@ -23,6 +23,7 @@ prisma/dev.db-*
 # Runtime storage / backups
 .local-storage/
 .backups/
+.generated/
 
 # Logs / reports
 *.log
