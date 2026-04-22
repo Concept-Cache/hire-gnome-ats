@@ -33,6 +33,24 @@ function escapeHtml(value) {
 
 function getClientPortalEmailPalette(themeKey) {
 	switch (normalizeThemeKey(themeKey)) {
+		case 'midnight':
+			return {
+				shellBg: '#0f1722',
+				cardBg: '#152233',
+				cardBorder: '#304760',
+				headerGradient: 'linear-gradient(135deg,#0a1220 0%,#10243a 56%,#183a5a 100%)',
+				headerInk: '#f3f7fc',
+				headerMuted: '#c9d7e8',
+				kickerInk: '#9fb0c7',
+				bodyInk: '#f3f7fc',
+				mutedInk: '#9fb0c7',
+				linkInk: '#57a6ff',
+				ctaBg: '#1d4ed8',
+				ctaInk: '#ffffff',
+				infoBg: '#1d2c40',
+				infoBorder: '#304760',
+				infoInk: '#d7e6f7'
+			};
 		case 'emerald':
 			return {
 				shellBg: '#eef8f2',
@@ -108,20 +126,20 @@ function getClientPortalEmailPalette(themeKey) {
 		case 'classic_blue':
 		default:
 			return {
-				shellBg: '#f4f7fb',
+				shellBg: '#eef3f8',
 				cardBg: '#ffffff',
-				cardBorder: '#d6e2f2',
-				headerGradient: 'linear-gradient(135deg,#0b2f5f 0%,#15579d 56%,#1b8f5d 100%)',
+				cardBorder: '#c7d9ef',
+				headerGradient: 'linear-gradient(135deg,#0b2f5f 0%,#15579d 56%,#1f79ff 100%)',
 				headerInk: '#f4f9ff',
 				headerMuted: '#dce9ff',
 				kickerInk: '#c6dcfb',
 				bodyInk: '#173153',
 				mutedInk: '#5d769d',
-				linkInk: '#15579d',
-				ctaBg: '#15579d',
+				linkInk: '#0f6bff',
+				ctaBg: '#0f6bff',
 				ctaInk: '#ffffff',
-				infoBg: '#f8fbff',
-				infoBorder: '#d6e2f2',
+				infoBg: '#eaf2ff',
+				infoBorder: '#c7d9ef',
 				infoInk: '#2d466d'
 			};
 	}

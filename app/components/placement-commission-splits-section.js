@@ -78,7 +78,7 @@ export default function PlacementCommissionSplitsSection({
 				{normalized.map((split, index) => (
 					<div key={split._key || `${split.role}-${index}`} className="placement-commission-split-card">
 						<div className="detail-form-grid-5 placement-commission-split-row">
-							<FormField label="User">
+							<FormField label="User" className="placement-commission-user-field">
 								<LookupTypeaheadSelect
 									entity="users"
 									lookupParams={{}}
@@ -90,7 +90,7 @@ export default function PlacementCommissionSplitsSection({
 									disabled={disabled}
 								/>
 							</FormField>
-							<FormField label="Role">
+							<FormField label="Role" className="placement-commission-role-field">
 								<select
 									value={split.role}
 									onChange={(event) => updateSplit(index, { role: event.target.value })}
@@ -100,7 +100,7 @@ export default function PlacementCommissionSplitsSection({
 									<option value="sales_rep">{formatPlacementCommissionRoleLabel('sales_rep')}</option>
 								</select>
 							</FormField>
-							<FormField label="Split %">
+							<FormField label="Split %" className="placement-commission-split-percent-field">
 								<input
 									type="text"
 									inputMode="decimal"
@@ -112,7 +112,7 @@ export default function PlacementCommissionSplitsSection({
 									placeholder="0"
 								/>
 							</FormField>
-							<FormField label="Commission %">
+							<FormField label="Commission %" className="placement-commission-commission-percent-field">
 								<input
 									type="text"
 									inputMode="decimal"
