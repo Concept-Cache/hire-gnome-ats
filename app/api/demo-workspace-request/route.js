@@ -5,6 +5,7 @@ import { withApiLogging } from '@/lib/api-logging';
 import { DEMO_MODE } from '@/lib/demo-config';
 import { logWarn, requestLogContext } from '@/lib/logger';
 import { enforceMutationThrottle } from '@/lib/mutation-throttle';
+import { CURRENT_ATS_OPTIONS } from '@/lib/demo-workspace-options';
 
 const SUBMITTED_COOKIE_NAME = 'hg_demo_workspace_requested';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -15,7 +16,7 @@ const requestSchema = z.object({
 	workEmail: z.string().trim().email().max(254),
 	agencyName: z.string().trim().min(1).max(160),
 	teamSize: z.string().trim().min(1).max(40),
-	currentAts: z.string().trim().min(1).max(120),
+	currentAts: z.string().trim().pipe(z.enum(CURRENT_ATS_OPTIONS.map((option) => option.value))),
 	note: z.string().trim().min(1).max(2000),
 	botpoisonSolution: z.string().trim().min(1).max(10000)
 });

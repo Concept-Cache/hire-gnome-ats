@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Botpoison from '@botpoison/browser';
 import { CheckCircle2, Send, X } from 'lucide-react';
 import FormField from '@/app/components/form-field';
+import { CURRENT_ATS_OPTIONS } from '@/lib/demo-workspace-options';
 
 const QUALIFYING_ACTIVE_MS = (process.env.NODE_ENV === 'development' ? 1 : 8) * 60 * 1000;
 const DISMISSAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -27,8 +28,8 @@ const MAIN_SECTION_PATHS = [
 ];
 const TEAM_SIZE_OPTIONS = [
 	{ label: 'Solo recruiter', value: 'Solo recruiter' },
-	{ label: '2-5 recruiters', value: '2–5 recruiters' },
-	{ label: '6-15 recruiters', value: '6–15 recruiters' },
+	{ label: '2–5 recruiters', value: '2–5 recruiters' },
+	{ label: '6–15 recruiters', value: '6–15 recruiters' },
 	{ label: '16+ recruiters', value: '16+ recruiters' }
 ];
 const EMPTY_FORM = {
@@ -214,7 +215,9 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 							</h3>
 							{view !== 'success' ? (
 								<p className="panel-subtext">
-									Request a private Hire Gnome workspace with a clean database for your agency.
+									{view === 'form'
+										? 'No sales call. No pitch deck. Just tell us about your agency and your workspace will be up and running within one business day — free for the first 14 days.'
+										: 'Request a private Hire Gnome workspace with a clean database for your agency.'}
 								</p>
 							) : null}
 						</div>
@@ -240,6 +243,7 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 					{view === 'form' ? (
 						<form className="demo-workspace-form" onSubmit={submitRequest}>
 							<input type="hidden" name="source" value="Hire Gnome Public Demo" />
+							<p className="panel-subtext">All fields are required.</p>
 							<div className="form-grid-2">
 								<FormField label="First name" required>
 									<input name="firstName" aria-label="First name" value={form.firstName} onChange={updateField} autoComplete="given-name" required maxLength={80} />
@@ -263,18 +267,23 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 										))}
 									</select>
 								</FormField>
-								<FormField label="Current ATS" required hint="Enter None if you do not use an ATS.">
-									<input name="currentAts" aria-label="Current ATS" value={form.currentAts} onChange={updateField} placeholder="Bullhorn, Zoho, None, etc." required maxLength={120} />
+								<FormField label="Current ATS" required>
+									<select name="currentAts" aria-label="Current ATS" value={form.currentAts} onChange={updateField} required>
+										<option value="">Select...</option>
+										{CURRENT_ATS_OPTIONS.map((option) => (
+											<option key={option.value} value={option.value}>{option.label}</option>
+										))}
+									</select>
 								</FormField>
 							</div>
 							<FormField label="Anything else we should know?" required>
-								<textarea name="note" aria-label="Anything else we should know?" value={form.note} onChange={updateField} placeholder="Tell us about your agency, migration needs, timeline, or questions..." required rows={3} maxLength={2000} />
+								<textarea name="note" aria-label="Anything else we should know?" value={form.note} onChange={updateField} placeholder="Migration needs, timeline, questions..." required rows={3} maxLength={2000} />
 							</FormField>
 							{status === 'error' ? <p className="form-status form-status-error" role="alert">{message}</p> : null}
 							<div className="demo-workspace-actions">
 								<button type="button" className="btn-secondary" onClick={dismiss} disabled={status === 'submitting'}>Keep exploring</button>
 								<button type="submit" className="btn-primary" disabled={status === 'submitting'}>
-									{status === 'submitting' ? 'Sending...' : 'Submit request'}
+									{status === 'submitting' ? 'Sending...' : 'Request Workspace'}
 								</button>
 							</div>
 						</form>
