@@ -50,7 +50,34 @@ async function loginAndGetCookie(email) {
 	}
 	const cookieParts = parseSetCookieHeaders(res.headers);
 	assert(cookieParts.length > 0, `No auth cookie returned for ${email}`);
-	return cookieParts.join('; ');
+	const cookie = cookieParts.join('; ');
+	if (!body.user?.passwordChangeRequired) return cookie;
+
+	// Fresh users must complete the same first-login flow as real users.
+	// Check the gate before changing the password; never bypass it in the app.
+	const blocked = await apiGet('/api/clients', cookie);
+	assert(
+		blocked.res.status === 403 && blocked.body.code === 'PASSWORD_CHANGE_REQUIRED',
+		`Temporary-password session should be blocked, got ${blocked.res.status}: ${JSON.stringify(blocked.body)}`
+	);
+	const newPassword = `${LOGIN_PASSWORD}-Changed!`;
+	const changeResponse = await fetch(`${BASE_URL}/api/session/change-password`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', cookie },
+		body: JSON.stringify({
+			currentPassword: LOGIN_PASSWORD,
+			newPassword,
+			confirmPassword: newPassword
+		})
+	});
+	const changeBody = await changeResponse.json().catch(() => ({}));
+	assert(
+		changeResponse.ok,
+		`First-login password change failed: ${changeResponse.status}: ${JSON.stringify(changeBody)}`
+	);
+	const refreshedCookies = parseSetCookieHeaders(changeResponse.headers);
+	assert(refreshedCookies.length > 0, 'Password change did not return a refreshed session cookie.');
+	return refreshedCookies.join('; ');
 }
 
 async function apiGet(path, cookie) {
@@ -182,7 +209,7 @@ async function run() {
 		const recruiterACookie = await loginAndGetCookie(recruiterA.email);
 
 		const directorList = await apiGet('/api/clients', directorCookie);
-		assert(directorList.res.ok, 'Director should be able to list clients.');
+		assert(directorList.res.ok, `Director should be able to list clients, got ${directorList.res.status}: ${JSON.stringify(directorList.body)}`);
 		const directorVisibleIds = new Set(
 			(Array.isArray(directorList.body) ? directorList.body : []).map((row) => row.id)
 		);
@@ -191,7 +218,7 @@ async function run() {
 		assert(!directorVisibleIds.has(clientOther.id), 'Director can see client from another division.');
 
 		const recruiterAList = await apiGet('/api/clients', recruiterACookie);
-		assert(recruiterAList.res.ok, 'Recruiter should be able to list clients.');
+		assert(recruiterAList.res.ok, `Recruiter should be able to list clients, got ${recruiterAList.res.status}: ${JSON.stringify(recruiterAList.body)}`);
 		const recruiterVisibleIds = new Set(
 			(Array.isArray(recruiterAList.body) ? recruiterAList.body : []).map((row) => row.id)
 		);
@@ -212,6 +239,7 @@ async function run() {
 		);
 
 		console.log('Permissions API smoke checks passed.');
+		console.log('Verified first-login password enforcement and session refresh.');
 		console.log(`Verified against ${BASE_URL}`);
 	} finally {
 		if (state.clientIds.length > 0) {
