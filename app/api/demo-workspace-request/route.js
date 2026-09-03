@@ -15,8 +15,8 @@ const requestSchema = z.object({
 	workEmail: z.string().trim().email().max(254),
 	agencyName: z.string().trim().min(1).max(160),
 	teamSize: z.string().trim().min(1).max(40),
-	currentAts: z.string().trim().max(120).optional().default(''),
-	note: z.string().trim().max(2000).optional().default(''),
+	currentAts: z.string().trim().min(1).max(120),
+	note: z.string().trim().min(1).max(2000),
 	botpoisonSolution: z.string().trim().min(1).max(10000)
 });
 
@@ -49,7 +49,7 @@ async function postDemoWorkspaceRequestHandler(req) {
 	const parsed = requestSchema.safeParse(body);
 	if (!parsed.success) {
 		return NextResponse.json(
-			{ error: 'Complete all required fields with a valid work email.' },
+			{ error: 'Complete every field, including your current ATS and a note about your agency’s needs, and provide a valid work email.' },
 			{ status: 400 }
 		);
 	}

@@ -141,6 +141,12 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 	async function submitRequest(event) {
 		event.preventDefault();
 		if (status === 'submitting' || submitted) return;
+		if (Object.values(form).some((value) => !value.trim())) {
+			setStatus('error');
+			setMessage('Complete every field, including your current ATS and a note about your agency’s needs.');
+			return;
+		}
+		const requestData = Object.fromEntries(new FormData(event.currentTarget));
 		setStatus('submitting');
 		setMessage('');
 
@@ -156,7 +162,7 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 		const response = await fetch('/api/demo-workspace-request', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ...form, botpoisonSolution: challenge.solution })
+			body: JSON.stringify({ ...requestData, botpoisonSolution: challenge.solution })
 		}).catch(() => null);
 		const data = await response?.json().catch(() => ({}));
 
@@ -233,6 +239,7 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 
 					{view === 'form' ? (
 						<form className="demo-workspace-form" onSubmit={submitRequest}>
+							<input type="hidden" name="source" value="Hire Gnome Public Demo" />
 							<div className="form-grid-2">
 								<FormField label="First name" required>
 									<input name="firstName" aria-label="First name" value={form.firstName} onChange={updateField} autoComplete="given-name" required maxLength={80} />
@@ -256,12 +263,12 @@ export default function DemoWorkspaceRequest({ demoMode, userId, pathname, autoP
 										))}
 									</select>
 								</FormField>
-								<FormField label="Current ATS" hint="Optional">
-									<input name="currentAts" aria-label="Current ATS" value={form.currentAts} onChange={updateField} placeholder="Bullhorn, Zoho, etc." maxLength={120} />
+								<FormField label="Current ATS" required hint="Enter None if you do not use an ATS.">
+									<input name="currentAts" aria-label="Current ATS" value={form.currentAts} onChange={updateField} placeholder="Bullhorn, Zoho, None, etc." required maxLength={120} />
 								</FormField>
 							</div>
-							<FormField label="Anything else we should know?" hint="Optional">
-								<textarea name="note" aria-label="Anything else we should know?" value={form.note} onChange={updateField} placeholder="Migration needs, timeline, questions..." rows={3} maxLength={2000} />
+							<FormField label="Anything else we should know?" required>
+								<textarea name="note" aria-label="Anything else we should know?" value={form.note} onChange={updateField} placeholder="Tell us about your agency, migration needs, timeline, or questions..." required rows={3} maxLength={2000} />
 							</FormField>
 							{status === 'error' ? <p className="form-status form-status-error" role="alert">{message}</p> : null}
 							<div className="demo-workspace-actions">
